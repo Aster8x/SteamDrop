@@ -947,6 +947,8 @@ Section Uninstall
   ; We do this when not updating (to preserve the registry value on updates)
   ${If} $UpdateMode <> 1
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCTNAME}"
+    ; SteamDrop: the "Open Steam in Big Picture when Windows starts" entry
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCTNAME} Big Picture"
   ${EndIf}
 
   ; Delete app data if the checkbox is selected

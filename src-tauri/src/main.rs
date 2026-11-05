@@ -122,7 +122,8 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
 #[tauri::command]
 fn save_settings(app: AppHandle, state: State<App>, settings: Settings) -> Result<(), String> {
     let old = state.settings();
-    set_run_on_startup(settings.run_on_startup)?;
+    set_run_at_sign_in("SteamDrop", settings.run_on_startup.then_some("--tray"))?;
+    set_run_at_sign_in("SteamDrop Big Picture", settings.big_picture_at_sign_in.then_some("--start-big-picture"))?;
     let watch_changed = old.watched != settings.watched;
     log_changes(&old, &settings);
     state.update(|d| d.settings = settings)?;
@@ -143,21 +144,25 @@ fn log_changes(old: &Settings, new: &Settings) {
     }
 }
 
-fn set_run_on_startup(on: bool) -> Result<(), String> {
+/// Adds (with these arguments) or removes a "run when Windows starts" entry for SteamDrop.
+fn set_run_at_sign_in(name: &str, args: Option<&str>) -> Result<(), String> {
     #[cfg(windows)]
     {
         use winreg::{enums::HKEY_CURRENT_USER, RegKey};
         let (run, _) = RegKey::predef(HKEY_CURRENT_USER)
             .create_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run")
             .map_err(|e| e.to_string())?;
-        if on {
-            let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-            run.set_value("SteamDrop", &format!("\"{}\" --tray", exe.display())).map_err(|e| e.to_string())?;
-        } else {
-            let _ = run.delete_value("SteamDrop");
+        match args {
+            Some(args) => {
+                let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+                run.set_value(name, &format!("\"{}\" {args}", exe.display())).map_err(|e| e.to_string())?;
+            }
+            None => {
+                let _ = run.delete_value(name);
+            }
         }
     }
-    let _ = on;
+    let _ = (name, args);
     Ok(())
 }
 
@@ -503,6 +508,11 @@ fn main() {
     // Used by the installer's "Add SteamDrop to Steam" and by the uninstaller.
     if std::env::args().any(|a| a == "--add-to-steam") {
         library::add_to_steam_from_installer();
+        return;
+    }
+    // The "Open Steam in Big Picture when Windows starts" entry.
+    if std::env::args().any(|a| a == "--start-big-picture") {
+        steam::big_picture_at_sign_in();
         return;
     }
     if std::env::args().any(|a| a == "--remove-from-steam") {

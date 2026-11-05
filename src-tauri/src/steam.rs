@@ -296,6 +296,35 @@ pub fn shutdown(steam: &Path) -> Result<(), String> {
     Err("Steam did not close within a minute. Close Steam yourself, then try again.".into())
 }
 
+/// True while Steam's Big Picture window is open.
+#[cfg(windows)]
+pub fn big_picture_open() -> bool {
+    let title: Vec<u16> = "Steam Big Picture Mode".encode_utf16().chain([0]).collect();
+    // SAFETY: a NUL-terminated title and no class name.
+    let hwnd = unsafe { windows_sys::Win32::UI::WindowsAndMessaging::FindWindowW(std::ptr::null(), title.as_ptr()) };
+    !hwnd.is_null()
+}
+
+/// `SteamDrop.exe --start-big-picture`, run at Windows sign-in when the setting is on:
+/// opens Steam in Big Picture, unless it's already there.
+pub fn big_picture_at_sign_in() {
+    #[cfg(windows)]
+    {
+        // Give sign-in (and Steam's own start, if it has one) a moment.
+        std::thread::sleep(Duration::from_secs(8));
+        if is_running() && big_picture_open() {
+            crate::log::info("Windows sign-in: Steam is already in Big Picture.");
+            return;
+        }
+        // steam://open/bigpicture starts Steam if needed, or switches a running Steam to Big Picture.
+        let opened = std::process::Command::new("rundll32").args(["url.dll,FileProtocolHandler", "steam://open/bigpicture"]).spawn();
+        match opened {
+            Ok(_) => crate::log::info("Windows sign-in: opened Steam in Big Picture."),
+            Err(e) => crate::log::problem(format!("Windows sign-in: could not open Big Picture: {e}")),
+        }
+    }
+}
+
 pub fn start(steam: &Path, big_picture: bool) -> Result<(), String> {
     let mut cmd = std::process::Command::new(steam.join("steam.exe"));
     if big_picture {

@@ -570,6 +570,8 @@ function settingsView() {
       h("h2", {}, "App"),
       setting("Run when Windows starts", "SteamDrop starts quietly in the tray, next to the clock.",
         toggle(st.run_on_startup, (v) => saveSettings({ run_on_startup: v }), "Run when Windows starts")),
+      setting("Open Steam in Big Picture when Windows starts", "For a gaming PC on the TV: when you sign in to Windows, Steam opens in Big Picture, its full-screen mode for controllers. If Steam is already in Big Picture, nothing changes. This works even if SteamDrop itself doesn't start with Windows.",
+        toggle(st.big_picture_at_sign_in, (v) => saveSettings({ big_picture_at_sign_in: v }), "Open Steam in Big Picture when Windows starts")),
       setting("Keep running in the tray when closed", "Closing the window keeps SteamDrop watching your folders. Quit it from the tray icon.",
         toggle(st.close_to_tray, (v) => saveSettings({ close_to_tray: v }), "Keep running in the tray when closed")),
       setting("Play a sound when a game is added", "A short chime, so you hear it even while Steam's Big Picture is on screen.",

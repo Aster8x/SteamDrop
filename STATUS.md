@@ -103,12 +103,13 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Change "When opened from Steam" to "Always Couch mode" or "Always window" and check it's respected.
     - F11 or the switch button changes views; Steam keeps showing SteamDrop as running the whole time, and as stopped only after the last window closes.
 29. **Control bar** (both views): Scan now finds a game you copied while SteamDrop was paused (Y on a controller). Hide sends the window to the tray (Couch: back to Steam, SteamDrop still "running" in Steam). Close closes the window but the tray icon stays. Quit SteamDrop asks "Stop adding new games?" and then exits.
-30. **Chime:** Settings → App → "Play a sound when a game is added" is on. "Test" plays a short three-note chime at the slider's volume. Add a game while Big Picture is open: you hear the chime. Turn it off: no sound.
-31. **Delete game:**
+30. **Big Picture at sign-in:** turn on Settings → App → "Open Steam in Big Picture when Windows starts", sign out and back in: Steam opens in Big Picture. With Steam already set to start in Big Picture, nothing extra happens. Turn it off and sign in again: Steam starts as usual. Uninstalling removes it.
+31. **Chime:** Settings → App → "Play a sound when a game is added" is on. "Test" plays a short three-note chime at the slider's volume. Add a game while Big Picture is open: you hear the chime. Turn it off: no sound.
+32. **Delete game:**
     - Use a test game you don't need. Holding A for under 2 seconds does nothing; holding it for 2 seconds moves the folder to the Recycle Bin (check that you can restore it) and removes the game.
     - Set a PIN in Couch mode's Settings: deleting now asks for it, and a wrong PIN refuses.
     - On a USB stick or network drive without a Recycle Bin, SteamDrop must refuse and leave the folder alone.
-32. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
+33. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 

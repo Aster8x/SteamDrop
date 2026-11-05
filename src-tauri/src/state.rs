@@ -36,6 +36,8 @@ pub struct Settings {
     /// "Play a sound when a game is added", and its volume (0 to 100).
     pub chime: bool,
     pub chime_volume: u8,
+    /// "Open Steam in Big Picture when Windows starts".
+    pub big_picture_at_sign_in: bool,
 }
 
 impl Default for Settings {
@@ -61,6 +63,7 @@ impl Default for Settings {
             accounts: vec![],
             chime: true,
             chime_volume: 70,
+            big_picture_at_sign_in: false,
         }
     }
 }
