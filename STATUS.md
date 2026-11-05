@@ -57,9 +57,76 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - with "Delete SteamDrop settings and cache" checked: `%APPDATA%\SteamDrop` is gone.
 
     Also check that the two checkboxes' text fits and isn't cut off.
-18. **Release and update:** after setting up the signing key (see `docs/RELEASING.md`), tag `v0.1.0`, check that the release has `SteamDrop-Setup.exe` and the README button downloads it. Then release `v0.1.1` and use About → "Check for updates" → "Install update".
+18. **Version shown:** About says "Version 0.1.0" and hovering the tray icon says "SteamDrop 0.1.0".
+19. **Release and update:** publish `v0.1.0` as described in "How to publish a new version" below. Check that the release page shows the 0.1.0 notes from CHANGELOG.md and has `SteamDrop-Setup.exe`, and that the README button downloads it. Then publish `v0.1.1`, and in the installed 0.1.0 use About → "Check for updates" → "Install update".
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`.
+
+## How to publish a new version
+
+SteamDrop uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`. Bump PATCH for fixes (0.1.0 → 0.1.1), MINOR for new features (0.1.1 → 0.2.0), and MAJOR only for big breaking changes. The version lives in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` (plus their lock files). The bump script keeps all of them in sync, so never edit them by hand.
+
+One-time setup before the very first release: the updater signing key (see `docs/RELEASING.md`, "One-time setup").
+
+Every release, from the project folder on `main`:
+
+1. **Get up to date.**
+
+   ```bash
+   git checkout main
+   ```
+
+   ```bash
+   git pull
+   ```
+
+2. **Write the changelog.** While you work, list changes in `CHANGELOG.md` under `## [Unreleased]`, in groups like `### Added`, `### Changed` and `### Fixed`. This text becomes the release notes and the update notes.
+
+3. **Bump the version** (example: 0.2.0). This updates every version file and turns the "Unreleased" notes into a `## [0.2.0] - <today>` section:
+
+   ```bash
+   npm run bump -- 0.2.0
+   ```
+
+   Open `CHANGELOG.md` and check the new section reads well. If the script warns that the section is empty, write the notes under `## [0.2.0]` now.
+
+4. **Check** that everything agrees and the notes exist:
+
+   ```bash
+   node scripts/version.mjs check v0.2.0
+   ```
+
+5. **Commit and push** the bump:
+
+   ```bash
+   git commit -am "Release 0.2.0"
+   ```
+
+   ```bash
+   git push
+   ```
+
+6. **Tag and push the tag.** This starts the release:
+
+   ```bash
+   git tag v0.2.0
+   ```
+
+   ```bash
+   git push origin v0.2.0
+   ```
+
+7. **Wait for the "Release" workflow** on GitHub (Actions tab, about 10 to 15 minutes). It publishes the release with the changelog section as its notes, plus `SteamDrop-Setup.exe`, `SteamDrop-Setup.exe.sig` and `latest.json`. Installed copies see the update the next time someone presses "Check for updates" in About.
+
+If the workflow stops at "Check release setup", it says why: a version mismatch, missing changelog notes, or a missing signing key. To fix it, delete the tag, fix the problem, commit, and tag again:
+
+```bash
+git tag -d v0.2.0
+```
+
+```bash
+git push origin :refs/tags/v0.2.0
+```
 
 ## Known limits
 

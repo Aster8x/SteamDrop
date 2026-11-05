@@ -26,24 +26,17 @@ The updater only installs updates signed with your private key. You make the key
    - `TAURI_SIGNING_PRIVATE_KEY`: the whole content of `steamdrop.key`
    - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: the password you chose (skip it if you left the password empty)
 
-The release workflow stops with a clear message if either the public key or the secret is missing.
+The release workflow stops with a clear message if the public key or the secret is missing, if the tag doesn't match the version, or if `CHANGELOG.md` has no notes for it.
 
 ## Making a release
 
-1. Change `version` in `src-tauri/Cargo.toml` (for example to `0.2.0`), commit, and push to `main`.
-2. Tag that commit and push the tag:
+The step-by-step guide is in [STATUS.md, "How to publish a new version"](../STATUS.md#how-to-publish-a-new-version). In short: write notes under `## [Unreleased]` in `CHANGELOG.md`, run `npm run bump -- X.Y.Z`, commit and push, then push the tag `vX.Y.Z`.
 
-   ```bash
-   git tag v0.2.0
-   ```
+`scripts/version.mjs` does the version work:
 
-   ```bash
-   git push origin v0.2.0
-   ```
-
-3. Wait for the **Release** workflow to finish, then edit the release notes on GitHub if you like.
-
-The tag must match the version in `Cargo.toml`, or the workflow stops.
+- `bump X.Y.Z` sets the version in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock`, and moves the "Unreleased" notes into a new `## [X.Y.Z] - date` section.
+- `check [vX.Y.Z]` fails if the files disagree. With a tag, it also fails if the version doesn't match the tag or has no changelog notes. The Build workflow runs it on every push, and the Release workflow runs it with the tag.
+- `notes X.Y.Z` prints that version's changelog section. The Release workflow uses it as the GitHub release notes and as the notes in `latest.json`.
 
 ## Local builds
 

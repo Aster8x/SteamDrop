@@ -19,6 +19,8 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      - name: Versions in sync
+        run: node scripts/version.mjs check
       - name: Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: npm ci

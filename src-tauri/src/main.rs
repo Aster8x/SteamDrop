@@ -63,11 +63,11 @@ struct StateView {
     found: Vec<Found>,
     steam: SteamView,
     status: String,
-    version: &'static str,
+    version: String,
 }
 
 #[tauri::command]
-fn get_state(state: State<App>) -> StateView {
+fn get_state(app: AppHandle, state: State<App>) -> StateView {
     let data = state.data.lock().unwrap().clone();
     let steam_path = state.steam_path();
     let users = steam_path.as_deref().map(steam::users).unwrap_or_default();
@@ -89,7 +89,7 @@ fn get_state(state: State<App>) -> StateView {
         found: state.found.lock().unwrap().clone(),
         steam: SteamView { path: steam_path, detected: steam::detect_path(), users: users.len(), running: steam::is_running() },
         status: state.status.lock().unwrap().clone(),
-        version: env!("CARGO_PKG_VERSION"),
+        version: app.package_info().version.to_string(),
     }
 }
 
@@ -341,7 +341,7 @@ fn main() {
             )?;
             TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().cloned().expect("app icon"))
-                .tooltip("SteamDrop")
+                .tooltip(format!("SteamDrop {}", app.package_info().version))
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, e| match e.id.as_ref() {

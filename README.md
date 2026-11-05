@@ -105,7 +105,7 @@ npm run dev
 npx tauri build --config "{\"bundle\":{\"createUpdaterArtifacts\":false}}"
 ```
 
-Run the tests with `cargo test --manifest-path src-tauri/Cargo.toml`. For releases, see [docs/RELEASING.md](docs/RELEASING.md).
+Run the tests with `cargo test --manifest-path src-tauri/Cargo.toml`. For releases, see [docs/RELEASING.md](docs/RELEASING.md). What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Credits
 
