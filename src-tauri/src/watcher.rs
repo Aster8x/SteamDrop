@@ -141,4 +141,15 @@ mod tests {
         assert_eq!(game_folder(&roots, Path::new("/games")), None);
         assert_eq!(game_folder(&roots, Path::new("/elsewhere/x")), None);
     }
+
+    #[cfg(windows)]
+    #[test]
+    fn open_files_count_as_still_copying() {
+        let dir = std::env::temp_dir().join(format!("steamdrop-copy-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        let writer = std::fs::File::create(dir.join("sub/big.pak")).unwrap();
+        assert!(still_copying(&dir));
+        drop(writer);
+        assert!(!still_copying(&dir));
+    }
 }
