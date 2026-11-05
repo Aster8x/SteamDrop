@@ -33,6 +33,9 @@ pub struct Settings {
     /// "Add games to": all Steam accounts, or only the ones listed in `accounts`.
     pub all_accounts: bool,
     pub accounts: Vec<String>,
+    /// "Play a sound when a game is added", and its volume (0 to 100).
+    pub chime: bool,
+    pub chime_volume: u8,
 }
 
 impl Default for Settings {
@@ -56,6 +59,8 @@ impl Default for Settings {
             steam_view: "auto".into(),
             all_accounts: true,
             accounts: vec![],
+            chime: true,
+            chime_volume: 70,
         }
     }
 }

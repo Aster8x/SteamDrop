@@ -241,6 +241,9 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
         format!("Added {names} to Steam.")
     };
     notify(app, "Added to Steam", &msg);
+    if settings.chime {
+        crate::chime::play(settings.chime_volume);
+    }
     set_status(app, &msg);
     emit_state(app);
     Ok(msg)

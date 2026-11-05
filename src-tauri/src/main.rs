@@ -3,6 +3,7 @@
 
 mod art;
 mod changelog;
+mod chime;
 mod couch;
 mod exe;
 mod library;
@@ -465,6 +466,12 @@ fn close_window(app: AppHandle, label: String) {
     }
 }
 
+/// The "Test" button next to the chime volume.
+#[tauri::command]
+fn test_chime(volume: u8) {
+    chime::play(volume);
+}
+
 /// "Scan now": look at the watched folders right away.
 #[tauri::command]
 fn scan_now(app: AppHandle) -> String {
@@ -566,6 +573,7 @@ fn main() {
             hide_window,
             close_window,
             scan_now,
+            test_chime,
             quit
         ])
         .setup(move |app| {

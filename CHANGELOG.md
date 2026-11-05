@@ -37,6 +37,7 @@ First release.
 - Opened from Steam, SteamDrop picks its view: Couch mode in Big Picture or on a Steam Deck, the desktop window in normal Steam. A setting ("Auto", "Always Couch mode", "Always window"), a switch button and F11 change it anytime. Steam shows SteamDrop as running while either view is open.
 - A control bar in both views: Scan now (Y on a controller), Hide / Back to Steam, Close (keeps watching from the tray) and Quit SteamDrop (asks first), with controller button hints in Couch mode.
 - "Add games to": all Steam accounts on the PC (the default) or only the ones you tick, shown with their Steam names. Removing a game, and the uninstaller, cover every account.
+- A short chime when a game is added, heard even over Big Picture. On by default, with a volume slider and a "Test" button. The sound is synthesized by SteamDrop itself.
 - Leaving Couch mode after changes asks "Restart Steam to apply changes?". SteamDrop then restarts Steam once Couch mode has closed (back into Big Picture) and writes the changes while Steam is closed, so Steam can't bring back a removed game.
 
 [Unreleased]: https://github.com/Aster8x/SteamDrop/compare/v0.1.0...HEAD

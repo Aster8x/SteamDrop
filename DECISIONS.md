@@ -78,6 +78,11 @@ Why things are the way they are. Newest decisions go at the bottom of each secti
 - **Release notes come from `CHANGELOG.md`** (Keep a Changelog format). The release workflow refuses a tag whose version has no changelog section, and uses that section both on the GitHub release page and in `latest.json`. `bump` turns "Unreleased" into the new version's section and updates the compare links at the bottom.
 - **The app reads its version from Tauri's package info**, which comes from `tauri.conf.json`. It's shown in About and in the tray tooltip ("SteamDrop 0.1.0").
 
+## Sound
+
+- **The chime is synthesized in code** (`chime.rs`): a three-note rising bell (C6, E6, G6), each note a sine plus a quiet octave with a 5 ms attack and a smooth fade, about 1.2 seconds long, 16-bit mono WAV (around 100 KB in memory). No audio file from anyone else is involved.
+- **Played by the tray app with Windows' `PlaySound`** (asynchronously, from memory), so it works with no window open and is mixed with whatever else is playing, Big Picture included. Volume is applied when the sound is made, so it doesn't change the system volume. A new chime stops the previous one before its memory is replaced.
+
 ## Secrets, logs and bug reports
 
 - **SteamGridDB key in Windows Credential Manager** via the `keyring` crate (Windows backend only, with no extra C code). Using a well-tested crate is safer than hand-written Credential Manager calls. The key never goes into `data.json`, the logs or bug reports. The bug report also scrubs the key's text, in case it ever ended up in a log line. No migration from the settings file was written, because no released version ever stored the key there.

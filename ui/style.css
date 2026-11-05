@@ -274,3 +274,7 @@ textarea.report { width: 100%; font: .85rem/1.4 Consolas, monospace; background:
 .cbtn:hover { border-color: var(--accent); }
 .cbtn.danger { color: var(--danger); }
 .cbtn kbd { font: inherit; font-size: .75rem; padding: 0 .35rem; border-radius: 5px; border: 1px solid var(--border); color: var(--muted); }
+
+.row.volume { margin: -.2rem 0 .6rem; padding-left: .2rem; }
+.row.volume input[type=range] { flex: 1; max-width: 320px; accent-color: var(--accent); height: 2rem; }
+.row.volume span { min-width: 3.2rem; }
