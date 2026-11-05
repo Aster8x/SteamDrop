@@ -62,6 +62,7 @@ struct SteamView {
     detected: Option<PathBuf>,
     users: usize,
     running: bool,
+    accounts: Vec<steam::Account>,
 }
 
 #[derive(Serialize)]
@@ -101,7 +102,13 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
         settings: data.settings,
         games,
         found: state.found.lock().unwrap().clone(),
-        steam: SteamView { path: steam_path, detected: steam::detect_path(), users: users.len(), running: steam::is_running() },
+        steam: SteamView {
+            accounts: steam_path.as_deref().map(steam::accounts).unwrap_or_default(),
+            path: steam_path,
+            detected: steam::detect_path(),
+            users: users.len(),
+            running: steam::is_running(),
+        },
         status: state.status.lock().unwrap().clone(),
         update: state.update.lock().unwrap().clone(),
         whats_new: state.whats_new.lock().unwrap().clone(),

@@ -30,6 +30,9 @@ pub struct Settings {
     pub steam_shortcut: bool,
     /// "When opened from Steam": "auto" (Big Picture = Couch mode), "couch" or "window".
     pub steam_view: String,
+    /// "Add games to": all Steam accounts, or only the ones listed in `accounts`.
+    pub all_accounts: bool,
+    pub accounts: Vec<String>,
 }
 
 impl Default for Settings {
@@ -51,6 +54,8 @@ impl Default for Settings {
             last_seen_version: String::new(),
             steam_shortcut: true,
             steam_view: "auto".into(),
+            all_accounts: true,
+            accounts: vec![],
         }
     }
 }
@@ -184,6 +189,12 @@ impl App {
         let out = f(&mut d);
         save(&self.dir, &d)?;
         Ok(out)
+    }
+
+/// The Steam accounts games are added to: all of them, or the chosen ones.
+    pub fn target_users(&self, steam: &std::path::Path) -> Vec<(String, PathBuf)> {
+        let s = self.settings();
+        crate::steam::users(steam).into_iter().filter(|(id, _)| s.all_accounts || s.accounts.contains(id)).collect()
     }
 
     pub fn steam_path(&self) -> Option<PathBuf> {

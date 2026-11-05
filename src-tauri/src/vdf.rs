@@ -109,9 +109,94 @@ pub fn get_int(map: &Map, key: &str) -> Option<u32> {
     }
 }
 
+/// A node of Steam's text KeyValues format (loginusers.vdf, libraryfolders.vdf...).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Text {
+    Str(String),
+    Map(Vec<(String, Text)>),
+}
+
+/// Parses text KeyValues: `"key" "value"` pairs and `"key" { ... }` sections. Unquoted tokens,
+/// `//` comments and `\"` escapes are handled; anything odd ends the section instead of failing.
+pub fn parse_text(text: &str) -> Vec<(String, Text)> {
+    let mut chars = text.chars().peekable();
+    parse_text_map(&mut chars)
+}
+
+fn text_token(chars: &mut std::iter::Peekable<std::str::Chars>) -> Option<String> {
+    loop {
+        match chars.peek()? {
+            c if c.is_whitespace() => {
+                chars.next();
+            }
+            '/' => {
+                chars.next();
+                while chars.next().is_some_and(|c| c != '\n') {}
+            }
+            _ => break,
+        }
+    }
+    match chars.next()? {
+        '"' => {
+            let mut s = String::new();
+            while let Some(c) = chars.next() {
+                match c {
+                    '"' => break,
+                    '\\' => s.push(chars.next().unwrap_or('\\')),
+                    c => s.push(c),
+                }
+            }
+            Some(s)
+        }
+        c @ ('{' | '}') => Some(c.to_string()),
+        c => {
+            let mut s = c.to_string();
+            while let Some(&n) = chars.peek() {
+                if n.is_whitespace() || n == '{' || n == '}' || n == '"' {
+                    break;
+                }
+                s.push(n);
+                chars.next();
+            }
+            Some(s)
+        }
+    }
+}
+
+fn parse_text_map(chars: &mut std::iter::Peekable<std::str::Chars>) -> Vec<(String, Text)> {
+    let mut map = vec![];
+    while let Some(key) = text_token(chars) {
+        if key == "}" {
+            break;
+        }
+        match text_token(chars) {
+            Some(v) if v == "{" => map.push((key, Text::Map(parse_text_map(chars)))),
+            Some(v) => map.push((key, Text::Str(v))),
+            None => break,
+        }
+    }
+    map
+}
+
+pub fn text_get<'a>(map: &'a [(String, Text)], key: &str) -> Option<&'a Text> {
+    map.iter().find(|(k, _)| k.eq_ignore_ascii_case(key)).map(|(_, v)| v)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_text_keyvalues() {
+        let t = "\"users\"\n{\n\t\"76561198000000001\"\n\t{\n\t\t\"AccountName\"\t\t\"leon\"\n\t\t\"PersonaName\"\t\t\"Couch \\\"King\\\"\"\n\t}\n}\n";
+        let root = parse_text(t);
+        let Some(Text::Map(users)) = text_get(&root, "users") else { panic!("{root:?}") };
+        let Text::Map(u) = &users[0].1 else { panic!() };
+        assert_eq!(users[0].0, "76561198000000001");
+        assert_eq!(text_get(u, "personaname"), Some(&Text::Str("Couch \"King\"".into())));
+        assert_eq!(text_get(u, "AccountName"), Some(&Text::Str("leon".into())));
+        assert!(parse_text("\"broken\" {").len() == 1);
+    }
 
     #[test]
     fn round_trip_keeps_everything() {

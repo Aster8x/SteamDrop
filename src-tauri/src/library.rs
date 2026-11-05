@@ -95,9 +95,12 @@ pub struct Add {
 
 fn steam_and_users(state: &App) -> Result<(PathBuf, Vec<(String, PathBuf)>), String> {
     let steam = state.steam_path().ok_or("Steam was not found. Set its folder in Settings.")?;
-    let users = steam::users(&steam);
-    if users.is_empty() {
+    if steam::users(&steam).is_empty() {
         return Err("No Steam account found on this PC. Open Steam and sign in once, then try again.".into());
+    }
+    let users = state.target_users(&steam);
+    if users.is_empty() {
+        return Err("No Steam account is chosen. Pick one in Settings → Steam → \"Add games to\".".into());
     }
     Ok((steam, users))
 }
@@ -176,7 +179,7 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
             steam::shutdown(&steam_dir)?;
         }
         if !was_running || restarting {
-            apply_pending(&dir, &snapshot, &users2)?;
+            apply_pending(&dir, &snapshot, &steam::users(&steam_dir), &users2)?;
         }
         set_status(&app2, "Adding to Steam...");
         let mut result = Ok(());
@@ -275,7 +278,7 @@ async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<S
         }
         let r = remove_blocking(&steam_dir, &dir, &ids2, false);
         if !was_running || restarting {
-            apply_pending(&dir, &snapshot, &users)?;
+            apply_pending(&dir, &snapshot, &steam::users(&steam_dir), &users)?;
         }
         if restarting {
             set_status(&app2, "Starting Steam...");
@@ -342,6 +345,7 @@ fn self_shortcut() -> Result<(u32, PathBuf), String> {
 /// Adds or removes SteamDrop's own shortcut for every Steam account. Started from Steam it opens
 /// Couch mode in Big Picture and the window in desktop Steam (see couch.rs).
 pub fn set_self_shortcut(steam_dir: &Path, data_dir: &Path, on: bool) -> Result<(), String> {
+    let settings = crate::state::load(data_dir).settings;
     let (id, exe) = self_shortcut()?;
     let cache = art::cache_dir(data_dir, id);
     let mut files = vec![];
@@ -355,7 +359,8 @@ pub fn set_self_shortcut(steam_dir: &Path, data_dir: &Path, on: bool) -> Result<
     }
     for (user, config) in steam::users(steam_dir) {
         let grid = steam::grid_dir(&config);
-        if on {
+        let chosen = settings.all_accounts || settings.accounts.contains(&user);
+        if on && chosen {
             let icon = art::install(&grid, id, &files).unwrap_or_else(|| exe.clone());
             let s = steam::NewShortcut { id, name: SELF_NAME, exe: &exe, icon: icon.to_string_lossy().into_owned(), launch_options: "--from-steam" };
             steam::add(&config, data_dir, &user, &[s])?;
@@ -377,14 +382,14 @@ pub fn startup_repair(app: &AppHandle) {
         return;
     }
     let snapshot = state.data.lock().unwrap().clone();
-    if apply_pending(&state.dir, &snapshot, &steam::users(&steam_dir)).is_ok() {
+    if apply_pending(&state.dir, &snapshot, &steam::users(&steam_dir), &state.target_users(&steam_dir)).is_ok() {
         let _ = state.update(|d| {
             d.pending_removals.clear();
             d.pending_adds.clear();
         });
     }
     if state.settings().steam_shortcut {
-        let missing = self_shortcut().is_ok_and(|(id, _)| steam::users(&steam_dir).iter().any(|(_, c)| !steam::present_ids(c).contains(&id)));
+        let missing = self_shortcut().is_ok_and(|(id, _)| state.target_users(&steam_dir).iter().any(|(_, c)| !steam::present_ids(c).contains(&id)));
         if missing {
             if let Err(e) = set_self_shortcut(&steam_dir, &state.dir, true) {
                 log::problem(format!("Could not add SteamDrop to Steam: {e}"));
@@ -395,16 +400,19 @@ pub fn startup_repair(app: &AppHandle) {
 
 /// Writes again what was changed while Steam was running: removals Steam may have undone and
 /// games it may have dropped. Call only while Steam is closed.
-pub fn apply_pending(data_dir: &Path, data: &Data, users: &[(String, PathBuf)]) -> Result<(), String> {
+/// Removals go to every account; adds go to `targets` (the chosen accounts).
+pub fn apply_pending(data_dir: &Path, data: &Data, all: &[(String, PathBuf)], targets: &[(String, PathBuf)]) -> Result<(), String> {
     if data.pending_removals.is_empty() && data.pending_adds.is_empty() {
         return Ok(());
     }
-    for (user, config) in users {
-        let grid = steam::grid_dir(config);
+    for (user, config) in all {
         if !data.pending_removals.is_empty() {
             steam::remove(config, data_dir, user, &data.pending_removals)?;
-            data.pending_removals.iter().for_each(|id| art::uninstall(&grid, *id));
+            data.pending_removals.iter().for_each(|id| art::uninstall(&steam::grid_dir(config), *id));
         }
+    }
+    for (user, config) in targets {
+        let grid = steam::grid_dir(config);
         let present = steam::present_ids(config);
         let missing: Vec<&Game> = data.games.iter().filter(|g| data.pending_adds.contains(&g.id) && !present.contains(&g.id)).collect();
         let shortcuts: Vec<steam::NewShortcut> = missing
@@ -434,7 +442,7 @@ pub fn restart_steam_applying(app: &AppHandle, big_picture: bool) -> Result<(), 
     set_status(app, "Restarting Steam...");
     steam::shutdown(&steam_dir)?;
     let snapshot = state.data.lock().unwrap().clone();
-    apply_pending(&state.dir, &snapshot, &steam::users(&steam_dir))?;
+    apply_pending(&state.dir, &snapshot, &steam::users(&steam_dir), &state.target_users(&steam_dir))?;
     state.update(|d| {
         d.pending_removals.clear();
         d.pending_adds.clear();
@@ -527,11 +535,11 @@ mod tests {
         let game = Game { id: 9, name: "A".into(), exe: exe.to_string_lossy().into(), folder: String::new(), steam_appid: None, added: 1 };
         let data = Data { games: vec![game], pending_removals: vec![5], pending_adds: vec![9], ..Default::default() };
         let users = vec![("42".to_string(), config.clone())];
-        apply_pending(&data_dir, &data, &users).unwrap();
+        apply_pending(&data_dir, &data, &users, &users).unwrap();
         assert_eq!(steam::present_ids(&config), vec![9]);
         assert!(config.join("grid/9p.png").is_file());
         // Running it again changes nothing.
-        apply_pending(&data_dir, &data, &users).unwrap();
+        apply_pending(&data_dir, &data, &users, &users).unwrap();
         assert_eq!(steam::present_ids(&config), vec![9]);
     }
 }

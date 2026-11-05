@@ -473,6 +473,30 @@ function helpPanel() {
     list);
 }
 
+/** "Add games to": every Steam account on this PC, or a checklist of chosen ones. */
+function accountsPicker(st) {
+  const accounts = S.steam.accounts || [];
+  if (!accounts.length) return h("p", { class: "muted" }, "No Steam accounts found yet. Sign in to Steam once on this PC.");
+  const chosen = new Set(st.accounts);
+  const toggle = (id, on) => {
+    const next = new Set(chosen);
+    if (on) next.add(id); else next.delete(id);
+    saveSettings({ accounts: [...next] });
+  };
+  return h("div", { class: "accounts" },
+    setting("Add games to", accounts.length === 1 ? "There is one Steam account on this PC." : `There are ${accounts.length} Steam accounts on this PC.`,
+      h("div", { class: "seg", role: "group", "aria-label": "Add games to" },
+        h("button", { "aria-pressed": String(st.all_accounts), onclick: () => saveSettings({ all_accounts: true }) }, "All Steam accounts"),
+        h("button", { "aria-pressed": String(!st.all_accounts), onclick: () => saveSettings({ all_accounts: false, accounts: st.accounts.length ? st.accounts : accounts.map((a) => a.id) }) }, "Only these accounts"))),
+    st.all_accounts ? null : h("div", { class: "exe-list", role: "group", "aria-label": "Steam accounts" },
+      accounts.map((a) => h("label", { class: "exe-option" },
+        h("input", { type: "checkbox", checked: chosen.has(a.id), onchange: (e) => toggle(a.id, e.target.checked) }),
+        h("span", {}, h("strong", {}, a.persona), a.login ? h("span", { class: "muted small" }, `  ${a.login}`) : null),
+        h("span", { class: "muted small" }, `#${a.id}`)))),
+    !st.all_accounts && !chosen.size ? h("p", { class: "error" }, "Choose at least one account, or SteamDrop can't add games.") : null,
+    h("p", { class: "muted small" }, "Removing a game always removes it from every account it was added to."));
+}
+
 function settingsView() {
   const st = S.settings;
   const subs = [st.auto_add, st.auto_restart, st.notify];
@@ -519,7 +543,7 @@ function settingsView() {
     h("div", { class: "panel" },
       h("h2", {}, "Steam"),
       h("p", {}, h("strong", {}, "Steam folder: "), h("span", { class: "path" }, S.steam.path || "not found"), " ", h("span", { class: "muted" }, steamNote)),
-      S.steam.path ? h("p", { class: "muted" }, `Steam accounts on this PC: ${S.steam.users}. Games are added to all of them.`) : null,
+      S.steam.path ? accountsPicker(st) : null,
       h("div", { class: "row" },
         btn("Choose Steam folder...", async () => {
           const p = await invoke("pick_folder");

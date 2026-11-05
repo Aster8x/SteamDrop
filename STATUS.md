@@ -58,7 +58,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 13. **Tray:** close the window. SteamDrop should stay in the tray, and Task Manager should show no WebView2 processes for it. Click the tray icon and the window should come back. Turn "Keep running in the tray" off, and closing should quit.
 14. **Run on startup:** turn it on, sign out and back in. SteamDrop should start in the tray with no window.
 15. **While closed:** quit SteamDrop, copy a game into the watched folder, and start SteamDrop. It should find the game.
-16. **Several Steam accounts** (if you have them): the game should show up for each.
+16. **Several Steam accounts** (if you have them): by default a new game shows up for each. In Settings → Steam, "Add games to" lists every account by its Steam name; choose "Only these accounts", untick one, add a game, and check it only appears for the ticked accounts. Removing it must remove it from all of them.
 17. **Uninstall,** three times:
     - with both boxes unchecked: games stay in Steam;
     - with "Remove SteamDrop's games from Steam" checked: they're gone from Steam after it restarts;

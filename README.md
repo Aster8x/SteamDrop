@@ -105,7 +105,7 @@ Real art comes from Steam (when the game is on Steam) or from SteamGridDB. For S
 With Automatic mode off, you confirm the pick before anything is added. Otherwise, remove the game in SteamDrop and add its folder again with **+ Add a game**, then choose the right file.
 
 **I have more than one Steam account on this PC.**
-SteamDrop adds games to every account that has signed in on this PC.
+By default SteamDrop adds games to every account that has signed in on this PC. In Settings → Steam → "Add games to" you can pick "Only these accounts" and tick the ones you want; each account is shown with its Steam name. Removing a game always removes it from every account it was added to.
 
 **Something went wrong. How do I report it?**
 Go to **Settings → Help** and press **Copy bug report**. Then press **Report a problem** (or open a [new issue](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml)), describe what happened, and paste the report into the last box. The report holds SteamDrop's version, your Windows version, whether Steam was found, your settings, and the last 200 lines of SteamDrop's activity. Your Windows user name is replaced with `<user>`, and your SteamGridDB key is never included. The **Activity** list on the same page shows what SteamDrop did recently, in plain words.

@@ -44,6 +44,43 @@ pub fn users(steam: &Path) -> Vec<(String, PathBuf)> {
     list
 }
 
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct Account {
+    /// The folder name under userdata (Steam's 32-bit account id).
+    pub id: String,
+    pub persona: String,
+    pub login: String,
+}
+
+/// Steam accounts on this PC with their display names from config/loginusers.vdf.
+pub fn accounts(steam: &Path) -> Vec<Account> {
+    let text = std::fs::read_to_string(steam.join("config").join("loginusers.vdf")).unwrap_or_default();
+    let root = vdf::parse_text(&text);
+    let logins: Vec<(u64, String, String)> = match vdf::text_get(&root, "users") {
+        Some(vdf::Text::Map(users)) => users
+            .iter()
+            .filter_map(|(sid, v)| {
+                let vdf::Text::Map(u) = v else { return None };
+                let s = |k: &str| match vdf::text_get(u, k) {
+                    Some(vdf::Text::Str(x)) => x.clone(),
+                    _ => String::new(),
+                };
+                Some((sid.parse().ok()?, s("PersonaName"), s("AccountName")))
+            })
+            .collect(),
+        _ => vec![],
+    };
+    users(steam)
+        .into_iter()
+        .map(|(id, _)| {
+            // SteamID64 = 76561197960265728 + the 32-bit account id used for the userdata folder.
+            let found = id.parse::<u64>().ok().and_then(|n| logins.iter().find(|(sid, _, _)| *sid == n + 76_561_197_960_265_728));
+            let (persona, login) = found.map(|(_, p, l)| (p.clone(), l.clone())).unwrap_or_default();
+            Account { persona: if persona.is_empty() { format!("Steam account {id}") } else { persona }, login, id }
+        })
+        .collect()
+}
+
 pub fn grid_dir(config: &Path) -> PathBuf {
     config.join("grid")
 }
@@ -299,6 +336,9 @@ mod tests {
         add(&config, &data, "123", &[s]).unwrap();
         assert_eq!(present_ids(&config), vec![7, 0x8000_0001]);
         assert_eq!(users(&base), vec![("123".to_string(), config.clone())]);
+        std::fs::create_dir_all(base.join("config")).unwrap();
+        std::fs::write(base.join("config/loginusers.vdf"), "\"users\" { \"76561197960265851\" { \"AccountName\" \"leon\" \"PersonaName\" \"Leon\" } }").unwrap();
+        assert_eq!(accounts(&base), vec![Account { id: "123".into(), persona: "Leon".into(), login: "leon".into() }]);
 
         remove(&config, &data, "123", &[0x8000_0001]).unwrap();
         assert_eq!(present_ids(&config), vec![7]);
