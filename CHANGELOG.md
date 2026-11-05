@@ -6,20 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Added
-
-- SteamGridDB key box in Settings → Artwork: shows dots, a hold-to-show eye button (mouse, touch, Space/Enter), "Get a free key" and "Test key" with clear messages. The key is stored in Windows Credential Manager, never in a settings file or the logs.
-- Activity log in plain words, in `%APPDATA%\SteamDrop\logs` (last 5 files, up to 1 MB each).
-- Settings → Help: recent activity, "Copy bug report" (version, Windows version, Steam status, settings and the last 200 log lines, with the Windows user name and secrets removed), "Report a problem" and "Open log folder".
-- Bug report form on GitHub.
-- Settings → Updates: check on startup (on), check once a day (on), install automatically (off), and "Check now".
-- Update window with "Current → New", the changes in every version in between (newest first), and "Update now", "Remind me later" and "Skip this version".
-- Automatic updates install quietly, but never while a game started from Steam is running.
-- A one-time "What's new" screen after each update.
-- Couch mode: SteamDrop adds itself to Steam with its own artwork and, started from Steam, opens a full-screen view for gamepads (Xbox and PlayStation) with Library, game details, Settings and Activity.
-- Couch mode can find art again, change a game's file, remove a game from Steam, or delete it (hold A for 2 seconds; the folder goes to the Recycle Bin). An optional 4-digit PIN protects deleting.
-- Installer option "Add SteamDrop to Steam" (on by default) and a matching setting.
-
 ## [0.1.0] - 2026-11-05
 
 First release.
@@ -37,6 +23,18 @@ First release.
 - Tray icon, run on startup, keep running in the tray when closed, Steam folder detection with manual override, dark and light looks.
 - Uninstaller options to remove SteamDrop's games from Steam and to delete its settings and cache (both off by default).
 - Automatic updates from GitHub releases.
+- SteamGridDB key box in Settings → Artwork: shows dots, a hold-to-show eye button (mouse, touch, Space/Enter), "Get a free key" and "Test key" with clear messages. The key is stored in Windows Credential Manager, never in a settings file or the logs.
+- Activity log in plain words, in `%APPDATA%\SteamDrop\logs` (last 5 files, up to 1 MB each).
+- Settings → Help: recent activity, "Copy bug report" (version, Windows version, Steam status, settings and the last 200 log lines, with the Windows user name and secrets removed), "Report a problem" and "Open log folder".
+- Bug report form on GitHub.
+- Settings → Updates: check on startup (on), check once a day (on), install automatically (off), and "Check now".
+- Update window with "Current → New", the changes in every version in between (newest first), and "Update now", "Remind me later" and "Skip this version".
+- Automatic updates install quietly, but never while a game started from Steam is running.
+- A one-time "What's new" screen after each update.
+- Couch mode: SteamDrop adds itself to Steam with its own artwork and, started from Steam, opens a full-screen view for gamepads (Xbox and PlayStation) with Library, game details, Settings and Activity.
+- Couch mode can find art again, change a game's file, remove a game from Steam, or delete it (hold A for 2 seconds; the folder goes to the Recycle Bin). An optional 4-digit PIN protects deleting.
+- Installer option "Add SteamDrop to Steam" (on by default) and a matching setting.
+- Leaving Couch mode after changes asks "Restart Steam to apply changes?". SteamDrop then restarts Steam once Couch mode has closed (back into Big Picture) and writes the changes while Steam is closed, so Steam can't bring back a removed game.
 
 [Unreleased]: https://github.com/Aster8x/SteamDrop/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Aster8x/SteamDrop/releases/tag/v0.1.0

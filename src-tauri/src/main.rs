@@ -74,6 +74,8 @@ struct StateView {
     update: Option<updates::Available>,
     whats_new: Option<changelog::Section>,
     couch_pin_set: bool,
+    /// Changes were written while Steam was running and show after a Steam restart.
+    restart_needed: bool,
 }
 
 #[tauri::command]
@@ -103,6 +105,7 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
         update: state.update.lock().unwrap().clone(),
         whats_new: state.whats_new.lock().unwrap().clone(),
         couch_pin_set: !secrets::couch_pin().is_empty(),
+        restart_needed: !data.pending_adds.is_empty() || !data.pending_removals.is_empty(),
         version: app.package_info().version.to_string(),
     }
 }
@@ -307,17 +310,8 @@ fn open_logs() -> Result<(), String> {
 #[tauri::command]
 async fn restart_steam(app: AppHandle, state: State<'_, App>) -> Result<(), String> {
     let _guard = state.busy.lock().await;
-    let steam_dir = state.steam_path().ok_or("Steam was not found. Set its folder in Settings.")?;
-    library::set_status(&app, "Restarting Steam...");
-    tauri::async_runtime::spawn_blocking(move || {
-        steam::shutdown(&steam_dir)?;
-        steam::start(&steam_dir, true)
-    })
-    .await
-    .map_err(|e| e.to_string())??;
-    log::info("Restarted Steam.");
-    library::set_status(&app, "Steam restarted.");
-    Ok(())
+    let app2 = app.clone();
+    tauri::async_runtime::spawn_blocking(move || library::restart_steam_applying(&app2, true)).await.map_err(|e| e.to_string())?
 }
 
 /// Opens web pages (https only) and folders with the system's default handler.
@@ -432,7 +426,9 @@ fn open_couch(app: AppHandle) {
 }
 
 #[tauri::command]
-fn close_couch(app: AppHandle) {
+fn close_couch(app: AppHandle, state: State<App>, restart: bool) {
+    // The restart happens after the window (and the process Steam started) is gone; see couch::closed.
+    state.restart_after_couch.store(restart, std::sync::atomic::Ordering::SeqCst);
     if let Some(w) = app.get_webview_window(couch::LABEL) {
         let _ = w.close();
     }
@@ -471,9 +467,13 @@ fn main() {
     }
     let start_couch = from_steam || std::env::args().any(|a| a == "--couch-open");
     let start_hidden = std::env::args().any(|a| a == "--tray");
+    let big_picture = std::env::args().any(|a| a == "--big-picture") || (from_steam && couch::started_in_big_picture());
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            if args.iter().any(|a| a == "--big-picture") {
+                app.state::<App>().big_picture.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
             if args.iter().any(|a| a == "--couch-open") {
                 couch::open(app);
             } else {
@@ -518,6 +518,7 @@ fn main() {
             quit
         ])
         .setup(move |app| {
+            app.state::<App>().big_picture.store(big_picture, std::sync::atomic::Ordering::SeqCst);
             log::info(format!(
                 "SteamDrop {} started{}.",
                 app.package_info().version,

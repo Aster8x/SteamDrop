@@ -153,7 +153,7 @@ function settingsScreen() {
       ? push({ name: "pin", title: "Enter your current PIN to turn it off", done: (old) => run(() => invoke("set_couch_pin", { old, new: "" })) })
       : push({ name: "pin", title: "Choose a 4-digit PIN", done: (pin) => run(() => invoke("set_couch_pin", { old: "", new: pin })) }),
       { value: onoff(S.couch_pin_set), on: S.couch_pin_set }),
-    button("exit", "Leave Couch mode", () => invoke("close_couch"))),
+    button("exit", "Leave Couch mode", leave)),
     h("p", { class: "muted" }, `SteamDrop ${S.version}. More settings are in SteamDrop on your desktop.`)];
 }
 
@@ -171,7 +171,7 @@ function activityScreen() {
   return [h("h1", {}, "Activity"), list];
 }
 
-const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, pin: pinScreen };
+const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, pin: pinScreen, leave: leaveScreen };
 const current = () => stack.length ? SCREENS[stack.at(-1).name](stack.at(-1)) : SCREENS[tab]();
 
 /* ---------- navigation ---------- */
@@ -194,7 +194,22 @@ function focusFirst() {
 function push(sc) { stack.push(sc); render(); }
 function back() {
   if (stack.length) { stack.pop(); render(); }
-  else push({ name: "confirm", title: "Leave Couch mode?", text: "SteamDrop keeps running in the tray on your desktop.", yes: "Leave", action: () => invoke("close_couch") });
+  else leave();
+}
+
+/** Leaving: if changes are waiting for a Steam restart, offer to restart Steam once Couch mode has closed. */
+function leave() {
+  if (S.restart_needed) push({ name: "leave" });
+  else push({ name: "confirm", title: "Leave Couch mode?", text: "SteamDrop keeps running in the tray on your desktop.", yes: "Leave", action: () => invoke("close_couch", { restart: false }) });
+}
+
+function leaveScreen() {
+  return [h("div", { class: "pin" }, h("h1", {}, "Restart Steam to apply changes?"),
+    h("p", { class: "muted" }, "Steam shows the changes you made after it restarts. SteamDrop can restart it right after Couch mode closes, and bring you back to Big Picture."),
+    h("div", { class: "actions" },
+      button("restart", "Restart now", () => invoke("close_couch", { restart: true })),
+      button("later", "Later", () => invoke("close_couch", { restart: false })),
+      button("cancel", "Cancel", back)))];
 }
 function backToTab() { stack = []; render(); }
 function switchTab(step) {

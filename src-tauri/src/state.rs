@@ -73,6 +73,9 @@ pub struct Data {
     /// Shortcuts removed while Steam was running; removed again once Steam is closed,
     /// because Steam can write its old list back.
     pub pending_removals: Vec<u32>,
+    /// Games added or changed while Steam was running; added again once Steam is closed,
+    /// because Steam can write its old list back.
+    pub pending_adds: Vec<u32>,
 }
 
 /// A new folder waiting for the user to confirm.
@@ -99,6 +102,10 @@ pub struct App {
     pub whats_new: Mutex<Option<crate::changelog::Section>>,
     /// Held while Couch mode is open; the process Steam started waits for it to be released.
     pub couch_lock: Mutex<Option<std::fs::File>>,
+    /// Steam was in Big Picture when it started SteamDrop.
+    pub big_picture: std::sync::atomic::AtomicBool,
+    /// "Restart now" was chosen when leaving Couch mode.
+    pub restart_after_couch: std::sync::atomic::AtomicBool,
 }
 
 /// %APPDATA%\SteamDrop
@@ -159,6 +166,8 @@ impl App {
             update: Mutex::new(None),
             whats_new: Mutex::new(None),
             couch_lock: Mutex::new(None),
+            big_picture: Default::default(),
+            restart_after_couch: Default::default(),
         }
     }
 

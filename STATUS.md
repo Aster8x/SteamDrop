@@ -66,7 +66,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 
     Also check that the two checkboxes' text fits and isn't cut off.
 18. **Version shown:** About says "Version 0.1.0" and hovering the tray icon says "SteamDrop 0.1.0".
-19. **Release and update:** publish `v0.1.0` as described in "How to publish a new version" below. Check that the release page shows the 0.1.0 notes from CHANGELOG.md and has `SteamDrop-Setup.exe`, and that the README button downloads it. Then publish `v0.1.1`, and in the installed 0.1.0 use About → "Check for updates" → "Install update".
+19. **Release and update:** publish the first release as described in "Your first release: v0.1.0" below (just a tag, no bump). Check that the release page shows the 0.1.0 notes from CHANGELOG.md and has `SteamDrop-Setup.exe`, and that the README button downloads it. Then publish `v0.1.1`, and in the installed 0.1.0 use About → "Check for updates" → "Install update".
 
 20. **SteamGridDB key box:**
     - The key shows as dots.
@@ -97,11 +97,12 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - B on the main screen asks to leave; leaving closes Couch mode, and Steam shows SteamDrop as stopped.
     - Start Couch mode while SteamDrop is already in the tray: it still opens, and you don't get two SteamDrops.
 26. **Game details in Couch mode:** "Find artwork again", "Change game file" (pick another .exe), and "Remove from Steam" all work; Steam's library changes after a Steam restart.
-27. **Delete game:**
+27. **Leaving Couch mode after a change:** remove a game in Couch mode, then leave. You're asked "Restart Steam to apply changes?". "Restart now" closes Couch mode, restarts Steam back into Big Picture, and the game is gone for good: it must not come back after another Steam restart. "Later" just leaves.
+28. **Delete game:**
     - Use a test game you don't need. Holding A for under 2 seconds does nothing; holding it for 2 seconds moves the folder to the Recycle Bin (check that you can restore it) and removes the game.
     - Set a PIN in Couch mode's Settings: deleting now asks for it, and a wrong PIN refuses.
     - On a USB stick or network drive without a Recycle Bin, SteamDrop must refuse and leave the folder alone.
-28. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
+29. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 
@@ -110,6 +111,34 @@ If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To re
 SteamDrop uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`. Bump PATCH for fixes (0.1.0 → 0.1.1), MINOR for new features (0.1.1 → 0.2.0), and MAJOR only for big breaking changes. The version lives in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` (plus their lock files). The bump script keeps all of them in sync, so never edit them by hand.
 
 One-time setup before the very first release: the updater signing key (see `docs/RELEASING.md`, "One-time setup").
+
+### Your first release: v0.1.0
+
+The version is already 0.1.0 everywhere, and `CHANGELOG.md` already has the `## [0.1.0]` section with everything in it. So the first release needs **no bump**, only the tag:
+
+```bash
+git checkout main
+```
+
+```bash
+git pull
+```
+
+```bash
+node scripts/version.mjs check v0.1.0
+```
+
+```bash
+git tag v0.1.0
+```
+
+```bash
+git push origin v0.1.0
+```
+
+Then wait for the "Release" workflow (step 7 below). Use the full steps below for every release after that (0.1.1, 0.2.0...).
+
+### Every later release
 
 Every release, from the project folder on `main`:
 
@@ -175,5 +204,5 @@ git push origin :refs/tags/v0.2.0
 
 - If you decline a Steam restart and then play another non-Steam game before Steam restarts, Steam may overwrite the change. The game then shows "Not in Steam" in SteamDrop, with "Add to Steam again" in its details.
 - Some newer Steam games store their library art under hashed URLs that SteamDrop can't guess. Those slots fall back to SteamGridDB or a title card.
-- Changes made from Couch mode (remove, delete, change game file) are written while Steam is running, so they show after Steam restarts. Removals are repeated automatically the next time SteamDrop starts while Steam is closed, in case Steam wrote its old list back.
+- Changes made while Steam is running (Couch mode, or "Add without restarting") show after a Steam restart. Leaving Couch mode offers "Restart now". If you choose "Later" and restart Steam yourself, Steam may show its old list until SteamDrop next starts while Steam is closed (or does a restart), which writes the changes again.
 - Exe picking is a best guess. Games with unusual layouts may need "Choose a different file..." (with Automatic mode off).

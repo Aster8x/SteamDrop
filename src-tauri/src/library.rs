@@ -3,7 +3,7 @@
 use crate::art;
 use crate::exe;
 use crate::log;
-use crate::state::{same_path, App, Found, Game};
+use crate::state::{same_path, App, Data, Found, Game};
 use crate::steam;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager};
@@ -157,33 +157,36 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
     }
 
     // Re-adding a folder under a new name or exe gives it a new id; drop the old shortcut.
-    // Also drop shortcuts removed earlier while Steam was running, in case Steam wrote them back.
-    let replaced: Vec<u32> = {
+    let (replaced, snapshot): (Vec<u32>, Data) = {
         let d = state.data.lock().unwrap();
-        let mut ids: Vec<u32> = d.games.iter().filter(|o| games.iter().any(|g| g.id != o.id && same_path(&g.folder, &o.folder))).map(|o| o.id).collect();
-        ids.extend(d.pending_removals.iter().filter(|id| !games.iter().any(|g| g.id == **id)));
-        ids
+        let ids = d.games.iter().filter(|o| games.iter().any(|g| g.id != o.id && same_path(&g.folder, &o.folder))).map(|o| o.id).collect();
+        (ids, d.clone())
     };
     let was_running = steam::is_running();
     let restarting = was_running && restart;
     let dir = state.dir.clone();
     let games2 = games.clone();
     let app2 = app.clone();
+    let users2 = users.clone();
+    let replaced2 = replaced.clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         if restarting {
             set_status(&app2, "Closing Steam for a moment...");
             log::info("Closing Steam so it picks up the new shortcuts.");
             steam::shutdown(&steam_dir)?;
         }
+        if !was_running || restarting {
+            apply_pending(&dir, &snapshot, &users2)?;
+        }
         set_status(&app2, "Adding to Steam...");
         let mut result = Ok(());
         for (user, config) in &users {
             let grid = steam::grid_dir(config);
-            if !replaced.is_empty() {
-                if let Err(e) = steam::remove(config, &dir, user, &replaced) {
+            if !replaced2.is_empty() {
+                if let Err(e) = steam::remove(config, &dir, user, &replaced2) {
                     result = Err(e);
                 }
-                replaced.iter().for_each(|id| art::uninstall(&grid, *id));
+                replaced2.iter().for_each(|id| art::uninstall(&grid, *id));
             }
             let shortcuts: Vec<steam::NewShortcut> = games2
                 .iter()
@@ -215,6 +218,10 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
         }
         if !was_running || restarting {
             d.pending_removals.clear();
+            d.pending_adds.clear();
+        } else {
+            d.pending_adds.extend(games.iter().map(|g| g.id));
+            d.pending_removals.extend(&replaced);
         }
     })?;
     state.found.lock().unwrap().retain(|f| !games.iter().any(|g| same_path(&g.folder, &f.folder)));
@@ -253,19 +260,26 @@ pub async fn remove(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<Str
 async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
     let state = app.state::<App>();
     let _guard = state.busy.lock().await;
-    let (steam_dir, _) = steam_and_users(&state)?;
+    let (steam_dir, users) = steam_and_users(&state)?;
     let was_running = steam::is_running();
     let restarting = was_running && restart;
     let dir = state.dir.clone();
     let ids2 = ids.clone();
     let app2 = app.clone();
+    let mut snapshot = state.data.lock().unwrap().clone();
+    snapshot.pending_adds.retain(|id| !ids.contains(id));
     tauri::async_runtime::spawn_blocking(move || {
         if restarting {
             set_status(&app2, "Closing Steam for a moment...");
+            steam::shutdown(&steam_dir)?;
         }
-        let r = remove_blocking(&steam_dir, &dir, &ids2, restarting);
+        let r = remove_blocking(&steam_dir, &dir, &ids2, false);
+        if !was_running || restarting {
+            apply_pending(&dir, &snapshot, &users)?;
+        }
         if restarting {
             set_status(&app2, "Starting Steam...");
+            steam::start(&steam_dir, false)?;
         }
         r
     })
@@ -273,9 +287,12 @@ async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<S
     .map_err(|e| e.to_string())??;
     state.update(|d| {
         d.games.retain(|g| !ids.contains(&g.id));
-        d.pending_removals.retain(|id| !ids.contains(id));
+        d.pending_adds.retain(|id| !ids.contains(id));
         if was_running && !restart {
             d.pending_removals.extend(&ids);
+        } else {
+            d.pending_removals.clear();
+            d.pending_adds.clear();
         }
     })?;
     let msg = if was_running && !restart { "Removed. Restart Steam to see the change." } else { "Removed from Steam." };
@@ -358,10 +375,12 @@ pub fn startup_repair(app: &AppHandle) {
     if steam::is_running() {
         return;
     }
-    let pending = state.data.lock().unwrap().pending_removals.clone();
-    if !pending.is_empty() && remove_blocking(&steam_dir, &state.dir, &pending, false).is_ok() {
-        log::info(format!("Finished removing {} shortcut(s) from Steam.", pending.len()));
-        let _ = state.update(|d| d.pending_removals.clear());
+    let snapshot = state.data.lock().unwrap().clone();
+    if apply_pending(&state.dir, &snapshot, &steam::users(&steam_dir)).is_ok() {
+        let _ = state.update(|d| {
+            d.pending_removals.clear();
+            d.pending_adds.clear();
+        });
     }
     if state.settings().steam_shortcut {
         let missing = self_shortcut().is_ok_and(|(id, _)| steam::users(&steam_dir).iter().any(|(_, c)| !steam::present_ids(c).contains(&id)));
@@ -371,6 +390,59 @@ pub fn startup_repair(app: &AppHandle) {
             }
         }
     }
+}
+
+/// Writes again what was changed while Steam was running: removals Steam may have undone and
+/// games it may have dropped. Call only while Steam is closed.
+pub fn apply_pending(data_dir: &Path, data: &Data, users: &[(String, PathBuf)]) -> Result<(), String> {
+    if data.pending_removals.is_empty() && data.pending_adds.is_empty() {
+        return Ok(());
+    }
+    for (user, config) in users {
+        let grid = steam::grid_dir(config);
+        if !data.pending_removals.is_empty() {
+            steam::remove(config, data_dir, user, &data.pending_removals)?;
+            data.pending_removals.iter().for_each(|id| art::uninstall(&grid, *id));
+        }
+        let present = steam::present_ids(config);
+        let missing: Vec<&Game> = data.games.iter().filter(|g| data.pending_adds.contains(&g.id) && !present.contains(&g.id)).collect();
+        let shortcuts: Vec<steam::NewShortcut> = missing
+            .iter()
+            .map(|g| {
+                let art: Vec<(art::Slot, PathBuf)> = art::SLOTS.iter().filter_map(|s| art::cached(data_dir, g.id, *s).map(|p| (*s, p))).collect();
+                let icon = art::install(&grid, g.id, &art).unwrap_or_else(|| PathBuf::from(&g.exe));
+                steam::NewShortcut { id: g.id, name: &g.name, exe: Path::new(&g.exe), icon: icon.to_string_lossy().into_owned(), launch_options: "" }
+            })
+            .collect();
+        if !shortcuts.is_empty() {
+            steam::add(config, data_dir, user, &shortcuts)?;
+        }
+    }
+    log::info(format!(
+        "Applied changes made while Steam was running ({} removed, {} added or changed).",
+        data.pending_removals.len(),
+        data.pending_adds.len()
+    ));
+    Ok(())
+}
+
+/// Closes Steam, applies pending changes, and starts it again (in Big Picture if asked).
+pub fn restart_steam_applying(app: &AppHandle, big_picture: bool) -> Result<(), String> {
+    let state = app.state::<App>();
+    let steam_dir = state.steam_path().ok_or("Steam was not found. Set its folder in Settings.")?;
+    set_status(app, "Restarting Steam...");
+    steam::shutdown(&steam_dir)?;
+    let snapshot = state.data.lock().unwrap().clone();
+    apply_pending(&state.dir, &snapshot, &steam::users(&steam_dir))?;
+    state.update(|d| {
+        d.pending_removals.clear();
+        d.pending_adds.clear();
+    })?;
+    steam::start(&steam_dir, big_picture)?;
+    log::info(if big_picture { "Restarted Steam in Big Picture." } else { "Restarted Steam." });
+    set_status(app, "Steam restarted.");
+    emit_state(app);
+    Ok(())
 }
 
 /// Couch mode's "Delete game": the folder goes to the Recycle Bin, then the shortcut and art go.
@@ -431,5 +503,34 @@ pub fn uninstall_cleanup() {
         let mut data = data;
         data.games.clear();
         let _ = crate::state::save(&dir, &data);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pending_changes_are_written_again() {
+        let base = std::env::temp_dir().join(format!("steamdrop-pending-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let config = base.join("userdata/42/config");
+        std::fs::create_dir_all(&config).unwrap();
+        let data_dir = base.join("data");
+        let exe = base.join("games/A/a.exe");
+        // Steam wrote its old list back: the removed game 5 is there again, the added game 9 is gone.
+        let old = steam::NewShortcut { id: 5, name: "Old", exe: &exe, icon: String::new(), launch_options: "" };
+        steam::add(&config, &data_dir, "42", &[old]).unwrap();
+        std::fs::create_dir_all(art::cache_dir(&data_dir, 9)).unwrap();
+        std::fs::write(art::cache_dir(&data_dir, 9).join("portrait.png"), b"png").unwrap();
+        let game = Game { id: 9, name: "A".into(), exe: exe.to_string_lossy().into(), folder: String::new(), steam_appid: None, added: 1 };
+        let data = Data { games: vec![game], pending_removals: vec![5], pending_adds: vec![9], ..Default::default() };
+        let users = vec![("42".to_string(), config.clone())];
+        apply_pending(&data_dir, &data, &users).unwrap();
+        assert_eq!(steam::present_ids(&config), vec![9]);
+        assert!(config.join("grid/9p.png").is_file());
+        // Running it again changes nothing.
+        apply_pending(&data_dir, &data, &users).unwrap();
+        assert_eq!(steam::present_ids(&config), vec![9]);
     }
 }

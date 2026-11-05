@@ -30,7 +30,7 @@ The release workflow stops with a clear message if the public key or the secret 
 
 ## Making a release
 
-The step-by-step guide is in [STATUS.md, "How to publish a new version"](../STATUS.md#how-to-publish-a-new-version). In short: write notes under `## [Unreleased]` in `CHANGELOG.md`, run `npm run bump -- X.Y.Z`, commit and push, then push the tag `vX.Y.Z`.
+The step-by-step guide is in [STATUS.md, "How to publish a new version"](../STATUS.md#how-to-publish-a-new-version). The first release is just the tag `v0.1.0`, with no bump. After that, in short: write notes under `## [Unreleased]` in `CHANGELOG.md`, run `npm run bump -- X.Y.Z`, commit and push, then push the tag `vX.Y.Z`.
 
 `scripts/version.mjs` does the version work:
 

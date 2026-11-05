@@ -28,7 +28,12 @@ fn open_exclusive() -> std::io::Result<std::fs::File> {
 pub fn run_from_steam() {
     use std::time::{Duration, Instant};
     let Ok(exe) = std::env::current_exe() else { return };
-    if std::process::Command::new(exe).arg("--couch-open").spawn().is_err() {
+    let mut child = std::process::Command::new(exe);
+    child.arg("--couch-open");
+    if started_in_big_picture() {
+        child.arg("--big-picture");
+    }
+    if child.spawn().is_err() {
         return;
     }
     let start = Instant::now();
@@ -44,6 +49,11 @@ pub fn run_from_steam() {
             return;
         }
     }
+}
+
+/// Steam sets SteamTenfoot=1 for games started from Big Picture; a Steam Deck sets SteamDeck=1.
+pub fn started_in_big_picture() -> bool {
+    std::env::var("SteamTenfoot").is_ok_and(|v| v == "1") || std::env::var("SteamDeck").is_ok_and(|v| v == "1")
 }
 
 /// Opens (or focuses) the Couch mode window.
@@ -74,6 +84,19 @@ pub fn open(app: &AppHandle) {
 
 /// The window is gone: release the lock so the process Steam started can exit.
 pub fn closed(app: &AppHandle) {
-    app.state::<App>().couch_lock.lock().unwrap().take();
+    use std::sync::atomic::Ordering;
+    let state = app.state::<App>();
+    state.couch_lock.lock().unwrap().take();
     crate::log::info("Couch mode closed.");
+    if state.restart_after_couch.swap(false, Ordering::SeqCst) {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            // Let the process Steam started exit and Steam finish its own bookkeeping first.
+            std::thread::sleep(std::time::Duration::from_secs(3));
+            let big_picture = app.state::<App>().big_picture.load(Ordering::SeqCst);
+            if let Err(e) = crate::library::restart_steam_applying(&app, big_picture) {
+                crate::log::problem(format!("Could not restart Steam after Couch mode: {e}"));
+            }
+        });
+    }
 }
