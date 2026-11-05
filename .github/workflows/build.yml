@@ -1,0 +1,30 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    tags-ignore: ["**"]
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: npm ci
+      - name: Build installer (unsigned, no updater files)
+        run: npx tauri build --config "{\"bundle\":{\"createUpdaterArtifacts\":false}}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SteamDrop-Setup-unsigned
+          path: src-tauri/target/release/bundle/nsis/*.exe

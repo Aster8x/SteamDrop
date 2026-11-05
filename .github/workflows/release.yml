@@ -1,0 +1,75 @@
+name: Release
+
+# Push a tag like v0.2.0 (matching the version in src-tauri/Cargo.toml) to publish a release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Check release setup
+        shell: bash
+        run: |
+          version=$(grep -m1 '^version' src-tauri/Cargo.toml | cut -d '"' -f2)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version $version in src-tauri/Cargo.toml"; exit 1
+          fi
+          if grep -q REPLACE_WITH_YOUR_UPDATER_PUBLIC_KEY src-tauri/tauri.conf.json; then
+            echo "::error::Put your updater public key in src-tauri/tauri.conf.json (see docs/RELEASING.md)"; exit 1
+          fi
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is missing (see docs/RELEASING.md)"; exit 1
+          fi
+
+      - name: Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: npm ci
+      - name: Build
+        run: npx tauri build
+
+      - name: Collect files
+        shell: bash
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          mkdir out
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe out/SteamDrop-Setup.exe
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe.sig out/SteamDrop-Setup.exe.sig
+          node -e '
+            const fs = require("fs");
+            const [version, tag, repo] = process.argv.slice(1);
+            fs.writeFileSync("out/latest.json", JSON.stringify({
+              version,
+              notes: "See the release page for what changed.",
+              pub_date: new Date().toISOString(),
+              platforms: { "windows-x86_64": {
+                signature: fs.readFileSync("out/SteamDrop-Setup.exe.sig", "utf8").trim(),
+                url: `https://github.com/${repo}/releases/download/${tag}/SteamDrop-Setup.exe`,
+              } },
+            }, null, 2));
+          ' "$version" "$GITHUB_REF_NAME" "$GITHUB_REPOSITORY"
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" out/SteamDrop-Setup.exe out/SteamDrop-Setup.exe.sig out/latest.json \
+            --title "SteamDrop $GITHUB_REF_NAME" --generate-notes
