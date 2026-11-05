@@ -75,7 +75,7 @@ No. It only reads them to find the right .exe. The one exception is if you turn 
 Steam only reads its list of non-Steam games when it starts. SteamDrop closes Steam for a moment, adds the game and opens Steam again. If Steam is open and you'd rather not restart, SteamDrop can add the game anyway and it shows up the next time Steam starts.
 
 **The artwork is a plain title card. Can I get real art?**
-Real art comes from Steam (when the game is on Steam) or from SteamGridDB. For SteamGridDB, get a free key: sign in at [steamgriddb.com](https://www.steamgriddb.com/) with your Steam account, go to *Preferences → API*, press *Generate API Key*, and paste the key into SteamDrop's Settings. Then open the game's details and press **Find artwork again**. If SteamDrop picked the wrong game, enter its Steam App ID in the details window.
+Real art comes from Steam (when the game is on Steam) or from SteamGridDB. For SteamGridDB you need a free key: in SteamDrop go to **Settings → Artwork** and press **Get a free key**. Sign in on that page with your Steam account, press *Generate API Key*, copy the key, paste it into SteamDrop, and press **Test key**, then **Save key**. The key is stored in Windows Credential Manager, not in a settings file. Then open the game's details and press **Find artwork again**. If SteamDrop picked the wrong game, enter its Steam App ID in the details window.
 
 **It picked the wrong .exe.**
 With Automatic mode off, you confirm the pick before anything is added. Otherwise, remove the game in SteamDrop and add its folder again with **+ Add a game**, then choose the right file.
@@ -83,8 +83,11 @@ With Automatic mode off, you confirm the pick before anything is added. Otherwis
 **I have more than one Steam account on this PC.**
 SteamDrop adds games to every account that has signed in on this PC.
 
+**Something went wrong. How do I report it?**
+Go to **Settings → Help** and press **Copy bug report**. Then press **Report a problem** (or open a [new issue](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml)), describe what happened, and paste the report into the last box. The report holds SteamDrop's version, your Windows version, whether Steam was found, your settings, and the last 200 lines of SteamDrop's activity. Your Windows user name is replaced with `<user>`, and your SteamGridDB key is never included. The **Activity** list on the same page shows what SteamDrop did recently, in plain words.
+
 **Where does SteamDrop keep its files?**
-In `%APPDATA%\SteamDrop`: settings, the artwork cache (`art`), store details (`info`), and backups of Steam's shortcuts file (`backups`).
+In `%APPDATA%\SteamDrop`: settings, the artwork cache (`art`), store details (`info`), backups of Steam's shortcuts file (`backups`), and the activity log (`logs`, the last 5 files of up to 1 MB each). The SteamGridDB key is kept in Windows Credential Manager.
 
 **How do I undo a change?**
 Every version of Steam's shortcuts file is backed up in `%APPDATA%\SteamDrop\backups\<account number>`. Close Steam, copy the backup you want back to `Steam\userdata\<account number>\config\shortcuts.vdf`, and start Steam.

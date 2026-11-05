@@ -22,9 +22,12 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "nat
 ab_glyph = "0.2"
 png = "0.18"
 crc32fast = "1"
+time = { version = "0.3", features = ["local-offset", "formatting", "macros"] }
+keyring = "3"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
+keyring = { version = "3", features = ["windows-native"] }
 
 [profile.release]
 codegen-units = 1

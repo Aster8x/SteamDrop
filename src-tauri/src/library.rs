@@ -2,6 +2,7 @@
 
 use crate::art;
 use crate::exe;
+use crate::log;
 use crate::state::{same_path, App, Found, Game};
 use crate::steam;
 use std::path::{Path, PathBuf};
@@ -45,6 +46,15 @@ pub fn found(app: &AppHandle, folders: Vec<PathBuf>) {
             continue;
         }
         let f = inspect(&folder);
+        if f.installer_only {
+            log::info(format!("Skipped folder {}: installer only, not a ready-to-play game.", f.folder));
+        } else if f.candidates.is_empty() {
+            log::info(format!("Found folder {} but no game file (.exe) in it. Waiting for you to choose one.", f.folder));
+        } else if auto {
+            log::info(format!("New game found: \"{}\" in {}. Adding it automatically.", f.title, f.folder));
+        } else {
+            log::info(format!("New game found: \"{}\" in {}. Waiting for you to confirm.", f.title, f.folder));
+        }
         if f.installer_only {
             let _ = state.update(|d| d.mark_known(&f.folder));
             notify(app, "Only an installer found", &format!("\"{}\" holds an installer, not a ready-to-play game. Install it first, then put the installed folder here.", f.title));
@@ -94,10 +104,20 @@ fn steam_and_users(state: &App) -> Result<(PathBuf, Vec<(String, PathBuf)>), Str
 
 /// Adds games to Steam: artwork first (while Steam keeps running), then one quick Steam restart.
 pub async fn add(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<String, String> {
+    let names = items.iter().map(|i| format!("\"{}\"", i.name)).collect::<Vec<_>>().join(", ");
+    let result = add_inner(app, items, restart).await;
+    if let Err(e) = &result {
+        log::problem(format!("Could not add {names}: {e}"));
+    }
+    result
+}
+
+async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<String, String> {
     let state = app.state::<App>();
     let _guard = state.busy.lock().await;
     let (steam_dir, users) = steam_and_users(&state)?;
     let settings = state.settings();
+    let sgdb_key = crate::secrets::sgdb_key();
     let mut games = vec![];
     let mut art_sets = vec![];
     for item in &items {
@@ -112,13 +132,17 @@ pub async fn add(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<Stri
         if steam_appid.is_none() {
             steam_appid = crate::store::search(&state.http, &item.name).await;
         }
+        match steam_appid {
+            Some(a) => log::info(format!("\"{}\" is Steam App ID {a}.", item.name)),
+            None => log::info(format!("\"{}\" was not found in the Steam store.", item.name)),
+        }
         set_status(app, &format!("Getting artwork for \"{}\"...", item.name));
         let req = art::Request {
             id,
             title: &item.name,
             folder: &item.folder,
             steam_appid,
-            sgdb_key: &settings.sgdb_key,
+            sgdb_key: &sgdb_key,
             copy_to_game_folder: settings.art_in_game_folder,
         };
         art_sets.push(art::fetch(&state.http, &state.dir, &req).await);
@@ -145,6 +169,7 @@ pub async fn add(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<Stri
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         if restarting {
             set_status(&app2, "Closing Steam for a moment...");
+            log::info("Closing Steam so it picks up the new shortcuts.");
             steam::shutdown(&steam_dir)?;
         }
         set_status(&app2, "Adding to Steam...");
@@ -171,6 +196,7 @@ pub async fn add(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<Stri
         }
         if restarting {
             set_status(&app2, "Starting Steam...");
+            log::info("Starting Steam in Big Picture.");
             steam::start(&steam_dir, true)?;
         }
         result
@@ -186,6 +212,12 @@ pub async fn add(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<Stri
         }
     })?;
     state.found.lock().unwrap().retain(|f| !games.iter().any(|g| same_path(&g.folder, &f.folder)));
+    for g in &games {
+        log::info(format!("Added \"{}\" to Steam. Game file: {}", g.name, g.exe));
+    }
+    if was_running && !restart {
+        log::info("Steam is open and was not restarted, so the change shows after Steam restarts.");
+    }
     let names = games.iter().map(|g| format!("\"{}\"", g.name)).collect::<Vec<_>>().join(", ");
     let msg = if was_running && !restart {
         format!("Added {names}. Restart Steam to see it.")
@@ -200,6 +232,19 @@ pub async fn add(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<Stri
 
 /// Removes shortcuts and their art from Steam. Game files are never touched.
 pub async fn remove(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
+    let names: Vec<String> = {
+        let d = app.state::<App>().data.lock().unwrap().clone();
+        d.games.iter().filter(|g| ids.contains(&g.id)).map(|g| format!("\"{}\"", g.name)).collect()
+    };
+    let result = remove_inner(app, ids, restart).await;
+    match &result {
+        Ok(_) => log::info(format!("Removed {} from Steam. Game files were not touched.", names.join(", "))),
+        Err(e) => log::problem(format!("Could not remove {}: {e}", names.join(", "))),
+    }
+    result
+}
+
+async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
     let state = app.state::<App>();
     let _guard = state.busy.lock().await;
     let (steam_dir, _) = steam_and_users(&state)?;
@@ -259,9 +304,10 @@ pub fn uninstall_cleanup() {
     let ids: Vec<u32> = data.games.iter().map(|g| g.id).collect();
     if let (Some(steam_dir), false) = (steam_dir, ids.is_empty()) {
         if let Err(e) = remove_blocking(&steam_dir, &dir, &ids, steam::is_running()) {
-            eprintln!("{e}");
+            log::problem(format!("Uninstall: could not remove SteamDrop's games from Steam: {e}"));
             return;
         }
+        log::info(format!("Uninstall: removed {} game(s) from Steam.", ids.len()));
         let mut data = data;
         data.games.clear();
         let _ = crate::state::save(&dir, &data);

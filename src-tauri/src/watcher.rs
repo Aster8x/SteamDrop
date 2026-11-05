@@ -21,15 +21,17 @@ pub fn restart(app: &AppHandle) {
     let mut watcher = match notify::recommended_watcher(tx) {
         Ok(w) => w,
         Err(e) => {
-            eprintln!("watcher: {e}");
+            crate::log::problem(format!("Folder watching could not start: {e}"));
             return;
         }
     };
     for root in &roots {
         if let Err(e) = watcher.watch(root, RecursiveMode::Recursive) {
-            eprintln!("watcher: {}: {e}", root.display());
+            crate::log::problem(format!("Can't watch {}: {e}", root.display()));
         }
     }
+    let list: Vec<String> = roots.iter().map(|r| r.display().to_string()).collect();
+    crate::log::info(if list.is_empty() { "Not watching any folders yet.".into() } else { format!("Watching: {}", list.join(", ")) });
     *state.watcher.lock().unwrap() = Some(watcher);
     let app = app.clone();
     std::thread::spawn(move || run(app, roots, rx));
@@ -71,7 +73,7 @@ fn run(app: AppHandle, roots: Vec<PathBuf>, rx: mpsc::Receiver<notify::Result<no
                     }
                 }
             }
-            Ok(Err(e)) => eprintln!("watcher: {e}"),
+            Ok(Err(e)) => crate::log::problem(format!("Folder watching: {e}")),
             Err(mpsc::RecvTimeoutError::Disconnected) => return,
             Err(mpsc::RecvTimeoutError::Timeout) => {}
         }

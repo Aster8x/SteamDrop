@@ -1,0 +1,31 @@
+name: Bug report
+description: Something in SteamDrop doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this! The quickest way to help: open SteamDrop, go to **Settings → Help**, press **Copy bug report**, and paste it in the last box below. It leaves out your Windows user name and your SteamGridDB key.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe what you did and what went wrong. Screenshots help too.
+      placeholder: I copied a game folder into D:\Games, but it never showed up in Steam.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: The game should have appeared in my Steam library with artwork.
+    validations:
+      required: true
+  - type: textarea
+    id: bug-report
+    attributes:
+      label: Bug report from SteamDrop
+      description: In SteamDrop, open Settings → Help, press "Copy bug report", then paste here (Ctrl+V).
+      placeholder: "### SteamDrop bug report ..."
+    validations:
+      required: false

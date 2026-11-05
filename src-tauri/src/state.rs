@@ -17,7 +17,6 @@ pub struct Settings {
     pub close_to_tray: bool,
     /// Empty means "detect it".
     pub steam_path: String,
-    pub sgdb_key: String,
     pub art_in_game_folder: bool,
     pub theme: String,
 }
@@ -32,7 +31,6 @@ impl Default for Settings {
             run_on_startup: false,
             close_to_tray: true,
             steam_path: String::new(),
-            sgdb_key: String::new(),
             art_in_game_folder: false,
             theme: "dark".into(),
         }

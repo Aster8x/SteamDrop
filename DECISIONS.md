@@ -76,6 +76,14 @@ Why things are the way they are. Newest decisions go at the bottom of each secti
 - **Release notes come from `CHANGELOG.md`** (Keep a Changelog format). The release workflow refuses a tag whose version has no changelog section, and uses that section both on the GitHub release page and in `latest.json`. `bump` turns "Unreleased" into the new version's section and updates the compare links at the bottom.
 - **The app reads its version from Tauri's package info**, which comes from `tauri.conf.json`. It's shown in About and in the tray tooltip ("SteamDrop 0.1.0").
 
+## Secrets, logs and bug reports
+
+- **SteamGridDB key in Windows Credential Manager** via the `keyring` crate (Windows backend only, with no extra C code). Using a well-tested crate is safer than hand-written Credential Manager calls. The key never goes into `data.json`, the logs or bug reports. The bug report also scrubs the key's text, in case it ever ended up in a log line. No migration from the settings file was written, because no released version ever stored the key there.
+- **The key box loads the saved key** so it can show dots and reveal it while the eye is held. Reveal works only while held: pointer capture keeps it shown while the mouse or finger moves off the button, and Space/Enter key-down shows it until key-up. Losing focus always hides it.
+- **The uninstaller's "Delete SteamDrop settings and cache" also forgets the key** (`SteamDrop.exe --forget-secrets`), since Credential Manager isn't a folder it can delete.
+- **Own small logger** (`log.rs`) instead of a logging framework. It writes one plain-language line per event with a local timestamp (the `time` crate is already used by Tauri), rotates at 1 MB, and keeps 5 files. The log records what users and helpers care about: folders found or skipped and why, the exe and App ID chosen, where each picture came from, Steam restarts, settings changes, and problems marked "Problem:".
+- **Bug report** is Markdown so it renders nicely in a GitHub issue. Every `\Users\<name>` (any drive, either slash) becomes `\Users\<user>`. Settings are listed with any key, token or password fields dropped. It's copied with the browser clipboard; if that's blocked, the report is shown in a box to copy by hand.
+
 ## Left out on purpose
 
 - Removing a shortcut automatically when its game folder is deleted. The game shows "Game file missing" instead, because deleting things from Steam unasked felt wrong.

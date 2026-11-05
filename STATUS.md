@@ -4,13 +4,16 @@ Version 0.1.0, first complete build. Everything in the spec is implemented. It h
 
 ## Works and checked
 
-- **Unit tests** pass on Linux (18) and as real Windows binaries (19, cross-compiled and run under Wine; one test is Windows-only). They cover:
+- **Unit tests** pass on Linux (20) and as real Windows binaries (22, cross-compiled and run under Wine; two tests are Windows-only). They run on every push in GitHub Actions on Windows too. They cover:
   - reading and writing `shortcuts.vdf`, including keeping other tools' shortcuts byte-for-byte, refusing broken files, and the backups;
   - exe picking: junk exclusion, Unreal games, initials such as `GTA5`, cleaning folder names;
   - spotting folders that hold only an installer, and reading `steam_appid.txt`;
   - title-card rendering and installing art into a grid folder and removing it again;
   - detecting files that are still open, using the Windows share-mode check;
-  - loading old or partial settings files.
+  - loading old or partial settings files;
+  - log rotation (5 files of 1 MB);
+  - hiding user names in bug reports;
+  - saving the SteamGridDB key in Credential Manager and keeping it out of the bug report (run under Wine's Credential Manager).
 - **Windows installer builds:** a cross-compiled build produced a ~2 MB `SteamDrop_0.1.0_x64-setup.exe` with the custom uninstaller template, so the NSIS script compiles.
 - **`SteamDrop.exe --uninstall-cleanup`** was run as a Windows binary under Wine against a fake Steam folder. It removed SteamDrop's shortcut and its grid art, kept another tool's shortcut, made a backup, and cleared the art cache and the game list.
 - **The UI** was rendered in Chromium against a mocked backend (games list, new-game card, installer card, details window, settings, about, dark and light). The layout looks right.
@@ -60,7 +63,20 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 18. **Version shown:** About says "Version 0.1.0" and hovering the tray icon says "SteamDrop 0.1.0".
 19. **Release and update:** publish `v0.1.0` as described in "How to publish a new version" below. Check that the release page shows the 0.1.0 notes from CHANGELOG.md and has `SteamDrop-Setup.exe`, and that the README button downloads it. Then publish `v0.1.1`, and in the installed 0.1.0 use About → "Check for updates" → "Install update".
 
-If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`.
+20. **SteamGridDB key box:**
+    - The key shows as dots.
+    - Holding the eye button (mouse, touch, or Space/Enter on the keyboard) shows it, and letting go hides it again.
+    - "Get a free key" opens the SteamGridDB API page.
+    - "Test key" says clearly whether the key works. Try a wrong key too.
+    - After "Save key", the key is in Windows Credential Manager (Control Panel → Credential Manager → Windows Credentials, look for "SteamDrop") and not in `%APPDATA%\SteamDrop\data.json`.
+21. **Help and bug report:**
+    - Settings → Help shows recent activity in plain words (for example "Added "X" to Steam").
+    - "Open log folder" opens `%APPDATA%\SteamDrop\logs`.
+    - "Copy bug report" copies one block of text. Paste it into Notepad and check it shows `C:\Users\<user>` instead of your name and contains no key.
+    - "Report a problem" opens GitHub's bug report form.
+22. **Uninstall with "Delete SteamDrop settings and cache"** also removes the saved key from Credential Manager.
+
+If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 
 ## How to publish a new version
 

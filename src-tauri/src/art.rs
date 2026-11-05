@@ -113,14 +113,18 @@ pub async fn fetch(http: &Client, data_dir: &Path, r: &Request<'_>) -> Vec<(Slot
     let game_art = r.folder.join(GAME_FOLDER_ART);
     let mut sgdb_game: Option<Option<u64>> = None;
     let mut out = vec![];
+    let mut sources = vec![];
     for slot in SLOTS {
         if let Some(p) = find(&cache, slot.name()) {
             out.push((slot, p));
+            sources.push(format!("{} saved earlier", slot.name()));
             continue;
         }
+        let mut source = "the game folder";
         let mut bytes = find(&game_art, slot.name()).and_then(|p| std::fs::read(p).ok());
         if bytes.is_none() {
             if let Some(appid) = r.steam_appid {
+                source = "Steam";
                 bytes = from_steam(http, appid, slot).await;
             }
         }
@@ -128,8 +132,13 @@ pub async fn fetch(http: &Client, data_dir: &Path, r: &Request<'_>) -> Vec<(Slot
             if sgdb_game.is_none() {
                 sgdb_game = Some(sgdb_find(http, r.sgdb_key, r.title).await);
             }
+            source = "SteamGridDB";
             bytes = from_sgdb(http, r.sgdb_key, r.steam_appid, sgdb_game.flatten(), slot).await;
         }
+        if bytes.is_none() {
+            source = if slot == Slot::Icon { "the game's own icon" } else { "a title card" };
+        }
+        sources.push(format!("{} from {source}", slot.name()));
         let bytes = bytes.or_else(|| slot.title_card(r.title));
         let Some(bytes) = bytes else { continue };
         let Some(ext) = image_ext(&bytes) else { continue };
@@ -138,6 +147,7 @@ pub async fn fetch(http: &Client, data_dir: &Path, r: &Request<'_>) -> Vec<(Slot
             out.push((slot, path));
         }
     }
+    crate::log::info(format!("Artwork for \"{}\": {}.", r.title, sources.join(", ")));
     if r.copy_to_game_folder && std::fs::create_dir_all(&game_art).is_ok() {
         for (slot, p) in &out {
             clear(&game_art, slot.name());
@@ -194,10 +204,22 @@ async fn from_sgdb(http: &Client, key: &str, appid: Option<u32>, game: Option<u6
     None
 }
 
-/// True if the key works, for the settings screen.
-pub async fn sgdb_key_ok(http: &Client, key: &str) -> bool {
-    let res = http.get(format!("{SGDB}/grids/steam/220")).bearer_auth(key.trim()).send().await;
-    res.is_ok_and(|r| r.status().is_success())
+/// Checks a SteamGridDB key and says in plain words whether it works.
+pub async fn sgdb_key_check(http: &Client, key: &str) -> Result<String, String> {
+    if key.trim().is_empty() {
+        return Err("Type or paste a key first.".into());
+    }
+    let res = http
+        .get(format!("{SGDB}/grids/steam/220"))
+        .bearer_auth(key.trim())
+        .send()
+        .await
+        .map_err(|_| "Couldn't reach SteamGridDB. Check your internet connection and try again.")?;
+    match res.status().as_u16() {
+        200..=299 => Ok("The key works. SteamDrop can now get artwork from SteamGridDB.".into()),
+        401 | 403 => Err("SteamGridDB didn't accept this key. Copy it again from your SteamGridDB API page and try once more.".into()),
+        code => Err(format!("SteamGridDB answered with an error ({code}). Try again in a few minutes.")),
+    }
 }
 
 fn clear(dir: &Path, stem: &str) {

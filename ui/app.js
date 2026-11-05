@@ -9,6 +9,9 @@ let S = null;          // last state from the app
 let view = "games";
 let busy = false;
 let update = null;     // { checking, version, error, installing }
+let sgdbKey = null;    // what's in the key box (loaded from Windows Credential Manager once)
+let keyMsg = null;     // { text, ok } after "Test key" or "Save key"
+const SGDB_API_PAGE = "https://www.steamgriddb.com/profile/preferences/api";
 
 /* ---------- tiny DOM helper (text is always set as text, never as HTML) ---------- */
 function h(tag, props, ...kids) {
@@ -311,6 +314,83 @@ function setting(title, text, control) {
   return h("div", { class: "setting" }, h("div", { class: "text" }, h("strong", {}, title), h("span", {}, text)), control);
 }
 
+/** SteamGridDB key box: dots by default, the eye button shows it only while held down. */
+function keyField() {
+  const input = h("input", {
+    type: "password", value: sgdbKey || "", placeholder: "Paste your SteamGridDB key here",
+    "aria-label": "SteamGridDB key", autocomplete: "off", spellcheck: "false",
+    oninput: (e) => { sgdbKey = e.target.value; },
+  });
+  const show = (on) => { input.type = on ? "text" : "password"; eye.setAttribute("aria-pressed", String(on)); };
+  const eye = h("button", {
+    class: "btn eye", type: "button", title: "Hold to show the key", "aria-label": "Hold to show the key", "aria-pressed": "false",
+    onpointerdown: (e) => { e.preventDefault(); eye.setPointerCapture(e.pointerId); show(true); },
+    onpointerup: () => show(false),
+    onpointercancel: () => show(false),
+    onlostpointercapture: () => show(false),
+    onkeydown: (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (!e.repeat) show(true); } },
+    onkeyup: (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); show(false); } },
+    onblur: () => show(false),
+    onclick: (e) => e.preventDefault(),
+    oncontextmenu: (e) => e.preventDefault(),
+  });
+  eye.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.2 1.5 12c1.2 2.8 5 7 10.5 7s9.3-4.2 10.5-7C21.3 9.2 17.5 5 12 5Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2.2a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z" fill="currentColor"/></svg>';
+  const message = keyMsg ? h("p", { class: keyMsg.ok ? "ok-msg" : "error", role: "status" }, keyMsg.text) : null;
+  return h("div", { class: "key-field" },
+    h("label", { class: "small" }, h("strong", {}, "SteamGridDB key (free, optional)")),
+    h("div", { class: "row nowrap" }, h("div", { class: "grow" }, input), eye),
+    h("div", { class: "row" },
+      btn("Save key", async () => {
+        try {
+          await invoke("set_sgdb_key", { key: input.value });
+          keyMsg = { ok: true, text: input.value.trim() ? "Key saved." : "Key removed." };
+        } catch (e) { keyMsg = { ok: false, text: String(e) }; }
+        render();
+      }),
+      btn("Test key", async () => {
+        keyMsg = { ok: true, text: "Testing the key..." };
+        render();
+        try { keyMsg = { ok: true, text: await invoke("test_sgdb_key", { key: input.value }) }; }
+        catch (e) { keyMsg = { ok: false, text: String(e) }; }
+        render();
+      }),
+      btn("Get a free key", () => invoke("open", { target: SGDB_API_PAGE }), "", { always: true })),
+    message);
+}
+
+/** Settings > Help: recent activity in plain words, and an easy way to report a problem. */
+function helpPanel() {
+  const list = h("ol", { class: "activity", "aria-label": "Recent activity" }, h("li", { class: "muted" }, "Loading..."));
+  invoke("get_activity").then((lines) => {
+    const items = lines.slice(-80).reverse().map((line) => {
+      const time = line.slice(0, 19);
+      const text = line.slice(21);
+      return h("li", { class: text.startsWith("Problem:") ? "problem" : "" }, h("time", {}, time), h("span", {}, text));
+    });
+    list.replaceChildren(...(items.length ? items : [h("li", { class: "muted" }, "Nothing has happened yet.")]));
+  });
+  const copyReport = async () => {
+    const report = await invoke("bug_report");
+    try {
+      await navigator.clipboard.writeText(report);
+      showStatus("Bug report copied. Paste it into your report on GitHub.");
+    } catch {
+      // Clipboard blocked: show the report so it can be copied by hand.
+      await ask("Your bug report", [h("p", {}, "Select all of this text (Ctrl+A), copy it (Ctrl+C), and paste it into your report."),
+        h("textarea", { class: "report", readonly: true, rows: 12 }, report)], [{ label: "Close", value: null, kind: "primary" }]);
+    }
+  };
+  return h("div", { class: "panel" },
+    h("h2", {}, "Help"),
+    h("p", { class: "muted" }, "Something not working? Press \"Copy bug report\" and paste it into a new report on GitHub. It contains SteamDrop's recent activity and settings, with your Windows user name and SteamGridDB key left out."),
+    h("div", { class: "row" },
+      btn("Copy bug report", copyReport, "primary", { always: true }),
+      btn("Report a problem", () => invoke("open", { target: `${REPO}/issues/new?template=bug_report.yml` }), "", { always: true }),
+      btn("Open log folder", () => invoke("open_logs").catch((e) => showStatus(String(e), true)), "", { always: true })),
+    h("h3", { class: "activity-title" }, "Activity"),
+    list);
+}
+
 function settingsView() {
   const st = S.settings;
   const subs = [st.auto_add, st.auto_restart, st.notify];
@@ -324,8 +404,10 @@ function settingsView() {
 
   const steamNote = !S.steam.path ? "Not found. Choose Steam's folder."
     : st.steam_path ? "Chosen by you." : "Found automatically.";
-  const keyInput = h("input", { type: "password", value: st.sgdb_key, placeholder: "Paste your SteamGridDB key here", "aria-label": "SteamGridDB key", autocomplete: "off" });
-  const keyResult = h("span", { class: "muted small" });
+  if (sgdbKey === null) {
+    sgdbKey = "";
+    invoke("get_sgdb_key").then((k) => { sgdbKey = k; render(); });
+  }
 
   return [
     h("h1", {}, "Settings"),
@@ -366,18 +448,7 @@ function settingsView() {
     h("div", { class: "panel" },
       h("h2", {}, "Artwork"),
       h("p", { class: "muted" }, "SteamDrop fills in all of Steam's pictures for each game: cover, wide banner, background, logo and icon. It uses official Steam art when the game is on Steam, then SteamGridDB, and otherwise makes a clean title card."),
-      h("label", { class: "small" }, h("strong", {}, "SteamGridDB key (free, optional)")),
-      h("div", { class: "row" }, h("div", { class: "grow" }, keyInput),
-        btn("Save key", async () => {
-          await saveSettings({ sgdb_key: keyInput.value.trim() });
-          showStatus("Key saved.");
-        }),
-        btn("Check key", async () => {
-          keyResult.textContent = "Checking...";
-          const ok = await invoke("test_sgdb_key", { key: keyInput.value });
-          keyResult.textContent = ok ? "The key works." : "That key didn't work. Check it and try again.";
-        })),
-      keyResult,
+      keyField(),
       h("details", { class: "guide" },
         h("summary", {}, "How to get a free SteamGridDB key"),
         h("ol", {},
@@ -385,7 +456,7 @@ function settingsView() {
           h("li", {}, "Open ", h("a", { href: "#", onclick: (e) => { e.preventDefault(); invoke("open", { target: "https://www.steamgriddb.com/profile/preferences/api" }); } }, "Preferences, then API"), "."),
           h("li", {}, "Press \"Generate API Key\" and copy the key."),
           h("li", {}, "Paste it above and press \"Save key\".")),
-        h("p", { class: "muted small" }, "The key stays on this PC and is only sent to SteamGridDB.")),
+        h("p", { class: "muted small" }, "The key is kept in Windows Credential Manager on this PC and is only ever sent to SteamGridDB.")),
       setting("Also save art in the game folder", "Keeps a copy in a \"SteamDrop art\" folder inside each game, so it comes back if you move the game.",
         toggle(st.art_in_game_folder, (v) => saveSettings({ art_in_game_folder: v }), "Also save art in the game folder"))),
 
@@ -400,6 +471,8 @@ function settingsView() {
           h("button", { "aria-pressed": String(st.theme !== "light"), onclick: () => saveSettings({ theme: "dark" }) }, "Dark"),
           h("button", { "aria-pressed": String(st.theme === "light"), onclick: () => saveSettings({ theme: "light" }) }, "Light"))),
       h("div", { class: "row" }, btn("Quit SteamDrop", () => invoke("quit"), "", { always: true }))),
+
+    helpPanel(),
   ];
 }
 

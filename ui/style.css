@@ -15,6 +15,7 @@
   --accent-soft: rgba(92, 200, 255, .14);
   --danger: #ff7b7b;
   --danger-soft: rgba(255, 123, 123, .14);
+  --ok: #6fdc9b;
   --warn: #ffc95c;
   --warn-soft: rgba(255, 201, 92, .13);
   --logo-bg: #151b2a;
@@ -33,6 +34,7 @@
   --accent-soft: rgba(11, 116, 176, .1);
   --danger: #c22f2f;
   --danger-soft: rgba(194, 47, 47, .1);
+  --ok: #1a7f45;
   --warn: #8a5a00;
   --warn-soft: rgba(200, 140, 0, .14);
   --logo-bg: #151b2a;
@@ -237,3 +239,23 @@ dialog .actions { display: flex; flex-wrap: wrap; gap: .7rem; justify-content: f
 .error { color: var(--danger); font-weight: 700; }
 .spread > .text { flex: 1; min-width: 260px; }
 .info .row { margin-top: 1rem; }
+
+.ok-msg { color: var(--ok); font-weight: 700; }
+.row.nowrap { flex-wrap: nowrap; }
+.key-field { margin-bottom: .4rem; }
+.key-field .row { margin-top: .5rem; }
+.btn.eye { width: 56px; padding: 0; flex: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+.btn.eye svg { width: 26px; height: 26px; }
+.btn.eye[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.activity-title { margin-top: 1.4rem; }
+.activity {
+  list-style: none; margin: .4rem 0 0; padding: 0; max-height: 320px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
+}
+.activity li { display: grid; grid-template-columns: 11.5rem 1fr; gap: .8rem; padding: .45rem .9rem; border-top: 1px solid var(--border); font-size: .92rem; }
+.activity li:first-child { border-top: 0; }
+.activity time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.activity span { word-break: break-word; }
+.activity li.problem span { color: var(--danger); font-weight: 700; }
+.activity li.muted { display: block; }
+textarea.report { width: 100%; font: .85rem/1.4 Consolas, monospace; background: var(--bg); color: var(--text); border: 2px solid var(--border); border-radius: 12px; padding: .6rem; }

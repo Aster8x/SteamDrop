@@ -835,6 +835,12 @@ Section Uninstall
     ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --uninstall-cleanup'
   ${EndIf}
 
+  ; SteamDrop: forget the saved SteamGridDB key (Windows Credential Manager) with the rest of its data
+  ${If} $DeleteAppDataCheckboxState = 1
+  ${AndIf} $UpdateMode <> 1
+    ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --forget-secrets'
+  ${EndIf}
+
   ; Delete the app directory and its content from disk
   ; Copy main executable
   Delete "$INSTDIR\${MAINBINARYNAME}.exe"

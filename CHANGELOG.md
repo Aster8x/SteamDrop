@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- SteamGridDB key box in Settings → Artwork: shows dots, a hold-to-show eye button (mouse, touch, Space/Enter), "Get a free key" and "Test key" with clear messages. The key is stored in Windows Credential Manager, never in a settings file or the logs.
+- Activity log in plain words, in `%APPDATA%\SteamDrop\logs` (last 5 files, up to 1 MB each).
+- Settings → Help: recent activity, "Copy bug report" (version, Windows version, Steam status, settings and the last 200 log lines, with the Windows user name and secrets removed), "Report a problem" and "Open log folder".
+- Bug report form on GitHub.
+
 ## [0.1.0] - 2026-11-05
 
 First release.

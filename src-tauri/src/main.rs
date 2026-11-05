@@ -4,6 +4,9 @@
 mod art;
 mod exe;
 mod library;
+mod log;
+mod report;
+mod secrets;
 mod state;
 mod steam;
 mod store;
@@ -98,12 +101,23 @@ fn save_settings(app: AppHandle, state: State<App>, settings: Settings) -> Resul
     let old = state.settings();
     set_run_on_startup(settings.run_on_startup)?;
     let watch_changed = old.watched != settings.watched;
+    log_changes(&old, &settings);
     state.update(|d| d.settings = settings)?;
     if watch_changed {
         watcher::restart(&app);
     }
     library::emit_state(&app);
     Ok(())
+}
+
+/// Writes "Setting changed: auto_add: false -> true" lines, so bug reports show what was switched.
+fn log_changes(old: &Settings, new: &Settings) {
+    let (Ok(serde_json::Value::Object(a)), Ok(serde_json::Value::Object(b))) = (serde_json::to_value(old), serde_json::to_value(new)) else { return };
+    for (k, v) in &b {
+        if a.get(k) != Some(v) {
+            log::info(format!("Setting changed: {k}: {} -> {v}", a.get(k).unwrap_or(&serde_json::Value::Null)));
+        }
+    }
 }
 
 fn set_run_on_startup(on: bool) -> Result<(), String> {
@@ -158,6 +172,8 @@ fn add_watch_folder(app: AppHandle, state: State<App>, path: String, include_exi
             d.settings.watched.push(path.clone());
         }
     })?;
+    let existing = if include_existing { "games already there will be added" } else { "games already there were left alone" };
+    log::info(format!("Started watching {path} ({existing})."));
     watcher::restart(&app);
     library::emit_state(&app);
     Ok(())
@@ -190,6 +206,7 @@ async fn add_game(app: AppHandle, folder: String, exe: String, name: String, res
 fn dismiss_found(app: AppHandle, state: State<App>, folder: String) -> Result<(), String> {
     state.found.lock().unwrap().retain(|f| !same_path(&f.folder, &folder));
     state.update(|d| d.mark_known(&folder))?;
+    log::info(format!("You skipped {folder}. SteamDrop won't ask about it again."));
     library::emit_state(&app);
     Ok(())
 }
@@ -237,8 +254,43 @@ async fn get_info(state: State<'_, App>, id: u32) -> Result<Option<store::Info>,
 }
 
 #[tauri::command]
-async fn test_sgdb_key(state: State<'_, App>, key: String) -> Result<bool, String> {
-    Ok(art::sgdb_key_ok(&state.http, &key).await)
+fn get_sgdb_key() -> String {
+    secrets::sgdb_key()
+}
+
+#[tauri::command]
+fn set_sgdb_key(key: String) -> Result<(), String> {
+    let key = key.trim();
+    secrets::set_sgdb_key(key)?;
+    log::info(if key.is_empty() { "SteamGridDB key removed." } else { "SteamGridDB key saved in Windows Credential Manager." });
+    Ok(())
+}
+
+#[tauri::command]
+async fn test_sgdb_key(state: State<'_, App>, key: String) -> Result<String, String> {
+    let result = art::sgdb_key_check(&state.http, &key).await;
+    match &result {
+        Ok(_) => log::info("Tested the SteamGridDB key: it works."),
+        Err(e) => log::info(format!("Tested the SteamGridDB key: {e}")),
+    }
+    result
+}
+
+#[tauri::command]
+fn get_activity() -> Vec<String> {
+    log::recent(300)
+}
+
+#[tauri::command]
+fn bug_report(app: AppHandle, state: State<App>) -> String {
+    report::build(&state, &app.package_info().version.to_string())
+}
+
+#[tauri::command]
+fn open_logs() -> Result<(), String> {
+    let dir = log::dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    open(dir.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -252,6 +304,7 @@ async fn restart_steam(app: AppHandle, state: State<'_, App>) -> Result<(), Stri
     })
     .await
     .map_err(|e| e.to_string())??;
+    log::info("Restarted Steam.");
     library::set_status(&app, "Steam restarted.");
     Ok(())
 }
@@ -279,14 +332,20 @@ fn open(target: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn check_update(app: AppHandle) -> Result<Option<String>, String> {
-    let update = app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string())?;
-    Ok(update.map(|u| u.version))
+    let checked = async { app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string()) }.await;
+    match &checked {
+        Ok(Some(u)) => log::info(format!("Update available: version {}.", u.version)),
+        Ok(None) => log::info("Checked for updates: this is the latest version."),
+        Err(e) => log::problem(format!("Could not check for updates: {e}")),
+    }
+    Ok(checked?.map(|u| u.version))
 }
 
 #[tauri::command]
 async fn install_update(app: AppHandle) -> Result<(), String> {
     let update = app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string())?;
     if let Some(u) = update {
+        log::info(format!("Installing update {}.", u.version));
         u.download_and_install(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
         app.restart();
     }
@@ -301,6 +360,11 @@ fn quit(app: AppHandle) {
 fn main() {
     if std::env::args().any(|a| a == "--uninstall-cleanup") {
         library::uninstall_cleanup();
+        return;
+    }
+    // Used by the uninstaller's "Delete SteamDrop settings and cache".
+    if std::env::args().any(|a| a == "--forget-secrets") {
+        let _ = secrets::set_sgdb_key("");
         return;
     }
     let start_hidden = std::env::args().any(|a| a == "--tray");
@@ -324,7 +388,12 @@ fn main() {
             remove_game,
             refresh_game,
             get_info,
+            get_sgdb_key,
+            set_sgdb_key,
             test_sgdb_key,
+            get_activity,
+            bug_report,
+            open_logs,
             restart_steam,
             open,
             check_update,
@@ -332,6 +401,11 @@ fn main() {
             quit
         ])
         .setup(move |app| {
+            log::info(format!(
+                "SteamDrop {} started{}.",
+                app.package_info().version,
+                if start_hidden { " with Windows (in the tray)" } else { "" }
+            ));
             let menu = Menu::with_items(
                 app,
                 &[
