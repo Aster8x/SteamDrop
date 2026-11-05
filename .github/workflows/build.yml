@@ -25,7 +25,7 @@ jobs:
         run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: npm ci
       - name: Build installer (unsigned, no updater files)
-        run: npx tauri build --config "{\"bundle\":{\"createUpdaterArtifacts\":false}}"
+        run: npx tauri build --config src-tauri/tauri.no-updater.conf.json
       - uses: actions/upload-artifact@v4
         with:
           name: SteamDrop-Setup-unsigned

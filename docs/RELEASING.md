@@ -43,7 +43,7 @@ The step-by-step guide is in [STATUS.md, "How to publish a new version"](../STAT
 `npx tauri build` also needs the signing key, because the config asks for updater files. To build without it:
 
 ```bash
-npx tauri build --config "{\"bundle\":{\"createUpdaterArtifacts\":false}}"
+npx tauri build --config src-tauri/tauri.no-updater.conf.json
 ```
 
 ## The uninstaller template
