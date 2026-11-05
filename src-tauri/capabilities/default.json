@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The main window only needs core features; everything else goes through SteamDrop's own commands.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

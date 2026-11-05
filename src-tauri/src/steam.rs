@@ -1,0 +1,278 @@
+//! Everything that touches Steam: where it lives, its users, shortcuts.vdf and its grid folder.
+
+use crate::vdf::{self, Map, Value};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+pub fn now() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+}
+
+/// Steam's install folder, from the registry, or the usual default.
+pub fn detect_path() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+        let from_reg: Option<String> = RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(r"Software\Valve\Steam")
+            .and_then(|k| k.get_value("SteamPath"))
+            .ok();
+        if let Some(p) = from_reg.map(|p| PathBuf::from(p.replace('/', "\\"))) {
+            if p.join("steam.exe").exists() {
+                return Some(p);
+            }
+        }
+        let default = PathBuf::from(r"C:\Program Files (x86)\Steam");
+        default.join("steam.exe").exists().then_some(default)
+    }
+    #[cfg(not(windows))]
+    None
+}
+
+/// Steam accounts that have signed in on this PC: (account id, its config folder).
+pub fn users(steam: &Path) -> Vec<(String, PathBuf)> {
+    let Ok(entries) = std::fs::read_dir(steam.join("userdata")) else { return vec![] };
+    let mut list: Vec<(String, PathBuf)> = entries
+        .flatten()
+        .filter_map(|e| {
+            let id = e.file_name().to_string_lossy().into_owned();
+            let config = e.path().join("config");
+            (id != "0" && id.chars().all(|c| c.is_ascii_digit()) && config.is_dir()).then_some((id, config))
+        })
+        .collect();
+    list.sort();
+    list
+}
+
+pub fn grid_dir(config: &Path) -> PathBuf {
+    config.join("grid")
+}
+
+/// Steam's id for a non-Steam shortcut, the same formula Steam itself uses.
+pub fn shortcut_id(exe_quoted: &str, name: &str) -> u32 {
+    let mut h = crc32fast::Hasher::new();
+    h.update(exe_quoted.as_bytes());
+    h.update(name.as_bytes());
+    h.finalize() | 0x8000_0000
+}
+
+pub fn quote(p: &Path) -> String {
+    format!("\"{}\"", p.display())
+}
+
+fn shortcuts_file(config: &Path) -> PathBuf {
+    config.join("shortcuts.vdf")
+}
+
+fn load(config: &Path) -> Result<Map, String> {
+    match std::fs::read(shortcuts_file(config)) {
+        Ok(bytes) => vdf::parse(&bytes).map_err(|e| format!("Steam's shortcuts file could not be read ({e})")),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(vec![("shortcuts".into(), Value::Map(vec![]))]),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+fn list_mut(root: &mut Map) -> &mut Map {
+    if !root.iter().any(|(k, _)| k.eq_ignore_ascii_case("shortcuts")) {
+        root.push(("shortcuts".into(), Value::Map(vec![])));
+    }
+    match root.iter_mut().find(|(k, _)| k.eq_ignore_ascii_case("shortcuts")) {
+        Some((_, Value::Map(m))) => m,
+        // A "shortcuts" key that isn't a section: replace it rather than corrupt it further.
+        Some((_, v)) => {
+            *v = Value::Map(vec![]);
+            let Value::Map(m) = v else { unreachable!() };
+            m
+        }
+        None => unreachable!(),
+    }
+}
+
+fn entry_id(entry: &Value) -> Option<u32> {
+    match entry {
+        Value::Map(m) => vdf::get_int(m, "appid"),
+        _ => None,
+    }
+}
+
+/// The shortcut ids present for this Steam user.
+pub fn present_ids(config: &Path) -> Vec<u32> {
+    let Ok(mut root) = load(config) else { return vec![] };
+    list_mut(&mut root).iter().filter_map(|(_, e)| entry_id(e)).collect()
+}
+
+fn save(config: &Path, data_dir: &Path, user: &str, mut root: Map) -> Result<(), String> {
+    let path = shortcuts_file(config);
+    backup(&path, data_dir, user)?;
+    // Steam expects entries numbered 0, 1, 2...
+    for (i, (key, _)) in list_mut(&mut root).iter_mut().enumerate() {
+        *key = i.to_string();
+    }
+    let tmp = path.with_extension("vdf.steamdrop-tmp");
+    std::fs::write(&tmp, vdf::write(&root)).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
+}
+
+const KEEP_BACKUPS: usize = 30;
+
+/// Copies shortcuts.vdf to %APPDATA%\SteamDrop\backups\<user>\ before every change.
+fn backup(path: &Path, data_dir: &Path, user: &str) -> Result<(), String> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let dir = data_dir.join("backups").join(user);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let mut name = format!("shortcuts-{}.vdf", now());
+    let mut n = 1;
+    while dir.join(&name).exists() {
+        name = format!("shortcuts-{}-{n}.vdf", now());
+        n += 1;
+    }
+    std::fs::copy(path, dir.join(name)).map_err(|e| format!("Could not back up Steam's shortcuts file: {e}"))?;
+    let mut old: Vec<PathBuf> = std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten().map(|e| e.path()).collect();
+    old.sort_by_key(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok());
+    for p in old.iter().take(old.len().saturating_sub(KEEP_BACKUPS)) {
+        let _ = std::fs::remove_file(p);
+    }
+    Ok(())
+}
+
+pub struct NewShortcut<'a> {
+    pub id: u32,
+    pub name: &'a str,
+    pub exe: &'a Path,
+    pub icon: String,
+}
+
+/// Adds (or replaces) shortcuts for one Steam user, in one write.
+pub fn add(config: &Path, data_dir: &Path, user: &str, items: &[NewShortcut]) -> Result<(), String> {
+    let mut root = load(config)?;
+    let list = list_mut(&mut root);
+    for s in items {
+        list.retain(|(_, e)| entry_id(e) != Some(s.id));
+        let start_dir = s.exe.parent().map(|p| quote(p)).unwrap_or_default();
+        let str_ = |v: &str| Value::Str(v.to_string());
+        list.push((
+            String::new(),
+            Value::Map(vec![
+                ("appid".into(), Value::Int(s.id)),
+                ("AppName".into(), str_(s.name)),
+                ("Exe".into(), str_(&quote(s.exe))),
+                ("StartDir".into(), str_(&start_dir)),
+                ("icon".into(), str_(&s.icon)),
+                ("ShortcutPath".into(), str_("")),
+                ("LaunchOptions".into(), str_("")),
+                ("IsHidden".into(), Value::Int(0)),
+                ("AllowDesktopConfig".into(), Value::Int(1)),
+                ("AllowOverlay".into(), Value::Int(1)),
+                ("OpenVR".into(), Value::Int(0)),
+                ("Devkit".into(), Value::Int(0)),
+                ("DevkitGameID".into(), str_("")),
+                ("DevkitOverrideAppID".into(), Value::Int(0)),
+                // Puts it first under "Recent" in the library.
+                ("LastPlayTime".into(), Value::Int(now() as u32)),
+                ("FlatpakAppID".into(), str_("")),
+                ("tags".into(), Value::Map(vec![])),
+            ]),
+        ));
+    }
+    save(config, data_dir, user, root)
+}
+
+/// Removes shortcuts by id. Never touches game files.
+pub fn remove(config: &Path, data_dir: &Path, user: &str, ids: &[u32]) -> Result<(), String> {
+    let mut root = load(config)?;
+    let list = list_mut(&mut root);
+    let before = list.len();
+    list.retain(|(_, e)| !entry_id(e).is_some_and(|id| ids.contains(&id)));
+    if list.len() == before {
+        return Ok(());
+    }
+    save(config, data_dir, user, root)
+}
+
+#[cfg(windows)]
+fn hidden(cmd: &mut std::process::Command) -> &mut std::process::Command {
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+}
+
+pub fn is_running() -> bool {
+    #[cfg(windows)]
+    {
+        let out = hidden(std::process::Command::new("tasklist").args(["/FI", "IMAGENAME eq steam.exe", "/NH"])).output();
+        out.map(|o| String::from_utf8_lossy(&o.stdout).to_lowercase().contains("steam.exe")).unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+/// Asks Steam to close and waits (up to a minute) until it has.
+/// Steam must be closed while shortcuts.vdf changes, or it overwrites them on exit.
+pub fn shutdown(steam: &Path) -> Result<(), String> {
+    if !is_running() {
+        return Ok(());
+    }
+    std::process::Command::new(steam.join("steam.exe"))
+        .arg("-shutdown")
+        .spawn()
+        .map_err(|e| format!("Could not ask Steam to close: {e}"))?;
+    for _ in 0..120 {
+        std::thread::sleep(Duration::from_millis(500));
+        if !is_running() {
+            // Give Steam a moment to finish writing its own files.
+            std::thread::sleep(Duration::from_secs(2));
+            return Ok(());
+        }
+    }
+    Err("Steam did not close within a minute. Close Steam yourself, then try again.".into())
+}
+
+pub fn start(steam: &Path, big_picture: bool) -> Result<(), String> {
+    let mut cmd = std::process::Command::new(steam.join("steam.exe"));
+    if big_picture {
+        cmd.arg("-tenfoot");
+    }
+    cmd.spawn().map(|_| ()).map_err(|e| format!("Could not start Steam: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shortcut_ids_have_the_high_bit() {
+        let id = shortcut_id("\"C:\\Games\\A\\a.exe\"", "A");
+        assert!(id & 0x8000_0000 != 0);
+        assert_ne!(id, shortcut_id("\"C:\\Games\\B\\b.exe\"", "B"));
+    }
+
+    #[test]
+    fn add_replace_remove() {
+        let base = std::env::temp_dir().join(format!("steamdrop-steam-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let config = base.join("userdata/123/config");
+        std::fs::create_dir_all(&config).unwrap();
+        let data = base.join("data");
+        // Someone else's shortcut must survive untouched.
+        let other: Map = vec![(
+            "shortcuts".into(),
+            Value::Map(vec![("0".into(), Value::Map(vec![("appid".into(), Value::Int(7)), ("appname".into(), Value::Str("Other".into()))]))]),
+        )];
+        std::fs::write(config.join("shortcuts.vdf"), vdf::write(&other)).unwrap();
+
+        let exe = PathBuf::from("/games/A/a.exe");
+        let s = NewShortcut { id: 0x8000_0001, name: "A", exe: &exe, icon: String::new() };
+        add(&config, &data, "123", &[s]).unwrap();
+        let s = NewShortcut { id: 0x8000_0001, name: "A", exe: &exe, icon: String::new() };
+        add(&config, &data, "123", &[s]).unwrap();
+        assert_eq!(present_ids(&config), vec![7, 0x8000_0001]);
+        assert_eq!(users(&base), vec![("123".to_string(), config.clone())]);
+
+        remove(&config, &data, "123", &[0x8000_0001]).unwrap();
+        assert_eq!(present_ids(&config), vec![7]);
+        let root = vdf::parse(&std::fs::read(config.join("shortcuts.vdf")).unwrap()).unwrap();
+        assert_eq!(root, other);
+        assert_eq!(std::fs::read_dir(data.join("backups/123")).unwrap().count(), 3);
+    }
+}
