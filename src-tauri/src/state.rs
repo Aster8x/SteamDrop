@@ -28,6 +28,8 @@ pub struct Settings {
     pub last_seen_version: String,
     /// SteamDrop's own Steam shortcut, which opens Couch mode.
     pub steam_shortcut: bool,
+    /// "When opened from Steam": "auto" (Big Picture = Couch mode), "couch" or "window".
+    pub steam_view: String,
 }
 
 impl Default for Settings {
@@ -48,6 +50,7 @@ impl Default for Settings {
             skipped_version: String::new(),
             last_seen_version: String::new(),
             steam_shortcut: true,
+            steam_view: "auto".into(),
         }
     }
 }

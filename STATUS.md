@@ -98,11 +98,16 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Start Couch mode while SteamDrop is already in the tray: it still opens, and you don't get two SteamDrops.
 26. **Game details in Couch mode:** "Find artwork again", "Change game file" (pick another .exe), and "Remove from Steam" all work; Steam's library changes after a Steam restart.
 27. **Leaving Couch mode after a change:** remove a game in Couch mode, then leave. You're asked "Restart Steam to apply changes?". "Restart now" closes Couch mode, restarts Steam back into Big Picture, and the game is gone for good: it must not come back after another Steam restart. "Later" just leaves.
-28. **Delete game:**
+28. **Opening from Steam:**
+    - Start SteamDrop from desktop Steam: the normal window opens. Start it from Big Picture (or a Steam Deck): Couch mode opens.
+    - Change "When opened from Steam" to "Always Couch mode" or "Always window" and check it's respected.
+    - F11 or the switch button changes views; Steam keeps showing SteamDrop as running the whole time, and as stopped only after the last window closes.
+29. **Control bar** (both views): Scan now finds a game you copied while SteamDrop was paused (Y on a controller). Hide sends the window to the tray (Couch: back to Steam, SteamDrop still "running" in Steam). Close closes the window but the tray icon stays. Quit SteamDrop asks "Stop adding new games?" and then exits.
+30. **Delete game:**
     - Use a test game you don't need. Holding A for under 2 seconds does nothing; holding it for 2 seconds moves the folder to the Recycle Bin (check that you can restore it) and removes the game.
     - Set a PIN in Couch mode's Settings: deleting now asks for it, and a wrong PIN refuses.
     - On a USB stick or network drive without a Recycle Bin, SteamDrop must refuse and leave the folder alone.
-29. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
+31. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 

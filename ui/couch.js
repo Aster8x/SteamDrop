@@ -174,11 +174,33 @@ function activityScreen() {
 const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, pin: pinScreen, leave: leaveScreen };
 const current = () => stack.length ? SCREENS[stack.at(-1).name](stack.at(-1)) : SCREENS[tab]();
 
+/* ---------- control bar ---------- */
+async function scanNow() {
+  toast("Looking for new games...");
+  try { toast((await invoke("scan_now")) || "Done."); } catch (e) { toast(String(e), true); }
+}
+const switchView = () => invoke("switch_view", { from: "couch" });
+const backToSteam = () => invoke("hide_window", { label: "couch" });
+const quitScreen = () => push({ name: "confirm", title: "Stop adding new games?", text: "SteamDrop will stop watching your folders until you start it again.", yes: "Quit SteamDrop", action: () => invoke("quit") });
+
+function controlBar() {
+  const c = (key, badge, cls, label, action, kind = "") =>
+    h("button", { class: `cbtn f ${kind}`, "data-key": key, onclick: action }, h("b", { class: cls }, badge), label);
+  return [
+    c("c-scan", "Y", "y", "Scan now", scanNow),
+    c("c-view", "View", "", "Window view", switchView),
+    c("c-hide", "Menu", "", "Back to Steam", backToSteam),
+    c("c-close", "A", "a", "Close", leave),
+    c("c-quit", "A", "a", "Quit SteamDrop", quitScreen, "danger"),
+  ];
+}
+
 /* ---------- navigation ---------- */
 function render() {
   const keep = document.activeElement?.dataset?.key;
   for (const t of document.querySelectorAll(".tab")) t.classList.toggle("active", t.dataset.tab === tab);
   $("#screen").replaceChildren(...current());
+  $("#controls").replaceChildren(...controlBar());
   const hints = [h("span", {}, h("b", { class: "a" }, "A"), "Select"), h("span", {}, h("b", { class: "b" }, "B"), stack.length ? "Back" : "Leave")];
   if (!stack.length) hints.push(h("span", {}, h("b", {}, "LB"), h("b", {}, "RB"), "Switch"));
   $("#hints").replaceChildren(...hints);
@@ -225,7 +247,7 @@ async function save(patch) {
 
 /** Moves focus to the nearest focusable element in a direction. */
 function move(dx, dy) {
-  const items = [...document.querySelectorAll("#screen .f")];
+  const items = [...document.querySelectorAll("#screen .f, #controls .f")];
   const cur = document.activeElement;
   if (!items.includes(cur)) { items[0]?.focus(); return; }
   const a = cur.getBoundingClientRect();
@@ -273,6 +295,9 @@ function press(action) {
   if (action === "a") {
     if (!holdStart()) document.activeElement?.classList.contains("f") && document.activeElement.click();
   } else if (action === "b") back();
+  else if (action === "y") scanNow();
+  else if (action === "view") switchView();
+  else if (action === "menu") backToSteam();
   else if (action === "lb") switchTab(-1);
   else if (action === "rb") switchTab(1);
   else if (action === "up") move(0, -1);
@@ -283,20 +308,21 @@ function press(action) {
 function release(action) { if (action === "a") holdEnd(); }
 
 /* Keyboard */
-const KEYS = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "a", " ": "a", Escape: "b", Backspace: "b", q: "lb", Q: "lb", PageUp: "lb", e: "rb", E: "rb", PageDown: "rb" };
+const KEYS = { F11: "view", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "a", " ": "a", Escape: "b", Backspace: "b", q: "lb", Q: "lb", PageUp: "lb", e: "rb", E: "rb", PageDown: "rb" };
 document.addEventListener("keydown", (e) => {
   const action = KEYS[e.key];
   if (!action) return;
   e.preventDefault();
-  if (e.repeat && (action === "a" || action === "b" || action === "lb" || action === "rb")) return;
+  if (e.repeat && !["up", "down", "left", "right"].includes(action)) return;
   press(action);
 });
 document.addEventListener("keyup", (e) => { if (KEYS[e.key]) { e.preventDefault(); release(KEYS[e.key]); } });
 document.addEventListener("click", (e) => { if (e.target.closest?.("[data-hold]")) e.preventDefault(); }, true);
 
-/* Gamepad (standard mapping: 0 A, 1 B, 4 LB, 5 RB, 12-15 D-pad; axes 0/1 left stick).
+/* Gamepad (standard mapping: 0 A, 1 B, 3 Y, 4 LB, 5 RB, 8 View/Share, 9 Menu/Options, 12-15 D-pad;
+   axes 0/1 left stick).
    The Gamepad API has no events for buttons, so it's read every frame while Couch mode is open. */
-const BUTTONS = { 0: "a", 1: "b", 4: "lb", 5: "rb", 12: "up", 13: "down", 14: "left", 15: "right" };
+const BUTTONS = { 0: "a", 1: "b", 3: "y", 4: "lb", 5: "rb", 8: "view", 9: "menu", 12: "up", 13: "down", 14: "left", 15: "right" };
 const REPEATS = new Set(["up", "down", "left", "right"]);
 const held = new Map(); // action -> next repeat time
 function pollPads(t) {

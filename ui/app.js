@@ -557,8 +557,12 @@ function settingsView() {
     h("div", { class: "panel" },
       h("h2", {}, "Couch mode"),
       h("p", { class: "muted" }, "A full-screen view for the TV that you control with a gamepad. It opens when you start SteamDrop from your Steam library (for example in Big Picture)."),
-      setting("Add SteamDrop to Steam", "Puts SteamDrop in your Steam library with its own artwork, so you can open Couch mode from the couch.",
+      setting("Add SteamDrop to Steam", "Puts SteamDrop in your Steam library with its own artwork, so you can open it from the couch.",
         toggle(st.steam_shortcut, (v) => run(() => invoke("set_steam_shortcut", { on: v })), "Add SteamDrop to Steam")),
+      setting("When opened from Steam", "Auto: Couch mode in Big Picture (and on a Steam Deck), this window in normal Steam. You can switch anytime with F11.",
+        h("div", { class: "seg", role: "group", "aria-label": "When opened from Steam" },
+          [["auto", "Auto"], ["couch", "Always Couch mode"], ["window", "Always window"]].map(([v, label]) =>
+            h("button", { "aria-pressed": String((st.steam_view || "auto") === v), onclick: () => saveSettings({ steam_view: v }) }, label)))),
       h("div", { class: "row" }, btn("Open Couch mode", () => invoke("open_couch"), "", { always: true }))),
 
     h("div", { class: "panel" },
@@ -598,6 +602,39 @@ function aboutView() {
       link("Third-party credits", `${REPO}/blob/main/THIRD_PARTY.md`)),
   ];
 }
+
+/* ---------- control bar (also F11, and Y / View on a controller) ---------- */
+async function scanNow() {
+  showStatus("Looking for new games...");
+  try { showStatus(await invoke("scan_now")); } catch (e) { showStatus(String(e), true); }
+}
+async function quitSteamDrop() {
+  const ok = await ask("Stop adding new games?", "SteamDrop will stop watching your folders until you start it again.",
+    [{ label: "Cancel", value: null }, { label: "Quit SteamDrop", value: "quit", kind: "danger" }]);
+  if (ok) invoke("quit");
+}
+const switchView = () => invoke("switch_view", { from: "main" });
+$("#c-scan").addEventListener("click", scanNow);
+$("#c-view").addEventListener("click", switchView);
+$("#c-hide").addEventListener("click", () => invoke("hide_window", { label: "main" }));
+$("#c-close").addEventListener("click", () => invoke("close_window", { label: "main" }));
+$("#c-quit").addEventListener("click", quitSteamDrop);
+document.addEventListener("keydown", (e) => { if (e.key === "F11") { e.preventDefault(); switchView(); } });
+
+// The desktop window isn't built for a controller, but Y and View work here too.
+// Only read while a controller is connected (the Gamepad API has no button events).
+const padDown = new Set();
+function pollPad() {
+  const pads = [...(navigator.getGamepads?.() || [])].filter(Boolean);
+  if (!pads.length) return;
+  for (const [i, act] of [[3, scanNow], [8, switchView]]) {
+    const down = pads.some((p) => p.buttons[i]?.pressed);
+    if (down && !padDown.has(i) && document.hasFocus()) act();
+    if (down) padDown.add(i); else padDown.delete(i);
+  }
+  requestAnimationFrame(pollPad);
+}
+window.addEventListener("gamepadconnected", () => requestAnimationFrame(pollPad));
 
 /* ---------- start ---------- */
 for (const t of document.querySelectorAll(".tab")) {

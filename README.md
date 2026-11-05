@@ -50,7 +50,7 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 
 ## Couch mode
 
-Play from the sofa? SteamDrop can add **itself** to your Steam library, with its own artwork. Start it from Steam (in Big Picture, on the TV) and it opens **Couch mode**: a full-screen view you control with an Xbox or PlayStation controller.
+Play from the sofa? SteamDrop can add **itself** to your Steam library, with its own artwork. Start it from Steam in Big Picture (or on a Steam Deck) and it opens **Couch mode**: a full-screen view you control with an Xbox or PlayStation controller. Started from normal desktop Steam, it opens its usual window instead. Settings → Couch mode → "When opened from Steam" can make it always one or the other, and **F11** switches between the two views anytime.
 
 - **Library:** all the games SteamDrop added, as big cover tiles.
 - **Game details:** find the artwork again, change which file starts the game, remove it from Steam, or delete the game.
@@ -62,6 +62,11 @@ Play from the sofa? SteamDrop can add **itself** to your Steam library, with its
 | A (Cross) | Select |
 | B (Circle) | Back |
 | LB / RB (L1 / R1) | Switch between Library, Settings and Activity |
+| Y (Triangle) | Scan now: look for new games right away |
+| View (Share) | Switch to the desktop window |
+| Menu (Options) | Back to Steam (SteamDrop keeps running) |
+
+Both views have the same control bar: **Scan now**, **Hide** ("Back to Steam" in Couch mode), **Close** (closes the window, SteamDrop keeps watching from the tray) and **Quit SteamDrop** (stops watching completely, after asking).
 
 **Deleting a game** needs you to hold A for 2 seconds. The game folder goes to the **Recycle Bin**, never deleted for good (on drives without a Recycle Bin, SteamDrop refuses). You can also set a 4-digit PIN in Couch mode's Settings so nobody deletes games by accident.
 

@@ -339,7 +339,8 @@ fn self_shortcut() -> Result<(u32, PathBuf), String> {
     Ok((steam::shortcut_id(&steam::quote(&exe), SELF_NAME), exe))
 }
 
-/// Adds or removes SteamDrop's own shortcut (it opens Couch mode) for every Steam account.
+/// Adds or removes SteamDrop's own shortcut for every Steam account. Started from Steam it opens
+/// Couch mode in Big Picture and the window in desktop Steam (see couch.rs).
 pub fn set_self_shortcut(steam_dir: &Path, data_dir: &Path, on: bool) -> Result<(), String> {
     let (id, exe) = self_shortcut()?;
     let cache = art::cache_dir(data_dir, id);
@@ -356,7 +357,7 @@ pub fn set_self_shortcut(steam_dir: &Path, data_dir: &Path, on: bool) -> Result<
         let grid = steam::grid_dir(&config);
         if on {
             let icon = art::install(&grid, id, &files).unwrap_or_else(|| exe.clone());
-            let s = steam::NewShortcut { id, name: SELF_NAME, exe: &exe, icon: icon.to_string_lossy().into_owned(), launch_options: "--couch" };
+            let s = steam::NewShortcut { id, name: SELF_NAME, exe: &exe, icon: icon.to_string_lossy().into_owned(), launch_options: "--from-steam" };
             steam::add(&config, data_dir, &user, &[s])?;
         } else {
             steam::remove(&config, data_dir, &user, &[id])?;

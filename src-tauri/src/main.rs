@@ -40,6 +40,7 @@ pub fn show_window(app: &AppHandle) {
         if let Some(cfg) = app2.config().app.windows.first() {
             if let Ok(w) = WebviewWindowBuilder::from_config(&app2, cfg).and_then(|b| b.build()) {
                 let _ = w.set_focus();
+                couch::sync_lock(&app2, None);
             }
         }
     });
@@ -422,15 +423,50 @@ async fn set_steam_shortcut(app: AppHandle, state: State<'_, App>, on: bool) -> 
 
 #[tauri::command]
 fn open_couch(app: AppHandle) {
-    couch::open(&app);
+    couch::open(&app, couch::View::Couch);
 }
 
 #[tauri::command]
 fn close_couch(app: AppHandle, state: State<App>, restart: bool) {
     // The restart happens after the window (and the process Steam started) is gone; see couch::closed.
     state.restart_after_couch.store(restart, std::sync::atomic::Ordering::SeqCst);
-    if let Some(w) = app.get_webview_window(couch::LABEL) {
-        let _ = w.close();
+    if let Some(w) = app.get_webview_window(couch::COUCH) {
+        let _ = w.destroy();
+    }
+}
+
+/// The view switch button and F11.
+#[tauri::command]
+fn switch_view(app: AppHandle, from: String) {
+    couch::switch(&app, &from);
+}
+
+/// "Hide": the desktop window goes to the tray; Couch mode minimizes, back to Steam.
+/// Either way SteamDrop keeps its Steam session, so Steam can bring it back.
+#[tauri::command]
+fn hide_window(app: AppHandle, label: String) {
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = if label == couch::COUCH { w.minimize() } else { w.hide() };
+    }
+}
+
+/// "Close": the window goes away; SteamDrop keeps watching from the tray.
+#[tauri::command]
+fn close_window(app: AppHandle, label: String) {
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = w.destroy();
+    }
+}
+
+/// "Scan now": look at the watched folders right away.
+#[tauri::command]
+fn scan_now(app: AppHandle) -> String {
+    let found = watcher::scan_now(&app);
+    log::info(format!("Scan now: {found} new folder(s) found."));
+    match found {
+        0 => "No new game folders found.".into(),
+        1 => "Found 1 new folder.".into(),
+        n => format!("Found {n} new folders."),
     }
 }
 
@@ -459,25 +495,29 @@ fn main() {
         library::remove_self_from_installer();
         return;
     }
-    let from_steam = std::env::args().any(|a| a == "--couch");
+    let args: Vec<String> = std::env::args().collect();
+    // "--couch" is what the Steam shortcut used before views could be chosen.
+    let from_steam = args.iter().any(|a| a == "--from-steam" || a == "--couch");
     #[cfg(windows)]
     if from_steam {
         couch::run_from_steam();
         return;
     }
-    let start_couch = from_steam || std::env::args().any(|a| a == "--couch-open");
-    let start_hidden = std::env::args().any(|a| a == "--tray");
-    let big_picture = std::env::args().any(|a| a == "--big-picture") || (from_steam && couch::started_in_big_picture());
+    let big_picture = args.iter().any(|a| a == "--big-picture") || (from_steam && couch::started_in_big_picture());
+    // Elsewhere (development builds) the Steam launch opens its view in this same process.
+    let open_view = couch::parse_view(&args).or_else(|| {
+        from_steam.then(|| couch::view_for(&state::load(&state::data_dir()).settings.steam_view, big_picture))
+    });
+    let start_hidden = args.iter().any(|a| a == "--tray");
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             if args.iter().any(|a| a == "--big-picture") {
                 app.state::<App>().big_picture.store(true, std::sync::atomic::Ordering::SeqCst);
             }
-            if args.iter().any(|a| a == "--couch-open") {
-                couch::open(app);
-            } else {
-                show_window(app);
+            match couch::parse_view(&args) {
+                Some(view) => couch::open(app, view),
+                None => show_window(app),
             }
         }))
         .plugin(tauri_plugin_dialog::init())
@@ -515,6 +555,10 @@ fn main() {
             set_steam_shortcut,
             open_couch,
             close_couch,
+            switch_view,
+            hide_window,
+            close_window,
+            scan_now,
             quit
         ])
         .setup(move |app| {
@@ -539,7 +583,7 @@ fn main() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "open" => show_window(app),
-                    "couch" => couch::open(app),
+                    "couch" => couch::open(app, couch::View::Couch),
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -554,8 +598,8 @@ fn main() {
             updates::schedule(app.handle());
             let handle = app.handle().clone();
             std::thread::spawn(move || library::startup_repair(&handle));
-            if start_couch {
-                couch::open(app.handle());
+            if let Some(view) = open_view {
+                couch::open(app.handle(), view);
             } else if !start_hidden {
                 show_window(app.handle());
             }
@@ -564,15 +608,15 @@ fn main() {
         .on_window_event(|window, event| {
             // With "minimize to tray" on, closing destroys the window (freeing its memory) and we keep running.
             let app = window.app_handle();
-            let couch = window.label() == couch::LABEL;
+            let label = window.label();
             match event {
                 WindowEvent::CloseRequested { .. } => {
-                    let other_open = app.get_webview_window(if couch { "main" } else { couch::LABEL }).is_some();
-                    if !window.state::<App>().settings().close_to_tray && !other_open {
+                    let other = if label == couch::COUCH { couch::MAIN } else { couch::COUCH };
+                    if !window.state::<App>().settings().close_to_tray && app.get_webview_window(other).is_none() {
                         app.exit(0);
                     }
                 }
-                WindowEvent::Destroyed if couch => couch::closed(app),
+                WindowEvent::Destroyed => couch::closed(app, label),
                 _ => {}
             }
         })

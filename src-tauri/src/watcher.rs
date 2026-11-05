@@ -97,6 +97,25 @@ fn run(app: AppHandle, roots: Vec<PathBuf>, rx: mpsc::Receiver<notify::Result<no
     }
 }
 
+/// "Scan now": hands over every new, fully copied folder in the watched folders. Returns how many.
+pub fn scan_now(app: &AppHandle) -> usize {
+    let state = app.state::<App>();
+    let roots: Vec<PathBuf> = state.settings().watched.iter().map(PathBuf::from).collect();
+    let ready: Vec<PathBuf> = roots
+        .iter()
+        .flat_map(|root| std::fs::read_dir(root).into_iter().flatten().flatten().map(|e| e.path()))
+        .filter(|p| p.is_dir() && !state.data.lock().unwrap().is_known(&p.to_string_lossy()))
+        .filter(|p| std::fs::read_dir(p).is_ok_and(|mut d| d.next().is_some()))
+        // Folders still being copied are left to the watcher, which adds them once copying ends.
+        .filter(|p| !still_copying(p))
+        .collect();
+    let count = ready.len();
+    if count > 0 {
+        crate::library::found(app, ready);
+    }
+    count
+}
+
 /// True while any recently changed file can't be opened exclusively (it's still being written).
 fn still_copying(folder: &Path) -> bool {
     let recent = SystemTime::now() - Duration::from_secs(180);

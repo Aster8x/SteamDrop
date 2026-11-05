@@ -268,3 +268,9 @@ textarea.report { width: 100%; font: .85rem/1.4 Consolas, monospace; background:
 .notes ul { margin: .2rem 0 .6rem; padding-left: 1.3rem; }
 .notes li { margin: .25rem 0; }
 .notes code { font-family: Consolas, monospace; font-size: .9em; background: var(--panel-2); padding: 0 .3rem; border-radius: 5px; }
+
+.controlbar { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; padding: .5rem 1.5rem; background: var(--panel); border-bottom: 1px solid var(--border); }
+.cbtn { font: inherit; font-weight: 700; font-size: .9rem; min-height: 40px; padding: .3rem .9rem; border-radius: 10px; border: 2px solid var(--border); background: var(--panel-2); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: .45rem; }
+.cbtn:hover { border-color: var(--accent); }
+.cbtn.danger { color: var(--danger); }
+.cbtn kbd { font: inherit; font-size: .75rem; padding: 0 .35rem; border-radius: 5px; border: 1px solid var(--border); color: var(--muted); }
