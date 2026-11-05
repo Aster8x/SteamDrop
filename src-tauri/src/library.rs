@@ -132,6 +132,11 @@ pub async fn add(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<Stri
         });
     }
 
+    // Re-adding a folder under a new name or exe gives it a new id; drop the old shortcut.
+    let replaced: Vec<u32> = {
+        let d = state.data.lock().unwrap();
+        d.games.iter().filter(|o| games.iter().any(|g| g.id != o.id && same_path(&g.folder, &o.folder))).map(|o| o.id).collect()
+    };
     let was_running = steam::is_running();
     let restarting = was_running && restart;
     let dir = state.dir.clone();
@@ -146,6 +151,12 @@ pub async fn add(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<Stri
         let mut result = Ok(());
         for (user, config) in &users {
             let grid = steam::grid_dir(config);
+            if !replaced.is_empty() {
+                if let Err(e) = steam::remove(config, &dir, user, &replaced) {
+                    result = Err(e);
+                }
+                replaced.iter().for_each(|id| art::uninstall(&grid, *id));
+            }
             let shortcuts: Vec<steam::NewShortcut> = games2
                 .iter()
                 .zip(&art_sets)
