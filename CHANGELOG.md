@@ -39,6 +39,9 @@ First release.
 - "Add games to": all Steam accounts on the PC (the default) or only the ones you tick, shown with their Steam names. Removing a game, and the uninstaller, cover every account.
 - A short chime when a game is added, heard even over Big Picture. On by default, with a volume slider and a "Test" button. The sound is synthesized by SteamDrop itself.
 - "Open Steam in Big Picture when Windows starts" (off by default): at sign-in, Steam opens in Big Picture unless it's already there.
+- Starting fresh: adding a watched folder that already has games asks "What about games already in this folder?" ("Only new games from now on" by default), with "Add existing games now" for later.
+- Folder rules: each direct subfolder of a watched folder is one game; a watched folder inside another is skipped by the outer one; per-folder "Exclude a subfolder" ignores a folder and everything in it; a game whose .exe already has a Steam shortcut is never added again.
+- Folders moved or renamed into a watched folder are added like copies. Games moved out are never removed from Steam automatically: they show under "Missing games" with "Find it" and "Remove from Steam".
 - Leaving Couch mode after changes asks "Restart Steam to apply changes?". SteamDrop then restarts Steam once Couch mode has closed (back into Big Picture) and writes the changes while Steam is closed, so Steam can't bring back a removed game.
 
 [Unreleased]: https://github.com/Aster8x/SteamDrop/compare/v0.1.0...HEAD

@@ -223,11 +223,12 @@ async function addWatchFolder() {
   const count = await invoke("count_subfolders", { path });
   let includeExisting = false;
   if (count > 0) {
-    const choice = await ask("Add the games already there?",
-      `This folder already has ${count} folder${count === 1 ? "" : "s"} in it. Should SteamDrop add those games to Steam too, or only games that arrive from now on?`,
+    const n = `${count} game${count === 1 ? "" : "s"}`;
+    const choice = await ask("What about games already in this folder?",
+      `This folder already has ${n} in it. SteamDrop can leave them alone and only add games that arrive from now on, or add these too. You can still add them later with "Add existing games now".`,
       [
-        { label: "Only new games", value: "new" },
-        { label: "Add them too", value: "all", kind: "primary" },
+        { label: `Also add the ${n} already here`, value: "all" },
+        { label: "Only new games from now on", value: "new", kind: "primary" },
       ]);
     if (choice === null) return;
     includeExisting = choice === "all";
@@ -330,8 +331,10 @@ function gamesView() {
     h("div", {}, h("h1", {}, "Your games"),
       h("p", { class: "muted" }, S.games.length ? `${S.games.length} game${S.games.length === 1 ? "" : "s"} added by SteamDrop` : "Games you add show up here.")),
     btn("+ Add a game", addGameFolder, "primary")));
+  const missing = S.games.filter((g) => g.folder_missing);
+  if (missing.length) out.splice(out.length - 1, 0, missingPanel(missing));
   if (S.games.length) {
-    out.push(h("div", { class: "grid" }, S.games.map(gameCard)));
+    out.push(h("div", { class: "grid" }, S.games.filter((g) => !g.folder_missing).map(gameCard)));
   } else {
     out.push(h("div", { class: "panel empty" }, logo(),
       h("h2", {}, "No games yet"),
@@ -473,6 +476,47 @@ function helpPanel() {
     list);
 }
 
+const inside = (path, folder) => path.toLowerCase().startsWith(folder.toLowerCase().replace(/[\\/]+$/, "") + "\\");
+
+/** One watched folder: add the games already there, exclude subfolders, stop watching. */
+function watchedFolder(st, w) {
+  // An exclusion belongs to the innermost watched folder that holds it.
+  const owner = (x) => st.watched.filter((v) => inside(x, v)).sort((a, b) => b.length - a.length)[0];
+  const excluded = st.excluded.filter((x) => owner(x) === w);
+  const exclude = async () => {
+    const p = await invoke("pick_folder", { start: w });
+    if (!p) return;
+    if (!inside(p, w)) return showStatus(`Choose a folder inside ${w}.`, true);
+    if (!st.excluded.some((x) => x.toLowerCase() === p.toLowerCase())) saveSettings({ excluded: [...st.excluded, p] });
+  };
+  return h("li", { class: "watched" },
+    h("div", { class: "spread" }, h("span", { class: "path" }, w),
+      h("div", { class: "row" },
+        btn("Add existing games now", () => run(() => invoke("add_existing_games", { path: w })), "small"),
+        btn("Exclude a subfolder...", exclude, "small"),
+        btn("Stop watching", () => saveSettings({ watched: st.watched.filter((x) => x !== w), excluded: st.excluded.filter((x) => owner(x) !== w) }), "small"))),
+    excluded.length ? h("ul", { class: "excluded", "aria-label": `Excluded folders in ${w}` }, excluded.map((x) => h("li", {},
+      h("span", { class: "path" }, `Excluded: ${x}`),
+      btn("Remove", () => saveSettings({ excluded: st.excluded.filter((y) => y !== x) }), "small")))) : null);
+}
+
+/** Games whose folder was moved or deleted. Nothing changes in Steam until the user says so. */
+function missingPanel(missing) {
+  const find = async (g) => {
+    const folder = await invoke("pick_folder", { start: null });
+    if (!folder) return;
+    const restart = await askRestart(`"${g.name}" in its new place`);
+    if (restart === null) return;
+    await run(() => invoke("find_game", { id: g.id, folder, restart }));
+  };
+  return h("div", { class: "panel warn" },
+    h("h2", {}, "Missing games"),
+    h("p", {}, "These games' folders were moved or deleted. SteamDrop hasn't changed anything in Steam. Find each one in its new place, or remove it from Steam."),
+    h("ul", { class: "folder-list" }, missing.map((g) => h("li", {},
+      h("span", {}, h("strong", {}, g.name), h("br", {}), h("span", { class: "path muted small" }, g.folder)),
+      h("div", { class: "row" }, btn("Find it", () => find(g), "small"), btn("Remove from Steam", () => removeGame(g), "small danger"))))));
+}
+
 /** "Add games to": every Steam account on this PC, or a checklist of chosen ones. */
 function accountsPicker(st) {
   const accounts = S.steam.accounts || [];
@@ -534,10 +578,9 @@ function settingsView() {
       h("h2", {}, "Watched folders"),
       h("p", { class: "muted" }, "SteamDrop keeps an eye on these folders. Pick the folder that holds your game folders, not a single game's folder."),
       st.watched.length
-        ? h("ul", { class: "folder-list" }, st.watched.map((w) => h("li", {},
-          h("span", { class: "path" }, w),
-          btn("Stop watching", () => saveSettings({ watched: st.watched.filter((x) => x !== w) }), "small"))))
+        ? h("ul", { class: "folder-list" }, st.watched.map((w) => watchedFolder(st, w)))
         : h("p", {}, "No folders yet."),
+      h("p", { class: "muted small" }, "Each folder directly inside a watched folder is one game. A watched folder inside another one is skipped by the outer one, and excluded folders are ignored with everything in them."),
       btn("Add a folder to watch", addWatchFolder, "primary")),
 
     h("div", { class: "panel" },

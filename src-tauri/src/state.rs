@@ -9,6 +9,8 @@ use std::sync::Mutex;
 #[serde(default)]
 pub struct Settings {
     pub watched: Vec<String>,
+    /// Folders inside watched folders that SteamDrop ignores, with everything in them.
+    pub excluded: Vec<String>,
     /// The three "automatic mode" switches. The main switch is derived from them in the UI.
     pub auto_add: bool,
     pub auto_restart: bool,
@@ -44,6 +46,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             watched: vec![],
+            excluded: vec![],
             auto_add: false,
             auto_restart: false,
             notify: false,

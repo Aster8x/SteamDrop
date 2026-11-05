@@ -124,7 +124,7 @@ fn save_settings(app: AppHandle, state: State<App>, settings: Settings) -> Resul
     let old = state.settings();
     set_run_at_sign_in("SteamDrop", settings.run_on_startup.then_some("--tray"))?;
     set_run_at_sign_in("SteamDrop Big Picture", settings.big_picture_at_sign_in.then_some("--start-big-picture"))?;
-    let watch_changed = old.watched != settings.watched;
+    let watch_changed = old.watched != settings.watched || old.excluded != settings.excluded;
     log_changes(&old, &settings);
     state.update(|d| d.settings = settings)?;
     if watch_changed {
@@ -167,8 +167,12 @@ fn set_run_at_sign_in(name: &str, args: Option<&str>) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn pick_folder(app: AppHandle) -> Option<String> {
-    app.dialog().file().set_title("Choose a folder").blocking_pick_folder().map(|p| p.to_string())
+async fn pick_folder(app: AppHandle, start: Option<String>) -> Option<String> {
+    let mut dialog = app.dialog().file().set_title("Choose a folder");
+    if let Some(dir) = start {
+        dialog = dialog.set_directory(dir);
+    }
+    dialog.blocking_pick_folder().map(|p| p.to_string())
 }
 
 #[tauri::command]
@@ -184,8 +188,30 @@ async fn pick_exe(app: AppHandle, folder: String) -> Option<String> {
 
 /// How many folders are already inside a folder about to be watched.
 #[tauri::command]
-fn count_subfolders(path: String) -> usize {
-    std::fs::read_dir(path).map(|d| d.flatten().filter(|e| e.path().is_dir()).count()).unwrap_or(0)
+fn count_subfolders(state: State<App>, path: String) -> usize {
+    let s = state.settings();
+    let mut roots: Vec<PathBuf> = s.watched.iter().map(PathBuf::from).collect();
+    roots.push(PathBuf::from(&path));
+    let excluded: Vec<PathBuf> = s.excluded.iter().map(PathBuf::from).collect();
+    watcher::subfolders(&PathBuf::from(path), &roots, &excluded).len()
+}
+
+/// "Add existing games now" next to a watched folder.
+#[tauri::command]
+fn add_existing_games(app: AppHandle, path: String) -> String {
+    match watcher::add_existing(&app, &PathBuf::from(&path)) {
+        0 => "There are no games in that folder that SteamDrop hasn't added yet.".into(),
+        n => {
+            log::info(format!("Add existing games now: {n} folder(s) in {path}."));
+            format!("Looking at {n} folder{} in {path}.", if n == 1 { "" } else { "s" })
+        }
+    }
+}
+
+/// "Find it" for a missing game.
+#[tauri::command]
+async fn find_game(app: AppHandle, id: u32, folder: String, restart: bool) -> Result<String, String> {
+    library::find_game(&app, id, folder.into(), restart).await
 }
 
 #[tauri::command]
@@ -225,7 +251,7 @@ async fn add_game(app: AppHandle, folder: String, exe: String, name: String, res
     if name.is_empty() {
         return Err("Please type a name for the game.".into());
     }
-    let item = library::Add { folder: folder.into(), exe: exe.into(), name };
+    let item = library::Add { folder: folder.into(), exe: exe.into(), name, replaces: None };
     library::add(&app, vec![item], restart).await
 }
 
@@ -257,7 +283,7 @@ async fn refresh_game(app: AppHandle, state: State<'_, App>, id: u32, steam_appi
     let game = game.ok_or("That game is no longer in the list.")?;
     let _ = std::fs::remove_dir_all(art::cache_dir(&state.dir, id));
     let _ = std::fs::remove_dir_all(PathBuf::from(&game.folder).join(art::GAME_FOLDER_ART));
-    let item = library::Add { folder: game.folder.into(), exe: game.exe.into(), name: game.name };
+    let item = library::Add { folder: game.folder.into(), exe: game.exe.into(), name: game.name, replaces: None };
     library::add(&app, vec![item], restart).await
 }
 
@@ -554,6 +580,8 @@ fn main() {
             pick_folder,
             pick_exe,
             count_subfolders,
+            add_existing_games,
+            find_game,
             add_watch_folder,
             inspect_folder,
             add_game,

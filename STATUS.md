@@ -41,75 +41,82 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 1. **Install:** run the installer from the Build workflow artifact (or a release). Check that it installs without admin rights, that a Start menu entry exists, and that SteamDrop opens.
 2. **Steam found:** Settings → Steam should show your Steam folder and "Steam accounts on this PC: 1" (or more).
 3. **Watch a folder:** Games → "Choose a folder to watch" → pick a test folder, such as an empty `D:\TestGames`.
-4. **Manual add (Automatic mode off):**
+4. **Starting fresh:** watch a folder that already holds 2–3 game folders. You're asked "What about games already in this folder?" with "Only new games from now on" selected; pressing Enter keeps them out of Steam. Then Settings → Watched folders → "Add existing games now" offers them.
+5. **Folder rules** (the README example): watch `D:\Games` and `D:\Games\Torrent`, and exclude `D:\Games\Torrent\X`.
+    - Copy a game into `D:\Games\Torrent\X\Downloads`: nothing happens.
+    - Move it (drag within the same drive) to `D:\Games\Torrent\Celeste`: it's found about 15 seconds later, just like a copy.
+    - `D:\Games\Torrent` itself is never offered as a game.
+    - A game whose .exe is already a Steam shortcut (for example one you added by hand in Steam) is skipped; the Activity list says why.
+6. **Moved out:** move an added game's folder out of the watched folders. It appears under "Missing games", and nothing changes in Steam. "Find it" with the new folder updates the Steam shortcut; "Remove from Steam" removes it.
+7. **Manual add (Automatic mode off):**
    - Copy a game folder in. It should be a known DRM-free game whose name matches a Steam game, for example a GOG copy.
    - About 15 seconds after the copy *finishes*, the SteamDrop window should pop up with "New game found".
    - Check that the right game file is preselected and the name is clean.
    - Press "Add to Steam". With Steam open, you should be asked to restart Steam. Choose "Restart Steam now".
    - Steam should close, reopen in Big Picture, and show the game first in Recent, with cover, banner, background, logo and icon.
-5. **Large copy:** copy a big game (10 GB or more). Nothing should happen until the copy has completely finished.
-6. **Game with `steam_appid.txt`:** official Steam art should appear.
-7. **Game not on Steam:** with no SteamGridDB key, you should get clean title cards. Add a SteamGridDB key in Settings, press "Check key" (it should say the key works), then the game's Details → "Find artwork again".
-8. **Installer only:** copy a folder containing only `setup_something.exe` (plus `.bin` files). You should get an "Only an installer found" card or notification, and nothing should be added to Steam.
-9. **Wrong exe:** use "Choose a different file..." on a new-game card and check that Steam launches the file you chose.
-10. **Details:** open a game's Details. You should see a description, developer and genres, and "Open store page" should open the browser.
-11. **Remove:** "Remove" on a game removes it from Steam after the restart. The game's folder must be untouched.
-12. **Automatic mode:** turn it on (it should show "On"), then switch one sub-setting off (it should show "Custom"). With all three on, copying a game in should add it, restart Steam and show a notification without any questions.
-13. **Tray:** close the window. SteamDrop should stay in the tray, and Task Manager should show no WebView2 processes for it. Click the tray icon and the window should come back. Turn "Keep running in the tray" off, and closing should quit.
-14. **Run on startup:** turn it on, sign out and back in. SteamDrop should start in the tray with no window.
-15. **While closed:** quit SteamDrop, copy a game into the watched folder, and start SteamDrop. It should find the game.
-16. **Several Steam accounts** (if you have them): by default a new game shows up for each. In Settings → Steam, "Add games to" lists every account by its Steam name; choose "Only these accounts", untick one, add a game, and check it only appears for the ticked accounts. Removing it must remove it from all of them.
-17. **Uninstall,** three times:
+8. **Large copy:** copy a big game (10 GB or more). Nothing should happen until the copy has completely finished.
+9. **Game with `steam_appid.txt`:** official Steam art should appear.
+10. **Game not on Steam:** with no SteamGridDB key, you should get clean title cards. Add a SteamGridDB key in Settings, press "Check key" (it should say the key works), then the game's Details → "Find artwork again".
+11. **Installer only:** copy a folder containing only `setup_something.exe` (plus `.bin` files). You should get an "Only an installer found" card or notification, and nothing should be added to Steam.
+12. **Wrong exe:** use "Choose a different file..." on a new-game card and check that Steam launches the file you chose.
+13. **Details:** open a game's Details. You should see a description, developer and genres, and "Open store page" should open the browser.
+14. **Remove:** "Remove" on a game removes it from Steam after the restart. The game's folder must be untouched.
+15. **Automatic mode:** turn it on (it should show "On"), then switch one sub-setting off (it should show "Custom"). With all three on, copying a game in should add it, restart Steam and show a notification without any questions.
+16. **Tray:** close the window. SteamDrop should stay in the tray, and Task Manager should show no WebView2 processes for it. Click the tray icon and the window should come back. Turn "Keep running in the tray" off, and closing should quit.
+17. **Run on startup:** turn it on, sign out and back in. SteamDrop should start in the tray with no window.
+18. **While closed:** quit SteamDrop, copy a game into the watched folder, and start SteamDrop. It should find the game.
+19. **Several Steam accounts** (if you have them): by default a new game shows up for each. In Settings → Steam, "Add games to" lists every account by its Steam name; choose "Only these accounts", untick one, add a game, and check it only appears for the ticked accounts. Removing it must remove it from all of them.
+20. **Uninstall,** three times:
     - with both boxes unchecked: games stay in Steam;
     - with "Remove SteamDrop's games from Steam" checked: they're gone from Steam after it restarts;
     - with "Delete SteamDrop settings and cache" checked: `%APPDATA%\SteamDrop` is gone.
 
     Also check that the two checkboxes' text fits and isn't cut off.
-18. **Version shown:** About says "Version 0.1.0" and hovering the tray icon says "SteamDrop 0.1.0".
-19. **Release and update:** publish the first release as described in "Your first release: v0.1.0" below (just a tag, no bump). Check that the release page shows the 0.1.0 notes from CHANGELOG.md and has `SteamDrop-Setup.exe`, and that the README button downloads it. Then publish `v0.1.1`, and in the installed 0.1.0 use About → "Check for updates" → "Install update".
+21. **Version shown:** About says "Version 0.1.0" and hovering the tray icon says "SteamDrop 0.1.0".
+22. **Release and update:** publish the first release as described in "Your first release: v0.1.0" below (just a tag, no bump). Check that the release page shows the 0.1.0 notes from CHANGELOG.md and has `SteamDrop-Setup.exe`, and that the README button downloads it. Then publish `v0.1.1`, and in the installed 0.1.0 use About → "Check for updates" → "Install update".
 
-20. **SteamGridDB key box:**
+23. **SteamGridDB key box:**
     - The key shows as dots.
     - Holding the eye button (mouse, touch, or Space/Enter on the keyboard) shows it, and letting go hides it again.
     - "Get a free key" opens the SteamGridDB API page.
     - "Test key" says clearly whether the key works. Try a wrong key too.
     - After "Save key", the key is in Windows Credential Manager (Control Panel → Credential Manager → Windows Credentials, look for "SteamDrop") and not in `%APPDATA%\SteamDrop\data.json`.
-21. **Help and bug report:**
+24. **Help and bug report:**
     - Settings → Help shows recent activity in plain words (for example "Added "X" to Steam").
     - "Open log folder" opens `%APPDATA%\SteamDrop\logs`.
     - "Copy bug report" copies one block of text. Paste it into Notepad and check it shows `C:\Users\<user>` instead of your name and contains no key.
     - "Report a problem" opens GitHub's bug report form.
-22. **Uninstall with "Delete SteamDrop settings and cache"** also removes the saved key from Credential Manager.
-23. **Updates** (needs two published releases, for example 0.1.0 installed and 0.1.1 released):
+25. **Uninstall with "Delete SteamDrop settings and cache"** also removes the saved key from Credential Manager.
+26. **Updates** (needs two published releases, for example 0.1.0 installed and 0.1.1 released):
     - Settings → Updates shows your version. "Check for updates on startup" and "Also check once a day" are on, "Install updates automatically" is off.
     - Start SteamDrop: after about 20 seconds you get a Windows notification and the update window, showing "Current: 0.1.0 → New: 0.1.1" and the changes for every version in between.
     - "Remind me later" closes it; it comes back on the next check. "Skip this version" stops it for that version (but "Check now" still shows it).
     - "Update now" downloads, installs and reopens SteamDrop, which then shows "What's new in 0.1.1" once.
     - Turn on "Install updates automatically", start a game from Steam, and trigger a check. The update must wait until the game is closed, then install, restart SteamDrop and show a notification.
     - Unplug the network and press "Check now": you get a short message, and the Activity list says the check failed. No error pop-ups.
-24. **Couch mode setup:**
+27. **Couch mode setup:**
     - On the installer's last page, "Add SteamDrop to Steam (for Couch mode)" is ticked.
     - After installing and restarting Steam, SteamDrop is in the library with its own cover, banner, background, logo and icon.
     - Settings → Couch mode can turn this off and on again.
-25. **Couch mode with a controller** (try an Xbox and a PlayStation controller if you have both):
+28. **Couch mode with a controller** (try an Xbox and a PlayStation controller if you have both):
     - Start SteamDrop from Steam in Big Picture. It opens full screen, and Steam shows SteamDrop as running.
     - D-pad and left stick move between tiles, A opens a game, B goes back, and LB/RB switch Library, Settings and Activity.
     - B on the main screen asks to leave; leaving closes Couch mode, and Steam shows SteamDrop as stopped.
     - Start Couch mode while SteamDrop is already in the tray: it still opens, and you don't get two SteamDrops.
-26. **Game details in Couch mode:** "Find artwork again", "Change game file" (pick another .exe), and "Remove from Steam" all work; Steam's library changes after a Steam restart.
-27. **Leaving Couch mode after a change:** remove a game in Couch mode, then leave. You're asked "Restart Steam to apply changes?". "Restart now" closes Couch mode, restarts Steam back into Big Picture, and the game is gone for good: it must not come back after another Steam restart. "Later" just leaves.
-28. **Opening from Steam:**
+29. **Game details in Couch mode:** "Find artwork again", "Change game file" (pick another .exe), and "Remove from Steam" all work; Steam's library changes after a Steam restart.
+30. **Leaving Couch mode after a change:** remove a game in Couch mode, then leave. You're asked "Restart Steam to apply changes?". "Restart now" closes Couch mode, restarts Steam back into Big Picture, and the game is gone for good: it must not come back after another Steam restart. "Later" just leaves.
+31. **Opening from Steam:**
     - Start SteamDrop from desktop Steam: the normal window opens. Start it from Big Picture (or a Steam Deck): Couch mode opens.
     - Change "When opened from Steam" to "Always Couch mode" or "Always window" and check it's respected.
     - F11 or the switch button changes views; Steam keeps showing SteamDrop as running the whole time, and as stopped only after the last window closes.
-29. **Control bar** (both views): Scan now finds a game you copied while SteamDrop was paused (Y on a controller). Hide sends the window to the tray (Couch: back to Steam, SteamDrop still "running" in Steam). Close closes the window but the tray icon stays. Quit SteamDrop asks "Stop adding new games?" and then exits.
-30. **Big Picture at sign-in:** turn on Settings → App → "Open Steam in Big Picture when Windows starts", sign out and back in: Steam opens in Big Picture. With Steam already set to start in Big Picture, nothing extra happens. Turn it off and sign in again: Steam starts as usual. Uninstalling removes it.
-31. **Chime:** Settings → App → "Play a sound when a game is added" is on. "Test" plays a short three-note chime at the slider's volume. Add a game while Big Picture is open: you hear the chime. Turn it off: no sound.
-32. **Delete game:**
+32. **Control bar** (both views): Scan now finds a game you copied while SteamDrop was paused (Y on a controller). Hide sends the window to the tray (Couch: back to Steam, SteamDrop still "running" in Steam). Close closes the window but the tray icon stays. Quit SteamDrop asks "Stop adding new games?" and then exits.
+33. **Big Picture at sign-in:** turn on Settings → App → "Open Steam in Big Picture when Windows starts", sign out and back in: Steam opens in Big Picture. With Steam already set to start in Big Picture, nothing extra happens. Turn it off and sign in again: Steam starts as usual. Uninstalling removes it.
+34. **Chime:** Settings → App → "Play a sound when a game is added" is on. "Test" plays a short three-note chime at the slider's volume. Add a game while Big Picture is open: you hear the chime. Turn it off: no sound.
+35. **Delete game:**
     - Use a test game you don't need. Holding A for under 2 seconds does nothing; holding it for 2 seconds moves the folder to the Recycle Bin (check that you can restore it) and removes the game.
     - Set a PIN in Couch mode's Settings: deleting now asks for it, and a wrong PIN refuses.
     - On a USB stick or network drive without a Recycle Bin, SteamDrop must refuse and leave the folder alone.
-33. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
+36. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 

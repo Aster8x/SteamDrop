@@ -49,6 +49,17 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 - **Dark and light looks**, large readable text (Atkinson Hyperlegible).
 - **Stays up to date:** checks for new versions on startup and once a day, shows what changed, and can install updates by itself (never while you're playing).
 
+## Folder rules
+
+- **Each folder directly inside a watched folder is one game.** The watched folder itself is never a game.
+- **Starting fresh:** when you add a watched folder that already has games in it, SteamDrop asks "What about games already in this folder?" The default, **Only new games from now on**, leaves them alone. You can still add them later with **Add existing games now** next to that folder in Settings.
+- **Watched folders inside watched folders** are fine: the outer folder skips the inner one, and the inner one handles its own games.
+- **Excluded folders** (Settings → Watched folders → "Exclude a subfolder...") are ignored, with everything inside them.
+- **Already in Steam?** SteamDrop never adds a game whose .exe already has a Steam shortcut, whoever made it.
+- **Moving counts:** a game folder moved or renamed into a watched folder is added just like one copied there. A game folder moved *out* is never removed from Steam by itself; it shows under **Missing games**, where you can **Find it** in its new place or **Remove from Steam**.
+
+**Example:** you watch `D:\Games` and `D:\Games\Torrent`, and exclude `D:\Games\Torrent\X`. You try games out in `D:\Games\Torrent\X\Downloads`, and SteamDrop ignores them there. When one is good, move it to `D:\Games\Torrent\Celeste`: SteamDrop notices the move and adds Celeste. `D:\Games\Torrent` itself is never treated as a game of `D:\Games`.
+
 ## Couch mode
 
 Play from the sofa? SteamDrop can add **itself** to your Steam library, with its own artwork. Start it from Steam in Big Picture (or on a Steam Deck) and it opens **Couch mode**: a full-screen view you control with an Xbox or PlayStation controller. Started from normal desktop Steam, it opens its usual window instead. Settings → Couch mode → "When opened from Steam" can make it always one or the other, and **F11** switches between the two views anytime.

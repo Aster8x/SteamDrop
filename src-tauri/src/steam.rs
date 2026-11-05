@@ -132,6 +132,26 @@ fn entry_id(entry: &Value) -> Option<u32> {
     }
 }
 
+/// A shortcut's game file as Steam stores it ("C:\\Games\\x.exe" or C:/Games/x.exe), in one comparable form.
+pub fn norm_exe(exe: &str) -> String {
+    exe.trim().trim_matches('"').replace('/', "\\").to_lowercase()
+}
+
+/// Every shortcut's id and game file for this Steam user, whoever added it.
+pub fn shortcut_exes(config: &Path) -> Vec<(u32, String)> {
+    let Ok(mut root) = load(config) else { return vec![] };
+    list_mut(&mut root)
+        .iter()
+        .filter_map(|(_, e)| match e {
+            Value::Map(m) => match vdf::get(m, "exe") {
+                Some(Value::Str(exe)) => Some((vdf::get_int(m, "appid").unwrap_or(0), norm_exe(exe))),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect()
+}
+
 /// The shortcut ids present for this Steam user.
 pub fn present_ids(config: &Path) -> Vec<u32> {
     let Ok(mut root) = load(config) else { return vec![] };
@@ -364,6 +384,8 @@ mod tests {
         let s = NewShortcut { id: 0x8000_0001, name: "A", exe: &exe, icon: String::new(), launch_options: "" };
         add(&config, &data, "123", &[s]).unwrap();
         assert_eq!(present_ids(&config), vec![7, 0x8000_0001]);
+        assert_eq!(shortcut_exes(&config), vec![(0x8000_0001, norm_exe(&quote(&exe)))], "shortcuts without a game file are skipped");
+        assert_eq!(norm_exe("\"C:/Games/A/A.EXE\""), norm_exe("c:\\games\\a\\a.exe"));
         assert_eq!(users(&base), vec![("123".to_string(), config.clone())]);
         std::fs::create_dir_all(base.join("config")).unwrap();
         std::fs::write(base.join("config/loginusers.vdf"), "\"users\" { \"76561197960265851\" { \"AccountName\" \"leon\" \"PersonaName\" \"Leon\" } }").unwrap();

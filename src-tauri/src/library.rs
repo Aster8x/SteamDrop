@@ -37,7 +37,8 @@ pub fn inspect(folder: &Path) -> Found {
 /// New folders from the watcher: add them right away in automatic mode, otherwise ask.
 pub fn found(app: &AppHandle, folders: Vec<PathBuf>) {
     let state = app.state::<App>();
-    let auto = state.settings().auto_add;
+    let settings = state.settings();
+    let auto = settings.auto_add;
     let mut to_add = vec![];
     let mut ask = false;
     for folder in folders {
@@ -45,7 +46,21 @@ pub fn found(app: &AppHandle, folders: Vec<PathBuf>) {
         if std::fs::read_dir(&folder).map(|mut d| d.next().is_none()).unwrap_or(true) {
             continue;
         }
-        let f = inspect(&folder);
+        let mut f = inspect(&folder);
+        f.candidates.retain(|c| !settings.excluded.iter().any(|x| c.path.starts_with(x)));
+        // One of SteamDrop's missing games, moved here: update it rather than adding it twice.
+        let name = folder.file_name().map(|n| n.to_string_lossy().to_lowercase());
+        let moved = state.data.lock().unwrap().games.iter().find(|g| !Path::new(&g.exe).is_file() && Path::new(&g.folder).file_name().map(|n| n.to_string_lossy().to_lowercase()) == name).cloned();
+        if let Some((g, exe)) = moved.and_then(|g| relocated_exe(&g, &folder, &f).map(|e| (g, e))) {
+            log::info(format!("Found \"{}\" in its new place: {}", g.name, f.folder));
+            to_add.push(Add { folder: folder.clone(), exe, name: g.name, replaces: Some(g.id) });
+            continue;
+        }
+        if f.candidates.first().is_some_and(|c| in_steam_elsewhere(&state, &c.path)) {
+            log::info(format!("Skipped folder {}: its game file is already in Steam.", f.folder));
+            let _ = state.update(|d| d.mark_known(&f.folder));
+            continue;
+        }
         if f.installer_only {
             log::info(format!("Skipped folder {}: installer only, not a ready-to-play game.", f.folder));
         } else if f.candidates.is_empty() {
@@ -60,7 +75,7 @@ pub fn found(app: &AppHandle, folders: Vec<PathBuf>) {
             notify(app, "Only an installer found", &format!("\"{}\" holds an installer, not a ready-to-play game. Install it first, then put the installed folder here.", f.title));
         }
         if auto && !f.installer_only && !f.candidates.is_empty() {
-            to_add.push(Add { folder: folder.clone(), exe: f.candidates[0].path.clone(), name: f.title.clone() });
+            to_add.push(Add { folder: folder.clone(), exe: f.candidates[0].path.clone(), name: f.title.clone(), replaces: None });
             continue;
         }
         if !auto && !f.installer_only && !f.candidates.is_empty() {
@@ -91,6 +106,31 @@ pub struct Add {
     pub folder: PathBuf,
     pub exe: PathBuf,
     pub name: String,
+    /// The game this one replaces (the same game, found in a new place).
+    pub replaces: Option<u32>,
+}
+
+/// True if a Steam shortcut that isn't one of SteamDrop's games already starts this exe.
+fn in_steam_elsewhere(state: &App, exe: &Path) -> bool {
+    let Some(steam) = state.steam_path() else { return false };
+    let ours: Vec<u32> = state.data.lock().unwrap().games.iter().map(|g| g.id).collect();
+    let want = steam::norm_exe(&exe.to_string_lossy());
+    steam::users(&steam).iter().any(|(_, c)| steam::shortcut_exes(c).iter().any(|(id, e)| *e == want && !ours.contains(id)))
+}
+
+/// A moved game's file in its new folder: the same path inside the folder if it's there, else the best guess.
+fn relocated_exe(game: &Game, folder: &Path, found: &Found) -> Option<PathBuf> {
+    let same = Path::new(&game.exe).strip_prefix(&game.folder).ok().map(|rel| folder.join(rel)).filter(|p| p.is_file());
+    same.or_else(|| found.candidates.first().map(|c| c.path.clone()))
+}
+
+/// "Find it" for a missing game: point it at the folder it was moved to.
+pub async fn find_game(app: &AppHandle, id: u32, folder: PathBuf, restart: bool) -> Result<String, String> {
+    let game = app.state::<App>().data.lock().unwrap().games.iter().find(|g| g.id == id).cloned();
+    let game = game.ok_or("That game is no longer in the list.")?;
+    let exe = relocated_exe(&game, &folder, &inspect(&folder)).ok_or("There's no game file (.exe) in that folder.")?;
+    log::info(format!("You found \"{}\" in a new place: {}", game.name, folder.display()));
+    add(app, vec![Add { folder, exe, name: game.name, replaces: Some(id) }], restart).await
 }
 
 fn steam_and_users(state: &App) -> Result<(PathBuf, Vec<(String, PathBuf)>), String> {
@@ -127,6 +167,9 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
         if !item.exe.is_file() {
             return Err(format!("The game file {} no longer exists.", item.exe.display()));
         }
+        if in_steam_elsewhere(&state, &item.exe) {
+            return Err(format!("\"{}\" is already in Steam (game file {}), so SteamDrop won't add it twice.", item.name, item.exe.display()));
+        }
         let id = steam::shortcut_id(&steam::quote(&item.exe), &item.name);
         let folder_str = item.folder.to_string_lossy().into_owned();
         let old = state.data.lock().unwrap().games.iter().find(|g| g.id == id).cloned();
@@ -162,7 +205,8 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
     // Re-adding a folder under a new name or exe gives it a new id; drop the old shortcut.
     let (replaced, snapshot): (Vec<u32>, Data) = {
         let d = state.data.lock().unwrap();
-        let ids = d.games.iter().filter(|o| games.iter().any(|g| g.id != o.id && same_path(&g.folder, &o.folder))).map(|o| o.id).collect();
+        let mut ids: Vec<u32> = d.games.iter().filter(|o| games.iter().any(|g| g.id != o.id && same_path(&g.folder, &o.folder))).map(|o| o.id).collect();
+        ids.extend(items.iter().filter_map(|i| i.replaces).filter(|old| !games.iter().any(|g| g.id == *old)));
         (ids, d.clone())
     };
     let was_running = steam::is_running();
@@ -215,7 +259,7 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
 
     state.update(|d| {
         for g in &games {
-            d.games.retain(|x| x.id != g.id && !same_path(&x.folder, &g.folder));
+            d.games.retain(|x| x.id != g.id && !same_path(&x.folder, &g.folder) && !replaced.contains(&x.id));
             d.games.push(g.clone());
             d.mark_known(&g.folder);
         }
@@ -521,6 +565,21 @@ pub fn uninstall_cleanup() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_moved_game_keeps_its_file() {
+        let base = std::env::temp_dir().join(format!("steamdrop-moved-{}", std::process::id()));
+        let new = base.join("Games/Hades");
+        std::fs::create_dir_all(new.join("x64")).unwrap();
+        std::fs::write(new.join("x64/Hades.exe"), b"x").unwrap();
+        let game = Game { id: 1, name: "Hades".into(), exe: r"D:\Old\Hades\x64\Hades.exe".replace('\\', std::path::MAIN_SEPARATOR_STR), folder: r"D:\Old\Hades".replace('\\', std::path::MAIN_SEPARATOR_STR), steam_appid: None, added: 1 };
+        let mut found = inspect(&new);
+        assert_eq!(relocated_exe(&game, &new, &found), Some(new.join("x64/Hades.exe")));
+        // Not at the same place inside the folder: fall back to the best guess.
+        found.candidates.truncate(1);
+        let other = Game { exe: game.exe.replace("x64", "bin"), ..game };
+        assert_eq!(relocated_exe(&other, &new, &found), found.candidates.first().map(|c| c.path.clone()));
+    }
 
     #[test]
     fn pending_changes_are_written_again() {
