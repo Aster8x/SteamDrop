@@ -10,8 +10,8 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -19,13 +19,20 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      # Tauri downloads NSIS when bundling; keep it between runs so a download hiccup can't break the build.
+      - uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\tauri
+          key: tauri-tools-${{ hashFiles('package-lock.json') }}
       - name: Versions in sync
         run: node scripts/version.mjs check
       - name: Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: npm ci
       - name: Build installer (unsigned, no updater files)
-        run: npx tauri build --config src-tauri/tauri.no-updater.conf.json
+        shell: bash
+        # One retry: the first build can fail on a temporary download error (seen: HTTP 504 fetching NSIS).
+        run: npx tauri build --config src-tauri/tauri.no-updater.conf.json || { sleep 30; npx tauri build --config src-tauri/tauri.no-updater.conf.json; }
       - uses: actions/upload-artifact@v4
         with:
           name: SteamDrop-Setup-unsigned
