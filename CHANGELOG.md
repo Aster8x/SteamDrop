@@ -16,6 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Update window with "Current → New", the changes in every version in between (newest first), and "Update now", "Remind me later" and "Skip this version".
 - Automatic updates install quietly, but never while a game started from Steam is running.
 - A one-time "What's new" screen after each update.
+- Couch mode: SteamDrop adds itself to Steam with its own artwork and, started from Steam, opens a full-screen view for gamepads (Xbox and PlayStation) with Library, game details, Settings and Activity.
+- Couch mode can find art again, change a game's file, remove a game from Steam, or delete it (hold A for 2 seconds; the folder goes to the Recycle Bin). An optional 4-digit PIN protects deleting.
+- Installer option "Add SteamDrop to Steam" (on by default) and a matching setting.
 
 ## [0.1.0] - 2026-11-05
 

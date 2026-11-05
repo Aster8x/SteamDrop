@@ -29,6 +29,7 @@ semver = "1"
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
 keyring = { version = "3", features = ["windows-native"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_Shell"] }
 
 [profile.release]
 codegen-units = 1

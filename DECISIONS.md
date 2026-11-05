@@ -93,6 +93,17 @@ Why things are the way they are. Newest decisions go at the bottom of each secti
 - **Update notifications always show,** even with "Show notifications" (part of Automatic mode) off, because they were asked for separately.
 - **Dialogs focus their main button,** so pressing Enter never picks "Skip" or "Cancel" by accident.
 
+## Couch mode
+
+- **One app, one extra tiny process.** Steam starts `SteamDrop.exe --couch`. That process starts `SteamDrop.exe --couch-open`, which either becomes SteamDrop or hands over to the one already in the tray (the single-instance plugin passes the argument along). Then it just waits until Couch mode closes, so Steam shows SteamDrop as running exactly while Couch mode is open. The app holds `%APPDATA%\SteamDrop\couch.lock` exclusively while the Couch window exists, and Windows releases it even if the app crashes. The waiting process checks that lock twice a second; it has no window and gives up after a minute if Couch mode never opens.
+- **Couch mode is a second window in the same app**, so settings, the log and Steam changes all go through the same code and state. There are no two processes writing `data.json`.
+- **Controller input** uses the Gamepad API's standard mapping (A, B, LB, RB, D-pad, left stick), so Xbox and PlayStation pads both work, read every frame only while the Couch window is open, since the API has no button events. Keyboard keys mirror every button, for testing and for remotes that send keys. Focus moves spatially to the nearest element in the pressed direction.
+- **Couch mode never restarts Steam,** because Couch mode itself runs inside Steam. Changes are written right away and show after the next Steam restart. Removed shortcuts are remembered (`pending_removals`) and removed again at the next start with Steam closed, or with the next add, because Steam may write its old list back when it updates playtime.
+- **Delete game = Recycle Bin, never permanent.** SteamDrop first asks Windows whether the drive has a Recycle Bin, and refuses if not. It then deletes with "allow undo" plus Windows' own warning before any permanent delete. The folder is recycled first; only if that works are the shortcut and art removed. Hold A for 2 seconds to confirm.
+- **The optional PIN** (4 digits, off by default) is stored in Windows Credential Manager next to the SteamGridDB key. Changing or turning it off needs the current PIN, otherwise anyone could just turn it off.
+- **SteamDrop's own artwork** is original vector art (`assets/steam-art/*.svg`) in the app's colors and fonts, rendered to Steam's sizes with `scripts/render-steam-art.mjs` and built into the app. It's the only artwork in the repo, and it's ours.
+- **The installer checkbox** sits on the finish page under "Run" and "Create desktop shortcut". It runs `SteamDrop.exe --add-to-steam` before SteamDrop starts. It isn't shown for silent installs or updates, so a later "off" in Settings is respected. The uninstaller always removes SteamDrop's own shortcut, since it would point at a deleted program. If the setting is on and the shortcut is missing (Steam closed), SteamDrop puts it back at startup.
+
 ## Left out on purpose
 
 - Removing a shortcut automatically when its game folder is deleted. The game shows "Game file missing" instead, because deleting things from Steam unasked felt wrong.

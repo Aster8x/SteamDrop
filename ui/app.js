@@ -555,6 +555,13 @@ function settingsView() {
       h("div", { class: "row" }, btn("Quit SteamDrop", () => invoke("quit"), "", { always: true }))),
 
     h("div", { class: "panel" },
+      h("h2", {}, "Couch mode"),
+      h("p", { class: "muted" }, "A full-screen view for the TV that you control with a gamepad. It opens when you start SteamDrop from your Steam library (for example in Big Picture)."),
+      setting("Add SteamDrop to Steam", "Puts SteamDrop in your Steam library with its own artwork, so you can open Couch mode from the couch.",
+        toggle(st.steam_shortcut, (v) => run(() => invoke("set_steam_shortcut", { on: v })), "Add SteamDrop to Steam")),
+      h("div", { class: "row" }, btn("Open Couch mode", () => invoke("open_couch"), "", { always: true }))),
+
+    h("div", { class: "panel" },
       h("h2", {}, "Updates"),
       h("p", { class: "muted" }, `You have SteamDrop ${S.version}. Updates come from SteamDrop's GitHub page.`),
       setting("Check for updates on startup", "Looks for a new version each time SteamDrop starts.",

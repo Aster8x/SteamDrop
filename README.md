@@ -48,6 +48,25 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 - **Dark and light looks**, large readable text (Atkinson Hyperlegible).
 - **Stays up to date:** checks for new versions on startup and once a day, shows what changed, and can install updates by itself (never while you're playing).
 
+## Couch mode
+
+Play from the sofa? SteamDrop can add **itself** to your Steam library, with its own artwork. Start it from Steam (in Big Picture, on the TV) and it opens **Couch mode**: a full-screen view you control with an Xbox or PlayStation controller.
+
+- **Library:** all the games SteamDrop added, as big cover tiles.
+- **Game details:** find the artwork again, change which file starts the game, remove it from Steam, or delete the game.
+- **Settings** and **Activity**, readable from across the room.
+
+| Button | Does |
+|---|---|
+| D-pad / left stick | Move |
+| A (Cross) | Select |
+| B (Circle) | Back |
+| LB / RB (L1 / R1) | Switch between Library, Settings and Activity |
+
+**Deleting a game** needs you to hold A for 2 seconds. The game folder goes to the **Recycle Bin**, never deleted for good (on drives without a Recycle Bin, SteamDrop refuses). You can also set a 4-digit PIN in Couch mode's Settings so nobody deletes games by accident.
+
+The installer has an **Add SteamDrop to Steam** box (on by default). You can change it later in Settings → Couch mode, where there's also an **Open Couch mode** button. Changes made in Couch mode show in Steam's library after Steam restarts.
+
 ## Screenshots
 
 > _Screenshots coming soon._

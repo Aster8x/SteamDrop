@@ -440,7 +440,26 @@ Var AppStartMenuFolder
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+; SteamDrop: a third, checked-by-default box under Run and desktop shortcut (90u and 110u in Modern UI 2).
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW SteamDropFinishShow
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE SteamDropFinishLeave
 !insertmacro MUI_PAGE_FINISH
+
+Var AddToSteamCheckbox
+Var AddToSteamState
+Function SteamDropFinishShow
+  ${NSD_CreateCheckbox} 120u 130u 195u 10u "Add SteamDrop to Steam (for Couch mode)"
+  Pop $AddToSteamCheckbox
+  SetCtlColors $AddToSteamCheckbox "" "ffffff"
+  ${NSD_Check} $AddToSteamCheckbox
+FunctionEnd
+; Runs before the "Run SteamDrop" box is handled, so the app starts with the setting already saved.
+Function SteamDropFinishLeave
+  ${NSD_GetState} $AddToSteamCheckbox $AddToSteamState
+  ${If} $AddToSteamState == ${BST_CHECKED}
+    ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --add-to-steam'
+  ${EndIf}
+FunctionEnd
 
 Function RunMainBinary
   nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" ""
@@ -827,6 +846,11 @@ Section Uninstall
   !endif
 
   !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+
+  ; SteamDrop: its own Steam shortcut (Couch mode) would point at a deleted program, so it always goes
+  ${If} $UpdateMode <> 1
+    ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --remove-from-steam'
+  ${EndIf}
 
   ; SteamDrop: remove its shortcuts and their art from Steam if the user asked for it
   ${If} $RemoveGamesCheckboxState = 1

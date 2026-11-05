@@ -3,9 +3,11 @@
 
 mod art;
 mod changelog;
+mod couch;
 mod exe;
 mod library;
 mod log;
+mod recycle;
 mod report;
 mod secrets;
 mod state;
@@ -48,6 +50,7 @@ struct GameView {
     #[serde(flatten)]
     game: Game,
     portrait: Option<PathBuf>,
+    hero: Option<PathBuf>,
     in_steam: bool,
     folder_missing: bool,
 }
@@ -70,6 +73,7 @@ struct StateView {
     version: String,
     update: Option<updates::Available>,
     whats_new: Option<changelog::Section>,
+    couch_pin_set: bool,
 }
 
 #[tauri::command]
@@ -83,6 +87,7 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
         .into_iter()
         .map(|g| GameView {
             portrait: art::cached(&state.dir, g.id, art::Slot::Portrait),
+            hero: art::cached(&state.dir, g.id, art::Slot::Hero),
             in_steam: present.contains(&g.id),
             folder_missing: !PathBuf::from(&g.exe).is_file(),
             game: g,
@@ -97,6 +102,7 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
         status: state.status.lock().unwrap().clone(),
         update: state.update.lock().unwrap().clone(),
         whats_new: state.whats_new.lock().unwrap().clone(),
+        couch_pin_set: !secrets::couch_pin().is_empty(),
         version: app.package_info().version.to_string(),
     }
 }
@@ -373,6 +379,65 @@ fn ack_whats_new(app: AppHandle, state: State<App>) -> Result<(), String> {
     Ok(())
 }
 
+/// Candidate game files for Couch mode's "Change game file".
+#[tauri::command]
+fn exe_candidates(folder: String) -> Vec<exe::Candidate> {
+    exe::candidates(&PathBuf::from(folder))
+}
+
+/// Couch mode's "Delete game" (after holding A). Checks the PIN when one is set.
+#[tauri::command]
+async fn delete_game(app: AppHandle, id: u32, pin: String) -> Result<String, String> {
+    let saved = secrets::couch_pin();
+    if !saved.is_empty() && pin != saved {
+        log::info("Someone tried to delete a game with a wrong PIN.");
+        return Err("That PIN isn't right.".into());
+    }
+    library::delete_game(&app, id).await
+}
+
+/// Sets, changes or removes (empty `new`) the Couch mode PIN. Changing it needs the old one.
+#[tauri::command]
+fn set_couch_pin(app: AppHandle, old: String, new: String) -> Result<(), String> {
+    let saved = secrets::couch_pin();
+    if !saved.is_empty() && old != saved {
+        return Err("The current PIN isn't right.".into());
+    }
+    if !new.is_empty() && (new.len() != 4 || !new.chars().all(|c| c.is_ascii_digit())) {
+        return Err("The PIN must be 4 digits.".into());
+    }
+    secrets::set_couch_pin(&new)?;
+    log::info(if new.is_empty() { "Couch mode PIN turned off." } else { "Couch mode PIN set." });
+    library::emit_state(&app);
+    Ok(())
+}
+
+/// "Add SteamDrop to Steam" setting.
+#[tauri::command]
+async fn set_steam_shortcut(app: AppHandle, state: State<'_, App>, on: bool) -> Result<String, String> {
+    state.update(|d| d.settings.steam_shortcut = on)?;
+    let steam_dir = state.steam_path().ok_or("Steam was not found. Set its folder in Settings.")?;
+    let dir = state.dir.clone();
+    tauri::async_runtime::spawn_blocking(move || library::set_self_shortcut(&steam_dir, &dir, on))
+        .await
+        .map_err(|e| e.to_string())??;
+    library::emit_state(&app);
+    let shown = if on { "SteamDrop is in your Steam library" } else { "SteamDrop was removed from Steam" };
+    Ok(if steam::is_running() { format!("{shown} after Steam restarts.") } else { format!("{shown}.") })
+}
+
+#[tauri::command]
+fn open_couch(app: AppHandle) {
+    couch::open(&app);
+}
+
+#[tauri::command]
+fn close_couch(app: AppHandle) {
+    if let Some(w) = app.get_webview_window(couch::LABEL) {
+        let _ = w.close();
+    }
+}
+
 #[tauri::command]
 fn quit(app: AppHandle) {
     app.exit(0);
@@ -386,12 +451,35 @@ fn main() {
     // Used by the uninstaller's "Delete SteamDrop settings and cache".
     if std::env::args().any(|a| a == "--forget-secrets") {
         let _ = secrets::set_sgdb_key("");
+        let _ = secrets::set_couch_pin("");
         return;
     }
+    // Used by the installer's "Add SteamDrop to Steam" and by the uninstaller.
+    if std::env::args().any(|a| a == "--add-to-steam") {
+        library::add_to_steam_from_installer();
+        return;
+    }
+    if std::env::args().any(|a| a == "--remove-from-steam") {
+        library::remove_self_from_installer();
+        return;
+    }
+    let from_steam = std::env::args().any(|a| a == "--couch");
+    #[cfg(windows)]
+    if from_steam {
+        couch::run_from_steam();
+        return;
+    }
+    let start_couch = from_steam || std::env::args().any(|a| a == "--couch-open");
     let start_hidden = std::env::args().any(|a| a == "--tray");
 
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| show_window(app)))
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            if args.iter().any(|a| a == "--couch-open") {
+                couch::open(app);
+            } else {
+                show_window(app);
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -421,6 +509,12 @@ fn main() {
             install_update,
             dismiss_update,
             ack_whats_new,
+            exe_candidates,
+            delete_game,
+            set_couch_pin,
+            set_steam_shortcut,
+            open_couch,
+            close_couch,
             quit
         ])
         .setup(move |app| {
@@ -433,6 +527,7 @@ fn main() {
                 app,
                 &[
                     &MenuItem::with_id(app, "open", "Open SteamDrop", true, None::<&str>)?,
+                    &MenuItem::with_id(app, "couch", "Couch mode", true, None::<&str>)?,
                     &MenuItem::with_id(app, "quit", "Quit SteamDrop", true, None::<&str>)?,
                 ],
             )?;
@@ -443,6 +538,7 @@ fn main() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "open" => show_window(app),
+                    "couch" => couch::open(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -455,17 +551,28 @@ fn main() {
             watcher::restart(app.handle());
             updates::after_start(app.handle());
             updates::schedule(app.handle());
-            if !start_hidden {
+            let handle = app.handle().clone();
+            std::thread::spawn(move || library::startup_repair(&handle));
+            if start_couch {
+                couch::open(app.handle());
+            } else if !start_hidden {
                 show_window(app.handle());
             }
             Ok(())
         })
         .on_window_event(|window, event| {
             // With "minimize to tray" on, closing destroys the window (freeing its memory) and we keep running.
-            if let WindowEvent::CloseRequested { .. } = event {
-                if !window.state::<App>().settings().close_to_tray {
-                    window.app_handle().exit(0);
+            let app = window.app_handle();
+            let couch = window.label() == couch::LABEL;
+            match event {
+                WindowEvent::CloseRequested { .. } => {
+                    let other_open = app.get_webview_window(if couch { "main" } else { couch::LABEL }).is_some();
+                    if !window.state::<App>().settings().close_to_tray && !other_open {
+                        app.exit(0);
+                    }
                 }
+                WindowEvent::Destroyed if couch => couch::closed(app),
+                _ => {}
             }
         })
         .build(tauri::generate_context!())

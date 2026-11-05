@@ -4,7 +4,7 @@ Version 0.1.0, first complete build. Everything in the spec is implemented. It h
 
 ## Works and checked
 
-- **Unit tests** pass on Linux (20) and as real Windows binaries (22, cross-compiled and run under Wine; two tests are Windows-only). They run on every push in GitHub Actions on Windows too. They cover:
+- **Unit tests** pass on Linux (23) and as real Windows binaries (26, cross-compiled and run under Wine; three tests are Windows-only). They run on every push in GitHub Actions on Windows too. They cover:
   - reading and writing `shortcuts.vdf`, including keeping other tools' shortcuts byte-for-byte, refusing broken files, and the backups;
   - exe picking: junk exclusion, Unreal games, initials such as `GTA5`, cleaning folder names;
   - spotting folders that hold only an installer, and reading `steam_appid.txt`;
@@ -13,7 +13,12 @@ Version 0.1.0, first complete build. Everything in the spec is implemented. It h
   - loading old or partial settings files;
   - log rotation (5 files of 1 MB);
   - hiding user names in bug reports;
-  - saving the SteamGridDB key in Credential Manager and keeping it out of the bug report (run under Wine's Credential Manager).
+  - saving the SteamGridDB key in Credential Manager and keeping it out of the bug report (run under Wine's Credential Manager);
+  - reading the changelog and picking the versions between two releases;
+  - sending a folder to the Recycle Bin, or refusing without touching it (Wine has no Recycle Bin, so it refused; GitHub's Windows runner exercises the real path).
+- **SteamDrop's own Steam shortcut:** `--add-to-steam` and `--remove-from-steam` were run as a Windows binary under Wine against a fake Steam folder. They added and removed the shortcut (launch options `--couch`) and all five artwork files.
+- **The process Steam starts** (`--couch`) exits by itself when Couch mode can't open; it doesn't hang.
+- **Couch mode** was driven in Chromium with a simulated gamepad and the keyboard: moving around, A, B, LB/RB, holding A (1 second does nothing, 2 seconds deletes), and the PIN pad.
 - **Windows installer builds:** a cross-compiled build produced a ~2 MB `SteamDrop_0.1.0_x64-setup.exe` with the custom uninstaller template, so the NSIS script compiles.
 - **`SteamDrop.exe --uninstall-cleanup`** was run as a Windows binary under Wine against a fake Steam folder. It removed SteamDrop's shortcut and its grid art, kept another tool's shortcut, made a backup, and cleared the art cache and the game list.
 - **The UI** was rendered in Chromium against a mocked backend (games list, new-game card, installer card, details window, settings, about, dark and light). The layout looks right.
@@ -82,6 +87,21 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - "Update now" downloads, installs and reopens SteamDrop, which then shows "What's new in 0.1.1" once.
     - Turn on "Install updates automatically", start a game from Steam, and trigger a check. The update must wait until the game is closed, then install, restart SteamDrop and show a notification.
     - Unplug the network and press "Check now": you get a short message, and the Activity list says the check failed. No error pop-ups.
+24. **Couch mode setup:**
+    - On the installer's last page, "Add SteamDrop to Steam (for Couch mode)" is ticked.
+    - After installing and restarting Steam, SteamDrop is in the library with its own cover, banner, background, logo and icon.
+    - Settings → Couch mode can turn this off and on again.
+25. **Couch mode with a controller** (try an Xbox and a PlayStation controller if you have both):
+    - Start SteamDrop from Steam in Big Picture. It opens full screen, and Steam shows SteamDrop as running.
+    - D-pad and left stick move between tiles, A opens a game, B goes back, and LB/RB switch Library, Settings and Activity.
+    - B on the main screen asks to leave; leaving closes Couch mode, and Steam shows SteamDrop as stopped.
+    - Start Couch mode while SteamDrop is already in the tray: it still opens, and you don't get two SteamDrops.
+26. **Game details in Couch mode:** "Find artwork again", "Change game file" (pick another .exe), and "Remove from Steam" all work; Steam's library changes after a Steam restart.
+27. **Delete game:**
+    - Use a test game you don't need. Holding A for under 2 seconds does nothing; holding it for 2 seconds moves the folder to the Recycle Bin (check that you can restore it) and removes the game.
+    - Set a PIN in Couch mode's Settings: deleting now asks for it, and a wrong PIN refuses.
+    - On a USB stick or network drive without a Recycle Bin, SteamDrop must refuse and leave the folder alone.
+28. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 
@@ -155,4 +175,5 @@ git push origin :refs/tags/v0.2.0
 
 - If you decline a Steam restart and then play another non-Steam game before Steam restarts, Steam may overwrite the change. The game then shows "Not in Steam" in SteamDrop, with "Add to Steam again" in its details.
 - Some newer Steam games store their library art under hashed URLs that SteamDrop can't guess. Those slots fall back to SteamGridDB or a title card.
+- Changes made from Couch mode (remove, delete, change game file) are written while Steam is running, so they show after Steam restarts. Removals are repeated automatically the next time SteamDrop starts while Steam is closed, in case Steam wrote its old list back.
 - Exe picking is a best guess. Games with unusual layouts may need "Choose a different file..." (with Automatic mode off).

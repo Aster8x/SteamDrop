@@ -157,9 +157,12 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
     }
 
     // Re-adding a folder under a new name or exe gives it a new id; drop the old shortcut.
+    // Also drop shortcuts removed earlier while Steam was running, in case Steam wrote them back.
     let replaced: Vec<u32> = {
         let d = state.data.lock().unwrap();
-        d.games.iter().filter(|o| games.iter().any(|g| g.id != o.id && same_path(&g.folder, &o.folder))).map(|o| o.id).collect()
+        let mut ids: Vec<u32> = d.games.iter().filter(|o| games.iter().any(|g| g.id != o.id && same_path(&g.folder, &o.folder))).map(|o| o.id).collect();
+        ids.extend(d.pending_removals.iter().filter(|id| !games.iter().any(|g| g.id == **id)));
+        ids
     };
     let was_running = steam::is_running();
     let restarting = was_running && restart;
@@ -187,7 +190,7 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
                 .zip(&art_sets)
                 .map(|(g, art)| {
                     let icon = art::install(&grid, g.id, art).unwrap_or_else(|| PathBuf::from(&g.exe));
-                    steam::NewShortcut { id: g.id, name: &g.name, exe: Path::new(&g.exe), icon: icon.to_string_lossy().into_owned() }
+                    steam::NewShortcut { id: g.id, name: &g.name, exe: Path::new(&g.exe), icon: icon.to_string_lossy().into_owned(), launch_options: "" }
                 })
                 .collect();
             if let Err(e) = steam::add(config, &dir, user, &shortcuts) {
@@ -209,6 +212,9 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
             d.games.retain(|x| x.id != g.id && !same_path(&x.folder, &g.folder));
             d.games.push(g.clone());
             d.mark_known(&g.folder);
+        }
+        if !was_running || restarting {
+            d.pending_removals.clear();
         }
     })?;
     state.found.lock().unwrap().retain(|f| !games.iter().any(|g| same_path(&g.folder, &f.folder)));
@@ -265,7 +271,13 @@ async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<S
     })
     .await
     .map_err(|e| e.to_string())??;
-    state.update(|d| d.games.retain(|g| !ids.contains(&g.id)))?;
+    state.update(|d| {
+        d.games.retain(|g| !ids.contains(&g.id));
+        d.pending_removals.retain(|id| !ids.contains(id));
+        if was_running && !restart {
+            d.pending_removals.extend(&ids);
+        }
+    })?;
     let msg = if was_running && !restart { "Removed. Restart Steam to see the change." } else { "Removed from Steam." };
     set_status(app, msg);
     emit_state(app);
@@ -293,6 +305,114 @@ fn remove_blocking(steam_dir: &Path, data_dir: &Path, ids: &[u32], restart: bool
         steam::start(steam_dir, false)?;
     }
     result
+}
+
+const SELF_NAME: &str = "SteamDrop";
+/// SteamDrop's own artwork (sources in assets/steam-art/*.svg).
+const SELF_ART: [(art::Slot, &[u8]); 5] = [
+    (art::Slot::Portrait, include_bytes!("../steam-art/portrait.png")),
+    (art::Slot::Wide, include_bytes!("../steam-art/wide.png")),
+    (art::Slot::Hero, include_bytes!("../steam-art/hero.png")),
+    (art::Slot::Logo, include_bytes!("../steam-art/logo.png")),
+    (art::Slot::Icon, include_bytes!("../steam-art/icon.png")),
+];
+
+fn self_shortcut() -> Result<(u32, PathBuf), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    Ok((steam::shortcut_id(&steam::quote(&exe), SELF_NAME), exe))
+}
+
+/// Adds or removes SteamDrop's own shortcut (it opens Couch mode) for every Steam account.
+pub fn set_self_shortcut(steam_dir: &Path, data_dir: &Path, on: bool) -> Result<(), String> {
+    let (id, exe) = self_shortcut()?;
+    let cache = art::cache_dir(data_dir, id);
+    let mut files = vec![];
+    if on {
+        std::fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
+        for (slot, bytes) in SELF_ART {
+            let path = cache.join(format!("{}.png", slot.name()));
+            std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+            files.push((slot, path));
+        }
+    }
+    for (user, config) in steam::users(steam_dir) {
+        let grid = steam::grid_dir(&config);
+        if on {
+            let icon = art::install(&grid, id, &files).unwrap_or_else(|| exe.clone());
+            let s = steam::NewShortcut { id, name: SELF_NAME, exe: &exe, icon: icon.to_string_lossy().into_owned(), launch_options: "--couch" };
+            steam::add(&config, data_dir, &user, &[s])?;
+        } else {
+            steam::remove(&config, data_dir, &user, &[id])?;
+            art::uninstall(&grid, id);
+        }
+    }
+    log::info(if on { "Added SteamDrop to Steam (it opens Couch mode)." } else { "Removed SteamDrop from Steam." });
+    Ok(())
+}
+
+/// Startup housekeeping while Steam is closed: finish removals Steam may have undone,
+/// and put SteamDrop's own shortcut back if the setting wants it and it's missing.
+pub fn startup_repair(app: &AppHandle) {
+    let state = app.state::<App>();
+    let Some(steam_dir) = state.steam_path() else { return };
+    if steam::is_running() {
+        return;
+    }
+    let pending = state.data.lock().unwrap().pending_removals.clone();
+    if !pending.is_empty() && remove_blocking(&steam_dir, &state.dir, &pending, false).is_ok() {
+        log::info(format!("Finished removing {} shortcut(s) from Steam.", pending.len()));
+        let _ = state.update(|d| d.pending_removals.clear());
+    }
+    if state.settings().steam_shortcut {
+        let missing = self_shortcut().is_ok_and(|(id, _)| steam::users(&steam_dir).iter().any(|(_, c)| !steam::present_ids(c).contains(&id)));
+        if missing {
+            if let Err(e) = set_self_shortcut(&steam_dir, &state.dir, true) {
+                log::problem(format!("Could not add SteamDrop to Steam: {e}"));
+            }
+        }
+    }
+}
+
+/// Couch mode's "Delete game": the folder goes to the Recycle Bin, then the shortcut and art go.
+pub async fn delete_game(app: &AppHandle, id: u32) -> Result<String, String> {
+    let game = app.state::<App>().data.lock().unwrap().games.iter().find(|g| g.id == id).cloned();
+    let game = game.ok_or("That game is no longer in the list.")?;
+    let folder = PathBuf::from(&game.folder);
+    let recycled = tauri::async_runtime::spawn_blocking(move || crate::recycle::recycle(&folder)).await.map_err(|e| e.to_string())?;
+    if let Err(e) = recycled {
+        log::problem(format!("Could not delete \"{}\": {e}", game.name));
+        return Err(e);
+    }
+    log::info(format!("Moved the folder of \"{}\" to the Recycle Bin: {}", game.name, game.folder));
+    remove(app, vec![id], false).await?;
+    Ok(format!("\"{}\" was moved to the Recycle Bin and removed from Steam.", game.name))
+}
+
+/// `SteamDrop.exe --add-to-steam` (from the installer): turn the setting on and add the shortcut.
+pub fn add_to_steam_from_installer() {
+    let dir = crate::state::data_dir();
+    let mut data = crate::state::load(&dir);
+    data.settings.steam_shortcut = true;
+    let _ = crate::state::save(&dir, &data);
+    let custom = data.settings.steam_path.trim();
+    let steam_dir = if custom.is_empty() { steam::detect_path() } else { Some(PathBuf::from(custom)) };
+    match steam_dir.map(|s| set_self_shortcut(&s, &dir, true)) {
+        Some(Ok(())) => {}
+        Some(Err(e)) => log::problem(format!("Installer: could not add SteamDrop to Steam: {e}")),
+        None => log::info("Installer: Steam was not found, so SteamDrop wasn't added to it yet."),
+    }
+}
+
+/// `SteamDrop.exe --remove-from-steam` (from the uninstaller): SteamDrop's own shortcut would point
+/// at a deleted program, so it always goes.
+pub fn remove_self_from_installer() {
+    let dir = crate::state::data_dir();
+    let data = crate::state::load(&dir);
+    let custom = data.settings.steam_path.trim();
+    let steam_dir = if custom.is_empty() { steam::detect_path() } else { Some(PathBuf::from(custom)) };
+    if let Some(Err(e)) = steam_dir.map(|s| set_self_shortcut(&s, &dir, false)) {
+        log::problem(format!("Uninstall: could not remove SteamDrop from Steam: {e}"));
+    }
 }
 
 /// `SteamDrop.exe --uninstall-cleanup`: removes every game SteamDrop added, and their art.

@@ -1,0 +1,106 @@
+@font-face { font-family: "Chakra Petch"; src: url(fonts/ChakraPetch-SemiBold.ttf); font-weight: 600; }
+@font-face { font-family: "Chakra Petch"; src: url(fonts/ChakraPetch-Bold.ttf); font-weight: 700; }
+@font-face { font-family: "Atkinson Hyperlegible"; src: url(fonts/AtkinsonHyperlegible-Regular.ttf); font-weight: 400; }
+@font-face { font-family: "Atkinson Hyperlegible"; src: url(fonts/AtkinsonHyperlegible-Bold.ttf); font-weight: 700; }
+
+/* Couch mode is always dark: it runs on a TV in Big Picture. Sizes scale with the screen. */
+:root {
+  --bg: #0b0f18;
+  --panel: #151c2b;
+  --panel-2: #1e2739;
+  --border: #2c3650;
+  --text: #f1f4fa;
+  --muted: #a9b4c9;
+  --accent: #5cc8ff;
+  --accent-ink: #052131;
+  --danger: #ff7b7b;
+  --ok: #6fdc9b;
+  font-size: clamp(16px, 1.45vw, 30px);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+  background: radial-gradient(ellipse at 75% 0%, #1b2742 0%, var(--bg) 60%);
+  color: var(--text);
+  font-family: "Atkinson Hyperlegible", "Segoe UI", sans-serif;
+  line-height: 1.4;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  cursor: none;
+  user-select: none;
+}
+h1, h2, h3, .brand, .tab, .bumper { font-family: "Chakra Petch", sans-serif; font-weight: 700; }
+h1 { font-size: 2rem; margin: 0 0 .3rem; }
+h2 { font-size: 1.5rem; margin: 0 0 .6rem; }
+p { margin: .3rem 0 .8rem; }
+.muted { color: var(--muted); }
+[hidden] { display: none !important; }
+
+.top { display: flex; align-items: center; gap: 2rem; padding: 1.2rem 2.5rem; }
+.brand { display: flex; align-items: center; gap: .7rem; font-size: 1.5rem; }
+.brand svg { width: 2.4rem; height: 2.4rem; }
+.tabs { display: flex; align-items: center; gap: .6rem; margin-left: auto; }
+.tab { padding: .45rem 1.3rem; border-radius: 99px; color: var(--muted); font-size: 1.15rem; }
+.tab.active { background: var(--accent); color: var(--accent-ink); }
+.bumper { font-size: .8rem; padding: .2rem .55rem; border: 2px solid var(--border); border-radius: 8px; color: var(--muted); }
+
+#screen { overflow-y: auto; padding: .5rem 2.5rem 2rem; scroll-behavior: smooth; scrollbar-width: none; }
+#screen::-webkit-scrollbar { display: none; }
+
+.hints { display: flex; gap: 2.2rem; justify-content: flex-end; padding: .9rem 2.5rem; background: rgba(0, 0, 0, .35); color: var(--muted); font-size: .95rem; }
+.hints b { display: inline-grid; place-items: center; min-width: 1.7rem; height: 1.7rem; padding: 0 .35rem; margin-right: .45rem; border-radius: 99px; background: var(--panel-2); color: var(--text); font-size: .85rem; }
+.hints b.a { background: #3ec46d; color: #062611; }
+.hints b.b { background: #e5534b; color: #2b0605; }
+
+/* Focus: anything with class "f" can be reached with the D-pad. */
+.f { outline: none; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
+.f:focus { transform: scale(1.045); box-shadow: 0 0 0 .22rem var(--accent), 0 .8rem 2rem rgba(0, 0, 0, .5); z-index: 1; }
+
+/* Library */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 1.6rem; padding: .6rem; }
+.tile { position: relative; aspect-ratio: 2 / 3; border-radius: 1rem; overflow: hidden; border: 0; padding: 0; background: var(--panel-2); color: var(--text); font: inherit; }
+.tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile .label { position: absolute; inset: auto 0 0 0; padding: 2.5rem .8rem .8rem; background: linear-gradient(transparent, rgba(0, 0, 0, .85)); font-weight: 700; text-align: left; opacity: 0; transition: opacity .12s; }
+.tile:focus .label, .tile.noart .label { opacity: 1; }
+.tile.noart { display: grid; place-items: center; }
+.empty { max-width: 46rem; margin: 4rem auto; text-align: center; }
+
+/* Detail */
+.detail { display: grid; grid-template-columns: 11rem 1fr; gap: 2rem; align-items: start; }
+.hero { height: 8rem; margin: -.5rem -2.5rem 1rem; background: center / cover no-repeat var(--panel); position: relative; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 30%, var(--bg)); }
+.cover { width: 100%; aspect-ratio: 2 / 3; border-radius: 1rem; object-fit: cover; background: var(--panel-2); margin-top: -4.5rem; position: relative; z-index: 1; box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, .6); }
+.actions { display: grid; gap: .7rem; max-width: 34rem; margin-top: .8rem; }
+
+.btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  width: 100%; min-height: 3rem; padding: .55rem 1.3rem;
+  border-radius: .9rem; border: .15rem solid var(--border); background: var(--panel);
+  color: var(--text); font: inherit; font-weight: 700; font-size: 1.1rem; text-align: left;
+  position: relative; overflow: hidden;
+}
+.btn:focus { border-color: var(--accent); background: var(--panel-2); }
+.btn.danger { color: var(--danger); }
+.btn .value { font-family: "Chakra Petch", sans-serif; color: var(--muted); }
+.btn .value.on { color: var(--accent); }
+.btn small { font-weight: 400; color: var(--muted); font-size: .85rem; }
+.btn .fill { position: absolute; inset: 0; width: 0; background: rgba(255, 123, 123, .25); pointer-events: none; }
+.btn .text { position: relative; }
+
+.list { display: grid; gap: .6rem; max-width: 60rem; }
+.row { display: grid; grid-template-columns: 11rem 1fr; gap: 1rem; padding: .7rem 1.1rem; border-radius: .7rem; background: var(--panel); border: .15rem solid transparent; font-size: .95rem; }
+.row:focus { border-color: var(--accent); transform: none; }
+.row time { color: var(--muted); }
+.row.problem span { color: var(--danger); font-weight: 700; }
+
+/* PIN pad */
+.pin { max-width: 26rem; margin: 1rem auto; text-align: center; }
+.dots { display: flex; justify-content: center; gap: 1rem; margin: 1.4rem 0; }
+.dots i { width: 1.3rem; height: 1.3rem; border-radius: 50%; border: .15rem solid var(--muted); }
+.dots i.on { background: var(--accent); border-color: var(--accent); }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; }
+.pad .btn { justify-content: center; font-size: 1.5rem; }
+
+#toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); max-width: 80vw; padding: 1rem 1.8rem; border-radius: 1rem; background: var(--panel-2); border: .15rem solid var(--accent); font-weight: 700; box-shadow: 0 1rem 2rem rgba(0, 0, 0, .5); }
+#toast.error { border-color: var(--danger); color: var(--danger); }

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="620" viewBox="0 0 1920 620">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2740"/><stop offset="1" stop-color="#0a0d15"/></linearGradient>
+    <symbol id="drop" viewBox="0 0 64 64"><path d="M32 8 L48.5 33 A18 18 0 1 1 15.5 33 Z" fill="#5cc8ff"/><path d="M28.5 26h7v14h7L32 52 21.5 40h7z" fill="#0d1220"/></symbol>
+    <symbol id="tile" viewBox="0 0 100 150"><rect x="2" y="2" width="96" height="146" rx="12" fill="none" stroke="#5cc8ff" stroke-width="3"/></symbol>
+  </defs>
+  <linearGradient id="side" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0a0d15"/><stop offset="0.55" stop-color="#141c2f"/><stop offset="1" stop-color="#1f2b46"/></linearGradient>
+  <radialGradient id="glow" cx="0.78" cy="0.45" r="0.45"><stop offset="0" stop-color="#5cc8ff" stop-opacity="0.35"/><stop offset="1" stop-color="#5cc8ff" stop-opacity="0"/></radialGradient>
+  <rect width="1920" height="620" fill="url(#side)"/>
+  <rect width="1920" height="620" fill="url(#glow)"/>
+  <g opacity="0.18">
+    <use href="#tile" x="1040" y="70" width="200" height="300"/><use href="#tile" x="1270" y="40" width="200" height="300"/>
+    <use href="#tile" x="1500" y="90" width="200" height="300"/><use href="#tile" x="1730" y="60" width="200" height="300"/>
+    <use href="#tile" x="1150" y="400" width="200" height="300"/><use href="#tile" x="1380" y="370" width="200" height="300"/>
+    <use href="#tile" x="1610" y="420" width="200" height="300"/>
+  </g>
+  <use href="#drop" x="1300" y="70" width="480" height="480" opacity="0.9"/>
+  <rect y="610" width="1920" height="10" fill="#5cc8ff"/>
+</svg>

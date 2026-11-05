@@ -1,23 +1,37 @@
-//! The SteamGridDB key lives in Windows Credential Manager, never in data.json or the logs.
+//! Secrets live in Windows Credential Manager, never in data.json or the logs:
+//! the SteamGridDB key and the optional Couch mode PIN.
 
 const SERVICE: &str = "SteamDrop";
-const ACCOUNT: &str = "SteamGridDB API key";
+const SGDB: &str = "SteamGridDB API key";
+const PIN: &str = "Couch mode PIN";
 
-fn entry() -> keyring::Result<keyring::Entry> {
-    keyring::Entry::new(SERVICE, ACCOUNT)
+/// The saved value, or "" when there is none.
+fn get(account: &str) -> String {
+    keyring::Entry::new(SERVICE, account).and_then(|e| e.get_password()).unwrap_or_default()
 }
 
-/// The saved key, or "" when there is none.
-pub fn sgdb_key() -> String {
-    entry().and_then(|e| e.get_password()).unwrap_or_default()
-}
-
-/// Saves the key; an empty key removes it.
-pub fn set_sgdb_key(key: &str) -> Result<(), String> {
-    let e = entry().map_err(|e| e.to_string())?;
-    let result = if key.is_empty() { e.delete_credential() } else { e.set_password(key) };
+/// Saves the value; an empty value removes it.
+fn set(account: &str, value: &str) -> Result<(), String> {
+    let e = keyring::Entry::new(SERVICE, account).map_err(|e| e.to_string())?;
+    let result = if value.is_empty() { e.delete_credential() } else { e.set_password(value) };
     match result {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(err) => Err(format!("Windows could not save the key ({err}).")),
+        Err(err) => Err(format!("Windows could not save it ({err}).")),
     }
+}
+
+pub fn sgdb_key() -> String {
+    get(SGDB)
+}
+
+pub fn set_sgdb_key(key: &str) -> Result<(), String> {
+    set(SGDB, key)
+}
+
+pub fn couch_pin() -> String {
+    get(PIN)
+}
+
+pub fn set_couch_pin(pin: &str) -> Result<(), String> {
+    set(PIN, pin)
 }

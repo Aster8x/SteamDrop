@@ -142,6 +142,7 @@ pub struct NewShortcut<'a> {
     pub name: &'a str,
     pub exe: &'a Path,
     pub icon: String,
+    pub launch_options: &'a str,
 }
 
 /// Adds (or replaces) shortcuts for one Steam user, in one write.
@@ -161,7 +162,7 @@ pub fn add(config: &Path, data_dir: &Path, user: &str, items: &[NewShortcut]) ->
                 ("StartDir".into(), str_(&start_dir)),
                 ("icon".into(), str_(&s.icon)),
                 ("ShortcutPath".into(), str_("")),
-                ("LaunchOptions".into(), str_("")),
+                ("LaunchOptions".into(), str_(s.launch_options)),
                 ("IsHidden".into(), Value::Int(0)),
                 ("AllowDesktopConfig".into(), Value::Int(1)),
                 ("AllowOverlay".into(), Value::Int(1)),
@@ -292,9 +293,9 @@ mod tests {
         std::fs::write(config.join("shortcuts.vdf"), vdf::write(&other)).unwrap();
 
         let exe = PathBuf::from("/games/A/a.exe");
-        let s = NewShortcut { id: 0x8000_0001, name: "A", exe: &exe, icon: String::new() };
+        let s = NewShortcut { id: 0x8000_0001, name: "A", exe: &exe, icon: String::new(), launch_options: "" };
         add(&config, &data, "123", &[s]).unwrap();
-        let s = NewShortcut { id: 0x8000_0001, name: "A", exe: &exe, icon: String::new() };
+        let s = NewShortcut { id: 0x8000_0001, name: "A", exe: &exe, icon: String::new(), launch_options: "" };
         add(&config, &data, "123", &[s]).unwrap();
         assert_eq!(present_ids(&config), vec![7, 0x8000_0001]);
         assert_eq!(users(&base), vec![("123".to_string(), config.clone())]);

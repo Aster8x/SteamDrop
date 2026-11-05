@@ -26,6 +26,8 @@ pub struct Settings {
     pub skipped_version: String,
     /// The version whose "What's new" was already shown.
     pub last_seen_version: String,
+    /// SteamDrop's own Steam shortcut, which opens Couch mode.
+    pub steam_shortcut: bool,
 }
 
 impl Default for Settings {
@@ -45,6 +47,7 @@ impl Default for Settings {
             update_auto_install: false,
             skipped_version: String::new(),
             last_seen_version: String::new(),
+            steam_shortcut: true,
         }
     }
 }
@@ -67,6 +70,9 @@ pub struct Data {
     pub games: Vec<Game>,
     /// Folders already dealt with (added, skipped, or there before watching began).
     pub known: Vec<String>,
+    /// Shortcuts removed while Steam was running; removed again once Steam is closed,
+    /// because Steam can write its old list back.
+    pub pending_removals: Vec<u32>,
 }
 
 /// A new folder waiting for the user to confirm.
@@ -91,6 +97,8 @@ pub struct App {
     pub update: Mutex<Option<crate::updates::Available>>,
     /// Set once after an update, for the "What's new" screen.
     pub whats_new: Mutex<Option<crate::changelog::Section>>,
+    /// Held while Couch mode is open; the process Steam started waits for it to be released.
+    pub couch_lock: Mutex<Option<std::fs::File>>,
 }
 
 /// %APPDATA%\SteamDrop
@@ -150,6 +158,7 @@ impl App {
             watcher: Mutex::new(None),
             update: Mutex::new(None),
             whats_new: Mutex::new(None),
+            couch_lock: Mutex::new(None),
         }
     }
 

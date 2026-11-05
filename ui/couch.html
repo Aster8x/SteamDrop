@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SteamDrop Couch mode</title>
+  <link rel="stylesheet" href="couch.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#151b2a"/><path d="M32 8 L48.5 33 A18 18 0 1 1 15.5 33 Z" fill="#5cc8ff"/><path d="M28.5 26h7v14h7L32 52 21.5 40h7z" fill="#151b2a"/></svg>
+      <span>SteamDrop</span>
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      <span class="bumper">LB</span>
+      <span class="tab" data-tab="library">Library</span>
+      <span class="tab" data-tab="settings">Settings</span>
+      <span class="tab" data-tab="activity">Activity</span>
+      <span class="bumper">RB</span>
+    </nav>
+  </header>
+  <main id="screen"></main>
+  <footer class="hints" id="hints"></footer>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="couch.js"></script>
+</body>
+</html>
