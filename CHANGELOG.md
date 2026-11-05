@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Activity log in plain words, in `%APPDATA%\SteamDrop\logs` (last 5 files, up to 1 MB each).
 - Settings → Help: recent activity, "Copy bug report" (version, Windows version, Steam status, settings and the last 200 log lines, with the Windows user name and secrets removed), "Report a problem" and "Open log folder".
 - Bug report form on GitHub.
+- Settings → Updates: check on startup (on), check once a day (on), install automatically (off), and "Check now".
+- Update window with "Current → New", the changes in every version in between (newest first), and "Update now", "Remind me later" and "Skip this version".
+- Automatic updates install quietly, but never while a game started from Steam is running.
+- A one-time "What's new" screen after each update.
 
 ## [0.1.0] - 2026-11-05
 

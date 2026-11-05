@@ -84,6 +84,15 @@ Why things are the way they are. Newest decisions go at the bottom of each secti
 - **Own small logger** (`log.rs`) instead of a logging framework. It writes one plain-language line per event with a local timestamp (the `time` crate is already used by Tauri), rotates at 1 MB, and keeps 5 files. The log records what users and helpers care about: folders found or skipped and why, the exe and App ID chosen, where each picture came from, Steam restarts, settings changes, and problems marked "Problem:".
 - **Bug report** is Markdown so it renders nicely in a GitHub issue. Every `\Users\<name>` (any drive, either slash) becomes `\Users\<user>`. Settings are listed with any key, token or password fields dropped. It's copied with the browser clipboard; if that's blocked, the report is shown in a box to copy by hand.
 
+## Updates
+
+- **Built on Tauri's updater** and the release's `latest.json`. The update window shows every changelog section between the installed and the new version. They come from `CHANGELOG.md` at the new version's tag on GitHub, falling back to the release notes if that can't be fetched. "What's new" uses the changelog built into the app, so it works offline.
+- **Checks:** 20 seconds after startup (so startup stays quick) and every 24 hours while running, each only if its setting is on. A failed check is logged in plain words and otherwise silent. Only "Check now" shows a message.
+- **"Skip this version"** is remembered in settings and only affects automatic checks; "Check now" always shows what's available. **"Remind me later"** just closes the window until the next check.
+- **Automatic installs** download right away, but install only when no game started from Steam is running. That means Steam's `RunningAppID` is 0 and none of SteamDrop's games' .exe files are running, checked every 5 minutes while an update waits. Installing restarts SteamDrop (the installer reopens it with the same arguments), and the startup after an update shows a notification and the one-time "What's new" screen.
+- **Update notifications always show,** even with "Show notifications" (part of Automatic mode) off, because they were asked for separately.
+- **Dialogs focus their main button,** so pressing Enter never picks "Skip" or "Cancel" by accident.
+
 ## Left out on purpose
 
 - Removing a shortcut automatically when its game folder is deleted. The game shows "Game file missing" instead, because deleting things from Steam unasked felt wrong.

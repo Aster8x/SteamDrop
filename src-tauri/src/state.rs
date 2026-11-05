@@ -19,6 +19,13 @@ pub struct Settings {
     pub steam_path: String,
     pub art_in_game_folder: bool,
     pub theme: String,
+    pub update_on_startup: bool,
+    pub update_daily: bool,
+    pub update_auto_install: bool,
+    /// "Skip this version" in the update window.
+    pub skipped_version: String,
+    /// The version whose "What's new" was already shown.
+    pub last_seen_version: String,
 }
 
 impl Default for Settings {
@@ -33,6 +40,11 @@ impl Default for Settings {
             steam_path: String::new(),
             art_in_game_folder: false,
             theme: "dark".into(),
+            update_on_startup: true,
+            update_daily: true,
+            update_auto_install: false,
+            skipped_version: String::new(),
+            last_seen_version: String::new(),
         }
     }
 }
@@ -75,6 +87,10 @@ pub struct App {
     pub busy: tauri::async_runtime::Mutex<()>,
     pub http: reqwest::Client,
     pub watcher: Mutex<Option<notify::RecommendedWatcher>>,
+    /// A newer version waiting for the user's choice in the update window.
+    pub update: Mutex<Option<crate::updates::Available>>,
+    /// Set once after an update, for the "What's new" screen.
+    pub whats_new: Mutex<Option<crate::changelog::Section>>,
 }
 
 /// %APPDATA%\SteamDrop
@@ -132,6 +148,8 @@ impl App {
                 .build()
                 .expect("http client"),
             watcher: Mutex::new(None),
+            update: Mutex::new(None),
+            whats_new: Mutex::new(None),
         }
     }
 

@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod art;
+mod changelog;
 mod exe;
 mod library;
 mod log;
@@ -11,6 +12,7 @@ mod state;
 mod steam;
 mod store;
 mod titlecard;
+mod updates;
 mod vdf;
 mod watcher;
 
@@ -21,7 +23,6 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, RunEvent, State, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
-use tauri_plugin_updater::UpdaterExt;
 
 /// Shows the main window, creating it if it was destroyed while in the tray.
 pub fn show_window(app: &AppHandle) {
@@ -67,6 +68,8 @@ struct StateView {
     steam: SteamView,
     status: String,
     version: String,
+    update: Option<updates::Available>,
+    whats_new: Option<changelog::Section>,
 }
 
 #[tauri::command]
@@ -92,6 +95,8 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
         found: state.found.lock().unwrap().clone(),
         steam: SteamView { path: steam_path, detected: steam::detect_path(), users: users.len(), running: steam::is_running() },
         status: state.status.lock().unwrap().clone(),
+        update: state.update.lock().unwrap().clone(),
+        whats_new: state.whats_new.lock().unwrap().clone(),
         version: app.package_info().version.to_string(),
     }
 }
@@ -330,25 +335,41 @@ fn open(target: String) -> Result<(), String> {
     Ok(())
 }
 
+/// "Check now": shows the update window if there's a newer version (even one that was skipped).
 #[tauri::command]
-async fn check_update(app: AppHandle) -> Result<Option<String>, String> {
-    let checked = async { app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string()) }.await;
-    match &checked {
-        Ok(Some(u)) => log::info(format!("Update available: version {}.", u.version)),
-        Ok(None) => log::info("Checked for updates: this is the latest version."),
-        Err(e) => log::problem(format!("Could not check for updates: {e}")),
-    }
-    Ok(checked?.map(|u| u.version))
+async fn check_now(app: AppHandle, state: State<'_, App>) -> Result<Option<updates::Available>, String> {
+    let found = updates::check(&app).await?.map(|(a, _)| a);
+    *state.update.lock().unwrap() = found.clone();
+    library::emit_state(&app);
+    Ok(found)
 }
 
 #[tauri::command]
 async fn install_update(app: AppHandle) -> Result<(), String> {
-    let update = app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string())?;
-    if let Some(u) = update {
-        log::info(format!("Installing update {}.", u.version));
-        u.download_and_install(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
-        app.restart();
+    updates::install_now(&app).await
+}
+
+/// "Remind me later" (skip = false) or "Skip this version" (skip = true).
+#[tauri::command]
+fn dismiss_update(app: AppHandle, state: State<App>, skip: bool) -> Result<(), String> {
+    let Some(update) = state.update.lock().unwrap().take() else { return Ok(()) };
+    if skip {
+        state.update(|d| d.settings.skipped_version = update.version.clone())?;
+        log::info(format!("You chose to skip update {}.", update.version));
+    } else {
+        log::info(format!("You chose to be reminded about update {} later.", update.version));
     }
+    library::emit_state(&app);
+    Ok(())
+}
+
+/// The "What's new" screen was closed: don't show it again for this version.
+#[tauri::command]
+fn ack_whats_new(app: AppHandle, state: State<App>) -> Result<(), String> {
+    state.whats_new.lock().unwrap().take();
+    let current = app.package_info().version.to_string();
+    state.update(|d| d.settings.last_seen_version = current)?;
+    library::emit_state(&app);
     Ok(())
 }
 
@@ -396,8 +417,10 @@ fn main() {
             open_logs,
             restart_steam,
             open,
-            check_update,
+            check_now,
             install_update,
+            dismiss_update,
+            ack_whats_new,
             quit
         ])
         .setup(move |app| {
@@ -430,6 +453,8 @@ fn main() {
                 })
                 .build(app)?;
             watcher::restart(app.handle());
+            updates::after_start(app.handle());
+            updates::schedule(app.handle());
             if !start_hidden {
                 show_window(app.handle());
             }

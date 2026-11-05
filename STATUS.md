@@ -75,6 +75,13 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - "Copy bug report" copies one block of text. Paste it into Notepad and check it shows `C:\Users\<user>` instead of your name and contains no key.
     - "Report a problem" opens GitHub's bug report form.
 22. **Uninstall with "Delete SteamDrop settings and cache"** also removes the saved key from Credential Manager.
+23. **Updates** (needs two published releases, for example 0.1.0 installed and 0.1.1 released):
+    - Settings → Updates shows your version. "Check for updates on startup" and "Also check once a day" are on, "Install updates automatically" is off.
+    - Start SteamDrop: after about 20 seconds you get a Windows notification and the update window, showing "Current: 0.1.0 → New: 0.1.1" and the changes for every version in between.
+    - "Remind me later" closes it; it comes back on the next check. "Skip this version" stops it for that version (but "Check now" still shows it).
+    - "Update now" downloads, installs and reopens SteamDrop, which then shows "What's new in 0.1.1" once.
+    - Turn on "Install updates automatically", start a game from Steam, and trigger a check. The update must wait until the game is closed, then install, restart SteamDrop and show a notification.
+    - Unplug the network and press "Check now": you get a short message, and the Activity list says the check failed. No error pop-ups.
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 

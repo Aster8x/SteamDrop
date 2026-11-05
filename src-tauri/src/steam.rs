@@ -207,6 +207,36 @@ pub fn is_running() -> bool {
     false
 }
 
+/// True while a game started from Steam is running: a Steam game (Steam's RunningAppID)
+/// or one of SteamDrop's own games (its .exe is running).
+pub fn game_running(games: &[crate::state::Game]) -> bool {
+    #[cfg(windows)]
+    {
+        use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+        let steam_game: u32 = RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(r"Software\Valve\Steam")
+            .and_then(|k| k.get_value("RunningAppID"))
+            .unwrap_or(0);
+        if steam_game != 0 {
+            return true;
+        }
+        let Ok(out) = hidden(std::process::Command::new("tasklist").args(["/FO", "CSV", "/NH"])).output() else { return false };
+        let running: Vec<String> = String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .filter_map(|l| l.split("\",\"").next().map(|n| n.trim_matches('"').to_lowercase()))
+            .collect();
+        games.iter().any(|g| {
+            let name = Path::new(&g.exe).file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+            running.contains(&name)
+        })
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = games;
+        false
+    }
+}
+
 /// Asks Steam to close and waits (up to a minute) until it has.
 /// Steam must be closed while shortcuts.vdf changes, or it overwrites them on exit.
 pub fn shutdown(steam: &Path) -> Result<(), String> {

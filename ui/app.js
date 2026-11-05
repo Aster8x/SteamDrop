@@ -8,7 +8,8 @@ const LEGAL = "SteamDrop is an independent, open source tool for adding games st
 let S = null;          // last state from the app
 let view = "games";
 let busy = false;
-let update = null;     // { checking, version, error, installing }
+let checkMsg = null;   // { text, ok } after "Check now"
+let dialogFor = null;  // which automatic dialog is open: "whats-new" or "update-<version>"
 let sgdbKey = null;    // what's in the key box (loaded from Windows Credential Manager once)
 let keyMsg = null;     // { text, ok } after "Test key" or "Save key"
 const SGDB_API_PAGE = "https://www.steamgriddb.com/profile/preferences/api";
@@ -36,7 +37,86 @@ async function refresh() {
   S = await invoke("get_state");
   document.documentElement.dataset.theme = S.settings.theme === "light" ? "light" : "dark";
   render();
+  maybeShowDialogs();
 }
+
+/* ---------- updates ---------- */
+/** Inline Markdown from the changelog: **bold**, `code`, and [links](...) shown as plain text. */
+function inline(text) {
+  return text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").split(/(\*\*[^*]+\*\*|`[^`]+`)/).map((p) =>
+    p.length > 4 && p.startsWith("**") && p.endsWith("**") ? h("strong", {}, p.slice(2, -2))
+      : p.length > 2 && p.startsWith("`") && p.endsWith("`") ? h("code", {}, p.slice(1, -1)) : p);
+}
+
+/** Changelog Markdown (### headings, - bullets, paragraphs) as readable elements. */
+function markdown(md) {
+  const out = [];
+  let list = null;
+  for (const raw of md.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) { list = null; continue; }
+    if (line.startsWith("### ")) { list = null; out.push(h("h4", {}, inline(line.slice(4)))); }
+    else if (/^[-*] /.test(line)) {
+      if (!list) { list = h("ul", {}); out.push(list); }
+      list.append(h("li", {}, ...inline(line.slice(2))));
+    } else { list = null; out.push(h("p", {}, ...inline(line))); }
+  }
+  return out;
+}
+
+function notesView(sections) {
+  return h("div", { class: "notes" }, sections.map((sec) => h("section", {},
+    h("h3", {}, `Version ${sec.version}`, sec.date ? h("span", { class: "muted small" }, ` · ${sec.date}`) : null),
+    markdown(sec.body || "No details were given for this version."))));
+}
+
+async function showUpdate(u) {
+  dialogFor = `update-${u.version}`;
+  const choice = await ask("An update is ready", [
+    h("p", { class: "update-versions" }, `Current: ${u.current}`, h("span", { "aria-hidden": "true" }, "  →  "), h("strong", {}, `New: ${u.version}`)),
+    notesView(u.notes),
+  ], [
+    { label: "Skip this version", value: "skip" },
+    { label: "Remind me later", value: "later" },
+    { label: "Update now", value: "now", kind: "primary" },
+  ]);
+  dialogFor = null;
+  if (choice === "now") {
+    busy = true;
+    showStatus("Downloading the update. SteamDrop will close and open again by itself.");
+    try { await invoke("install_update"); } catch (e) { busy = false; showStatus(String(e), true); }
+  } else {
+    await invoke("dismiss_update", { skip: choice === "skip" });
+  }
+}
+
+async function showWhatsNew(w) {
+  dialogFor = "whats-new";
+  await ask(`What's new in ${w.version}`, [h("div", { class: "notes" }, markdown(w.body))], [{ label: "Got it", value: "ok", kind: "primary" }]);
+  dialogFor = null;
+  await invoke("ack_whats_new");
+}
+
+/** Opens "What's new" (after an update) or the update window, but never over another dialog. */
+function maybeShowDialogs() {
+  if (dialogFor || $("#dialog").open) return;
+  if (S.whats_new) showWhatsNew(S.whats_new);
+  else if (S.update) showUpdate(S.update);
+}
+
+async function checkNow() {
+  checkMsg = { ok: true, text: "Checking for updates..." };
+  render();
+  try {
+    const found = await invoke("check_now");
+    checkMsg = found ? null : { ok: true, text: `You have the latest version (${S.version}).` };
+  } catch (e) {
+    checkMsg = { ok: false, text: String(e) };
+  }
+  render();
+}
+
+const checkLine = () => checkMsg ? h("p", { class: checkMsg.ok ? "muted" : "error", role: "status" }, checkMsg.text) : null;
 
 function showStatus(text, isError = false) {
   const el = $("#status");
@@ -88,6 +168,8 @@ function ask(title, body, buttons) {
     dlg.oncancel = () => resolve(null);
     if (dlg.open) dlg.close();
     dlg.showModal();
+    // Enter should do the main action, never "Skip" or "Cancel".
+    dlg.querySelector(".actions .primary")?.focus();
   });
 }
 
@@ -472,36 +554,23 @@ function settingsView() {
           h("button", { "aria-pressed": String(st.theme === "light"), onclick: () => saveSettings({ theme: "light" }) }, "Light"))),
       h("div", { class: "row" }, btn("Quit SteamDrop", () => invoke("quit"), "", { always: true }))),
 
+    h("div", { class: "panel" },
+      h("h2", {}, "Updates"),
+      h("p", { class: "muted" }, `You have SteamDrop ${S.version}. Updates come from SteamDrop's GitHub page.`),
+      setting("Check for updates on startup", "Looks for a new version each time SteamDrop starts.",
+        toggle(st.update_on_startup, (v) => saveSettings({ update_on_startup: v }), "Check for updates on startup")),
+      setting("Also check once a day while running", "Looks again every 24 hours while SteamDrop sits in the tray.",
+        toggle(st.update_daily, (v) => saveSettings({ update_daily: v }), "Also check once a day while running")),
+      setting("Install updates automatically", "Downloads and installs new versions by itself, never while you're playing a game. You'll get a notification afterward.",
+        toggle(st.update_auto_install, (v) => saveSettings({ update_auto_install: v }), "Install updates automatically")),
+      h("div", { class: "row" }, btn("Check now", checkNow, "primary", { always: true })),
+      checkLine()),
+
     helpPanel(),
   ];
 }
 
-async function checkUpdate() {
-  update = { checking: true };
-  render();
-  try {
-    const version = await invoke("check_update");
-    update = { version };
-  } catch (e) {
-    update = { error: String(e) };
-  }
-  render();
-}
-
 function aboutView() {
-  let updateLine = null;
-  if (update?.checking) updateLine = h("p", { class: "muted" }, "Checking for updates...");
-  else if (update?.installing) updateLine = h("p", { class: "muted" }, "Downloading the update. SteamDrop will restart by itself.");
-  else if (update?.error) updateLine = h("p", { class: "error" }, "Couldn't check for updates right now. Try again later.");
-  else if (update && update.version) updateLine = h("div", { class: "row" },
-    h("p", {}, `Version ${update.version} is available.`),
-    btn("Install update", async () => {
-      update = { installing: true };
-      render();
-      try { await invoke("install_update"); } catch (e) { update = { error: String(e) }; render(); }
-    }, "primary"));
-  else if (update) updateLine = h("p", { class: "muted" }, "You have the latest version.");
-
   const link = (label, url) => btn(label, () => invoke("open", { target: url }), "", { always: true });
   return [
     h("div", { class: "panel" },
@@ -509,10 +578,10 @@ function aboutView() {
         h("div", {}, h("h1", {}, "SteamDrop"), h("p", { class: "muted" }, `Version ${S.version} · Free and open source (MIT)`))),
       h("p", {}, "Drop a game folder in, play it from Steam. SteamDrop adds games stored on your PC to your Steam library, with artwork."),
       h("div", { class: "row" },
-        btn("Check for updates", checkUpdate, "primary", { always: true }),
+        btn("Check for updates", checkNow, "primary", { always: true }),
         link("Source code", REPO),
         link("Report a problem", `${REPO}/issues`)),
-      updateLine),
+      checkLine()),
     h("div", { class: "panel" },
       h("h2", {}, "Legal"),
       h("p", { class: "legal" }, LEGAL)),

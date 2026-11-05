@@ -3585,6 +3585,7 @@ dependencies = [
  "notify",
  "png",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "tauri",

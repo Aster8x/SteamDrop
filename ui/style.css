@@ -259,3 +259,12 @@ dialog .actions { display: flex; flex-wrap: wrap; gap: .7rem; justify-content: f
 .activity li.problem span { color: var(--danger); font-weight: 700; }
 .activity li.muted { display: block; }
 textarea.report { width: 100%; font: .85rem/1.4 Consolas, monospace; background: var(--bg); color: var(--text); border: 2px solid var(--border); border-radius: 12px; padding: .6rem; }
+
+.update-versions { font-size: 1.15rem; margin-bottom: 1rem; }
+.notes { max-height: 50vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; padding: .4rem 1.1rem; background: var(--bg); }
+.notes section + section { border-top: 1px solid var(--border); margin-top: .6rem; padding-top: .6rem; }
+.notes h3 { margin: .7rem 0 .3rem; }
+.notes h4 { margin: .7rem 0 .2rem; font-family: "Chakra Petch", sans-serif; color: var(--accent); }
+.notes ul { margin: .2rem 0 .6rem; padding-left: 1.3rem; }
+.notes li { margin: .25rem 0; }
+.notes code { font-family: Consolas, monospace; font-size: .9em; background: var(--panel-2); padding: 0 .3rem; border-radius: 5px; }

@@ -46,7 +46,7 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 - **Safe.** SteamDrop backs up Steam's shortcuts file before every change. "Remove from Steam" removes only the shortcut, never your game files.
 - **Light on your PC.** The window is fully closed while SteamDrop sits in the tray. The installer is only a few megabytes.
 - **Dark and light looks**, large readable text (Atkinson Hyperlegible).
-- **Updates itself** when a new version is released.
+- **Stays up to date:** checks for new versions on startup and once a day, shows what changed, and can install updates by itself (never while you're playing).
 
 ## Screenshots
 
