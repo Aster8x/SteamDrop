@@ -34,8 +34,14 @@ pub fn render(title: &str, w: u32, h: u32, kind: Kind) -> Vec<u8> {
         let stripe = (h / 60).max(3);
         fill(&mut px, w, 0, h - stripe, w, stripe, ACCENT);
     }
-    if !matches!(kind, Kind::Hero) {
-        draw_title(&mut px, w, h, title);
+    match kind {
+        Kind::Hero => {}
+        // A soft shadow keeps the logo readable over bright backgrounds.
+        Kind::Logo => {
+            draw_title(&mut px, w, h, title, (h as f32 * 0.008).max(2.0), [0.0; 3], 0.55);
+            draw_title(&mut px, w, h, title, 0.0, [245.0; 3], 1.0);
+        }
+        Kind::Cover => draw_title(&mut px, w, h, title, 0.0, [245.0; 3], 1.0),
     }
     encode(&px, w, h)
 }
@@ -51,7 +57,7 @@ fn fill(px: &mut [f32], w: u32, x0: u32, y0: u32, fw: u32, fh: u32, rgb: [f32; 3
 }
 
 /// Word-wraps the title and picks the largest size that fits in the middle of the image.
-fn draw_title(px: &mut [f32], w: u32, h: u32, title: &str) {
+fn draw_title(px: &mut [f32], w: u32, h: u32, title: &str, offset: f32, rgb: [f32; 3], alpha: f32) {
     let font = FontRef::try_from_slice(FONT).expect("bundled font");
     let (max_w, max_h) = (w as f32 * 0.84, h as f32 * 0.62);
     let mut size = h as f32 * 0.3;
@@ -67,9 +73,9 @@ fn draw_title(px: &mut [f32], w: u32, h: u32, title: &str) {
     };
     let sf = font.as_scaled(PxScale::from(size));
     let line_h = sf.height() * 1.05;
-    let mut y = (h as f32 - line_h * lines.len() as f32) / 2.0 + sf.ascent();
+    let mut y = (h as f32 - line_h * lines.len() as f32) / 2.0 + sf.ascent() + offset;
     for line in &lines {
-        let mut x = (w as f32 - width(&sf, line)) / 2.0;
+        let mut x = (w as f32 - width(&sf, line)) / 2.0 + offset;
         let mut prev = None;
         for ch in line.chars() {
             let id = font.glyph_id(ch);
@@ -83,9 +89,9 @@ fn draw_title(px: &mut [f32], w: u32, h: u32, title: &str) {
                     let (x, y) = (b.min.x as i32 + gx as i32, b.min.y as i32 + gy as i32);
                     if x >= 0 && y >= 0 && (x as u32) < w && (y as u32) < h {
                         let i = ((y as u32 * w + x as u32) * 4) as usize;
-                        let a = cov.clamp(0.0, 1.0);
+                        let a = cov.clamp(0.0, 1.0) * alpha;
                         for c in 0..3 {
-                            px[i + c] = px[i + c] * (1.0 - a) + 245.0 * a;
+                            px[i + c] = px[i + c] * (1.0 - a) + rgb[c] * a;
                         }
                         px[i + 3] = px[i + 3] + (255.0 - px[i + 3]) * a;
                     }

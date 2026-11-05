@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SteamDrop</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--logo-bg)"/><path d="M32 8 L48.5 33 A18 18 0 1 1 15.5 33 Z" fill="var(--accent)"/><path d="M28.5 26h7v14h7L32 52 21.5 40h7z" fill="var(--logo-bg)"/></svg>
+      <span>SteamDrop</span>
+    </div>
+    <nav aria-label="Main">
+      <button class="tab" data-view="games" aria-current="page">Games</button>
+      <button class="tab" data-view="settings">Settings</button>
+      <button class="tab" data-view="about">About</button>
+    </nav>
+    <button id="theme" class="icon-btn" title="Switch between dark and light" aria-label="Switch between dark and light"></button>
+  </header>
+
+  <div id="status" class="status" role="status" aria-live="polite" hidden></div>
+
+  <main>
+    <section id="view-games" class="view"></section>
+    <section id="view-settings" class="view" hidden></section>
+    <section id="view-about" class="view" hidden></section>
+  </main>
+
+  <dialog id="dialog"></dialog>
+  <script src="app.js"></script>
+</body>
+</html>
