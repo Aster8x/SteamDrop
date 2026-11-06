@@ -108,6 +108,15 @@ Why things are the way they are. Newest decisions go at the bottom of each secti
 
 ## Fixes from the first laptop test
 
+- **Settings lost after a restart (root cause):** any failed read or parse of `data.json` made SteamDrop start from defaults, and startup saves right away, so the defaults replaced the real file. Two ways a read could fail on Windows: another SteamDrop process (the tray app and the one Steam starts, around a view switch or Steam restart) replacing the file at that instant, or a broken file left by two processes writing the same `data.json.tmp` at once. A test showed that collision fails on Windows with "File not found". The data folder also came from the `APPDATA` variable, silently falling back to the Temp folder if it was missing, and windows sent all settings on every change, so a window with an old copy could put old values back. Now:
+  - the folder comes from Windows' Roaming AppData location;
+  - reads retry for up to a second;
+  - every save goes to the process's own temporary file and is renamed into place, after the previous good file is copied to `data.json.bak`;
+  - an unreadable `data.json` is kept as `data.json.broken-<time>`, logged in plain words, and recovered from `data.json.bak`;
+  - settings changes are sent as the changed fields only and merged in the backend (bad values are refused).
+  
+  A test saves a full setup and checks that every restart path keeps it.
+
 - **Art protocol instead of Tauri's asset protocol:** both windows load game art from `art://<game id>/<slot>` (on Windows `http://art.localhost/...`), served by SteamDrop from its art cache. Only a number and a known slot name are accepted, so nothing else on disk can be reached. The asset protocol needed the file path to match an allowed scope, which breaks when AppData is behind a link or redirected folder. Its scope and the `protocol-asset` feature are gone. If an image still fails, the page swaps it for a title card. The Couch detail view used to build `<img src="">` for games without a cover, which always shows a broken icon.
 - **Blank "Window view":** Tauri runs synchronous commands on the main thread, and `run_on_main_thread` then runs immediately. So the new window's WebView2 was created inside the old window's own command callback, a known Windows deadlock: blank window, and the old view never closed. All window commands (open, switch, hide, close) are async now, so the work is queued on the event loop. Windows have a dark background colour so they never flash white.
 - **One source of truth for the game list:** the app re-reads `data.json` whenever its timestamp changes (another SteamDrop process, or anything else, wrote it). It does this before showing state and before every save, so a stale copy can't overwrite newer data. A `data.json` that fails to parse is kept as `data.json.broken` instead of being replaced by an empty list. Both views also refresh when they're shown or focused.

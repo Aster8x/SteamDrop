@@ -121,8 +121,11 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
 }
 
 #[tauri::command]
-fn save_settings(app: AppHandle, state: State<App>, settings: Settings) -> Result<(), String> {
+fn save_settings(app: AppHandle, state: State<App>, patch: serde_json::Value) -> Result<(), String> {
+    state.reload_if_changed();
     let old = state.settings();
+    // Windows send only what changed, so one holding an older copy can't put old values back.
+    let settings = old.patched(&patch)?;
     set_run_at_sign_in("SteamDrop", settings.run_on_startup.then_some("--tray"))?;
     set_run_at_sign_in("SteamDrop Big Picture", settings.big_picture_at_sign_in.then_some("--start-big-picture"))?;
     let watch_changed = old.watched != settings.watched || old.excluded != settings.excluded;

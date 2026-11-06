@@ -128,7 +128,7 @@ By default SteamDrop adds games to every account that has signed in on this PC. 
 Go to **Settings → Help** and press **Copy bug report**. Then press **Report a problem** (or open a [new issue](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml)), describe what happened, and paste the report into the last box. The report holds SteamDrop's version, your Windows version, whether Steam was found, your settings, and the last 200 lines of SteamDrop's activity. Your Windows user name is replaced with `<user>`, and your SteamGridDB key is never included. The **Activity** list on the same page shows what SteamDrop did recently, in plain words.
 
 **Where does SteamDrop keep its files?**
-In `%APPDATA%\SteamDrop`: settings, the artwork cache (`art`), store details (`info`), backups of Steam's shortcuts file (`backups`), and the activity log (`logs`, the last 5 files of up to 1 MB each). The SteamGridDB key is kept in Windows Credential Manager.
+In `%APPDATA%\SteamDrop`: settings, the artwork cache (`art`), store details (`info`), a backup of its settings (`data.json.bak`), backups of Steam's shortcuts file (`backups`), and the activity log (`logs`, the last 5 files of up to 1 MB each). The SteamGridDB key is kept in Windows Credential Manager.
 
 **How do I undo a change?**
 Every version of Steam's shortcuts file is backed up in `%APPDATA%\SteamDrop\backups\<account number>`. Close Steam, copy the backup you want back to `Steam\userdata\<account number>\config\shortcuts.vdf`, and start Steam.

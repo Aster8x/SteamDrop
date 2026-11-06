@@ -12,6 +12,8 @@ First release.
 
 ### Fixed during testing
 
+- Settings, watched folders, exclusions and the games list could be lost after SteamDrop restarted: one failed read of the data file made SteamDrop start from defaults and save them over the real data, and two SteamDrop processes saving at once could break the file. Saves are now atomic per process, keep a `data.json.bak`, and an unreadable file is kept and recovered from the backup. Settings changes only update what changed.
+
 - SteamDrop's own Steam artwork shows just the logo and "SteamDrop".
 - Game art loads reliably in both views (served by SteamDrop itself instead of through a folder permission check), and a missing or broken picture shows a title card instead of a broken-image icon.
 - "Check now" with no published release says "You're on the latest version." Only real connection problems mention the internet.

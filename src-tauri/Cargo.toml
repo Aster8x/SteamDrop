@@ -25,6 +25,7 @@ crc32fast = "1"
 time = { version = "0.3", features = ["local-offset", "formatting", "macros"] }
 keyring = "3"
 semver = "1"
+dirs = "7"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"

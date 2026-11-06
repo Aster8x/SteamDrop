@@ -119,6 +119,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 36. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
 
 37. **Fixes from the first laptop test** (install the new build over the old one; your games and settings stay):
+    - **Settings survive restarts:** set up watched folders, an exclusion, Automatic mode and a few other settings, and add a game. Then quit and restart SteamDrop, restart Windows, open SteamDrop from Steam (both views), let SteamDrop restart Steam, and install the new build over the old one. After each, everything is still there. `%APPDATA%\SteamDrop` has `data.json` and `data.json.bak`.
     - SteamDrop's own Steam tile and banner show only the logo and "SteamDrop" (no "COUCH MODE").
     - Game covers show in both views, including Couch mode's Library and a game's details. A game without art shows a title card with its name, never a broken-image icon.
     - About → "Check for updates" with no release published says "You're on the latest version." With Wi-Fi off it says to check the internet connection.

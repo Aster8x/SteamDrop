@@ -3575,6 +3575,7 @@ version = "0.1.0"
 dependencies = [
  "ab_glyph",
  "crc32fast",
+ "dirs",
  "keyring",
  "notify",
  "png",

@@ -237,7 +237,7 @@ function switchTab(step) {
 }
 
 async function save(patch) {
-  try { await invoke("save_settings", { settings: { ...S.settings, ...patch } }); } catch (e) { toast(String(e), true); }
+  try { await invoke("save_settings", { patch }); } catch (e) { toast(String(e), true); }
   await refresh();
 }
 

@@ -148,7 +148,7 @@ async function run(fn) {
 async function saveSettings(patch) {
   S.settings = { ...S.settings, ...patch };
   try {
-    await invoke("save_settings", { settings: S.settings });
+    await invoke("save_settings", { patch });
   } catch (e) {
     showStatus(String(e), true);
   }
