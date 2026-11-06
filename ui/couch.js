@@ -2,7 +2,7 @@
 // Couch mode: a full-screen, controller-first view of SteamDrop.
 // Xbox and PlayStation pads through the Gamepad API (standard mapping), plus keyboard:
 // arrows = D-pad, Enter/Space = A, Escape/Backspace = B, Q/E or PageUp/PageDown = LB/RB.
-const { invoke, convertFileSrc } = window.__TAURI__.core;
+const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
 const TABS = ["library", "settings", "activity"];
@@ -25,7 +25,6 @@ function h(tag, props, ...kids) {
   return el;
 }
 const $ = (s) => document.querySelector(s);
-const art = (p, v) => p ? `${convertFileSrc(p)}?v=${v}` : null;
 const game = (id) => S.games.find((g) => g.id === id);
 
 /** A focusable button. `key` keeps focus on the same button after a re-render. */
@@ -69,24 +68,21 @@ function libraryScreen() {
     return [h("div", { class: "empty" }, h("h1", {}, "No games yet"),
       h("p", { class: "muted" }, "Copy a game folder into one of SteamDrop's watched folders and it shows up here. You can choose watched folders in SteamDrop on your desktop."))];
   }
-  return [h("div", { class: "grid" }, S.games.map((g) => {
-    const img = art(g.portrait, g.added);
-    return h("button", { class: `tile f ${img ? "" : "noart"}`, "data-key": `game-${g.id}`, onclick: () => push({ name: "detail", id: g.id }) },
-      img ? h("img", { src: img, alt: "" }) : null,
-      h("span", { class: "label" }, g.name));
-  }))];
+  return [h("div", { class: "grid" }, S.games.map((g) =>
+    h("button", { class: "tile f", "data-key": `game-${g.id}`, "aria-label": g.name, onclick: () => push({ name: "detail", id: g.id }) },
+      SD.art(g, "portrait"),
+      h("span", { class: "label" }, g.name))))];
 }
 
 function detailScreen({ id }) {
   const g = game(id);
   if (!g) { stack.pop(); return current(); }
-  const hero = h("div", { class: "hero" });
-  if (g.hero) hero.style.backgroundImage = `url("${art(g.hero, g.added)}")`;
+  const hero = h("div", { class: "hero" }, g.hero ? SD.art(g, "hero") : null);
   const info = h("p", { class: "muted" }, g.folder_missing ? "The game file is missing." : g.in_steam ? "" : "Not in Steam right now.");
   invoke("get_info", { id }).then((i) => { if (i && i.description) info.textContent = i.description; }).catch(() => {});
   const deleteNote = S.couch_pin_set ? "(hold A, then PIN)" : "(hold A for 2 seconds)";
   return [hero, h("div", { class: "detail" },
-    h("img", { class: "cover", src: art(g.portrait, g.added) || "", alt: "" }),
+    SD.art(g, "portrait", "cover"),
     h("div", {}, h("h1", {}, g.name), info,
       h("div", { class: "actions" },
         button("refresh", "Find artwork again", () => run(() => invoke("refresh_game", { id, steamAppid: null, restart: false }))),
@@ -147,7 +143,7 @@ function settingsScreen() {
     toggle("auto_restart", "Restart Steam automatically", "auto_restart"),
     toggle("notify", "Show notifications", "notify"),
     toggle("art_folder", "Also save art in the game folder", "art_in_game_folder"),
-    button("shortcut", "SteamDrop in the Steam library", () => run(() => invoke("set_steam_shortcut", { on: !st.steam_shortcut })),
+    button("shortcut", "Show SteamDrop in my Steam library", () => run(() => invoke("set_steam_shortcut", { on: !st.steam_shortcut })),
       { value: onoff(st.steam_shortcut), on: st.steam_shortcut }),
     button("pin", "PIN needed to delete games", () => S.couch_pin_set
       ? push({ name: "pin", title: "Enter your current PIN to turn it off", done: (old) => run(() => invoke("set_couch_pin", { old, new: "" })) })
@@ -245,26 +241,6 @@ async function save(patch) {
   await refresh();
 }
 
-/** Moves focus to the nearest focusable element in a direction. */
-function move(dx, dy) {
-  const items = [...document.querySelectorAll("#screen .f, #controls .f")];
-  const cur = document.activeElement;
-  if (!items.includes(cur)) { items[0]?.focus(); return; }
-  const a = cur.getBoundingClientRect();
-  const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
-  let best = null, bestScore = Infinity;
-  for (const el of items) {
-    if (el === cur) continue;
-    const b = el.getBoundingClientRect();
-    const ddx = b.left + b.width / 2 - ax, ddy = b.top + b.height / 2 - ay;
-    const along = dx ? ddx * dx : ddy * dy;           // distance in the wanted direction
-    const across = Math.abs(dx ? ddy : ddx);          // drift to the side
-    if (along <= 4) continue;
-    const score = along + across * 2.5;
-    if (score < bestScore) { bestScore = score; best = el; }
-  }
-  if (best) { best.focus({ preventScroll: true }); best.scrollIntoView({ block: "nearest", inline: "nearest" }); }
-}
 
 /* Hold A on a "hold" button (Delete game) for two seconds to confirm. */
 let hold = null;
@@ -306,6 +282,7 @@ function press(action) {
   else if (action === "right") move(1, 0);
 }
 function release(action) { if (action === "a") holdEnd(); }
+const move = (dx, dy) => SD.move(dx, dy, [...document.querySelectorAll("#screen .f, #controls .f")]);
 
 /* Keyboard */
 const KEYS = { F11: "view", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "a", " ": "a", Escape: "b", Backspace: "b", q: "lb", Q: "lb", PageUp: "lb", e: "rb", E: "rb", PageDown: "rb" };
@@ -319,28 +296,6 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("keyup", (e) => { if (KEYS[e.key]) { e.preventDefault(); release(KEYS[e.key]); } });
 document.addEventListener("click", (e) => { if (e.target.closest?.("[data-hold]")) e.preventDefault(); }, true);
 
-/* Gamepad (standard mapping: 0 A, 1 B, 3 Y, 4 LB, 5 RB, 8 View/Share, 9 Menu/Options, 12-15 D-pad;
-   axes 0/1 left stick).
-   The Gamepad API has no events for buttons, so it's read every frame while Couch mode is open. */
-const BUTTONS = { 0: "a", 1: "b", 3: "y", 4: "lb", 5: "rb", 8: "view", 9: "menu", 12: "up", 13: "down", 14: "left", 15: "right" };
-const REPEATS = new Set(["up", "down", "left", "right"]);
-const held = new Map(); // action -> next repeat time
-function pollPads(t) {
-  const down = new Set();
-  for (const pad of navigator.getGamepads?.() || []) {
-    if (!pad) continue;
-    for (const [i, action] of Object.entries(BUTTONS)) if (pad.buttons[i]?.pressed) down.add(action);
-    const [x = 0, y = 0] = pad.axes;
-    if (y < -0.55) down.add("up"); if (y > 0.55) down.add("down");
-    if (x < -0.55) down.add("left"); if (x > 0.55) down.add("right");
-  }
-  for (const action of down) {
-    if (!held.has(action)) { press(action); held.set(action, t + 380); }
-    else if (REPEATS.has(action) && t >= held.get(action)) { press(action); held.set(action, t + 120); }
-  }
-  for (const action of [...held.keys()]) if (!down.has(action)) { held.delete(action); release(action); }
-  requestAnimationFrame(pollPads);
-}
 
 /* ---------- start ---------- */
 async function refresh() {
@@ -353,4 +308,7 @@ document.addEventListener("held", (e) => {
   if (e.target.dataset.key === "delete" && sc?.name === "detail") deleteGame(game(sc.id));
 });
 listen("changed", refresh);
-refresh().then(() => requestAnimationFrame(pollPads));
+// Games added while this view was hidden or closed show up as soon as it's back.
+window.addEventListener("focus", refresh);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+refresh().then(() => SD.startPad(press, release));

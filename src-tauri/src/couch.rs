@@ -62,9 +62,6 @@ pub fn run_from_steam() {
     let view = view_for(&setting, big_picture);
     let mut child = std::process::Command::new(exe);
     child.arg(if view == View::Couch { "--open-view=couch" } else { "--open-view=window" });
-    if big_picture {
-        child.arg("--big-picture");
-    }
     if child.spawn().is_err() {
         return;
     }
@@ -118,6 +115,8 @@ fn build_couch(app: &AppHandle) {
     let built = WebviewWindowBuilder::new(app, COUCH, WebviewUrl::App("couch.html".into()))
         .title("SteamDrop Couch mode")
         .fullscreen(true)
+        // The page's own background, so the window never flashes white while it loads.
+        .background_color(tauri::window::Color(11, 15, 24, 255))
         .build();
     match built {
         Ok(w) => {
@@ -159,8 +158,7 @@ pub fn closed(app: &AppHandle, label: &str) {
         std::thread::spawn(move || {
             // Let the process Steam started exit and Steam finish its own bookkeeping first.
             std::thread::sleep(std::time::Duration::from_secs(3));
-            let big_picture = app.state::<App>().big_picture.load(Ordering::SeqCst);
-            if let Err(e) = crate::library::restart_steam_applying(&app, big_picture) {
+            if let Err(e) = crate::library::restart_steam_applying(&app) {
                 crate::log::problem(format!("Could not restart Steam after Couch mode: {e}"));
             }
         });

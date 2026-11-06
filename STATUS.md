@@ -95,7 +95,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Turn on "Install updates automatically", start a game from Steam, and trigger a check. The update must wait until the game is closed, then install, restart SteamDrop and show a notification.
     - Unplug the network and press "Check now": you get a short message, and the Activity list says the check failed. No error pop-ups.
 27. **Couch mode setup:**
-    - On the installer's last page, "Add SteamDrop to Steam (for Couch mode)" is ticked.
+    - On the installer's last page, "Show SteamDrop in my Steam library" is ticked.
     - After installing and restarting Steam, SteamDrop is in the library with its own cover, banner, background, logo and icon.
     - Settings → Couch mode can turn this off and on again.
 28. **Couch mode with a controller** (try an Xbox and a PlayStation controller if you have both):
@@ -117,6 +117,16 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Set a PIN in Couch mode's Settings: deleting now asks for it, and a wrong PIN refuses.
     - On a USB stick or network drive without a Recycle Bin, SteamDrop must refuse and leave the folder alone.
 36. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
+
+37. **Fixes from the first laptop test** (install the new build over the old one; your games and settings stay):
+    - SteamDrop's own Steam tile and banner show only the logo and "SteamDrop" (no "COUCH MODE").
+    - Game covers show in both views, including Couch mode's Library and a game's details. A game without art shows a title card with its name, never a broken-image icon.
+    - About → "Check for updates" with no release published says "You're on the latest version." With Wi-Fi off it says to check the internet connection.
+    - With Steam in the normal desktop window, add a game and let SteamDrop restart Steam: Steam comes back in the desktop window. Do the same from Big Picture: it comes back in Big Picture. The Activity list says which mode it chose and why. Try "Always Big Picture" and "Always desktop mode" too.
+    - In Couch mode (started from Big Picture), press "Window view": Couch mode closes and the desktop window opens with its content (no white window). F11 or View goes back. Steam keeps showing SteamDrop as running the whole time.
+    - Add a game from the desktop window, then open Couch mode: the game is in its Library. Also the other way around.
+    - Turn "Show SteamDrop in my Steam library" off with Steam open, then restart Steam from SteamDrop: the SteamDrop tile is gone from every account, your games and their art are still there, and SteamDrop still opens from the tray and Start menu. Turn it on again: the tile comes back with its art.
+    - In the desktop window with a controller: D-pad/stick move a clearly visible focus ring, A selects, B closes dialogs, LB/RB switch tabs, Y scans, View goes back to Couch mode.
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 
@@ -219,4 +229,5 @@ git push origin :refs/tags/v0.2.0
 - If you decline a Steam restart and then play another non-Steam game before Steam restarts, Steam may overwrite the change. The game then shows "Not in Steam" in SteamDrop, with "Add to Steam again" in its details.
 - Some newer Steam games store their library art under hashed URLs that SteamDrop can't guess. Those slots fall back to SteamGridDB or a title card.
 - Changes made while Steam is running (Couch mode, or "Add without restarting") show after a Steam restart. Leaving Couch mode offers "Restart now". If you choose "Later" and restart Steam yourself, Steam may show its old list until SteamDrop next starts while Steam is closed (or does a restart), which writes the changes again.
+- Games added by SteamDrop don't appear in Steam's "Recent games" until they've been played once. SteamDrop writes Steam's own last-played time in `shortcuts.vdf`, but Steam decides the recent list from its own live data and there's no reliable file to write (see DECISIONS.md).
 - Exe picking is a best guess. Games with unusual layouts may need "Choose a different file..." (with Automatic mode off).

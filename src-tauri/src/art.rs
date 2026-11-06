@@ -222,6 +222,21 @@ pub async fn sgdb_key_check(http: &Client, key: &str) -> Result<String, String> 
     }
 }
 
+/// The `art:` protocol behind both windows' covers: `<game id>/<slot>` from the art cache.
+/// Only a number and a known slot name are accepted, so no other file can be reached.
+pub fn serve(data_dir: &Path, path: &str) -> Option<(Vec<u8>, &'static str)> {
+    let path = path.replace("%2F", "/").replace("%2f", "/");
+    let (id, slot) = path.trim_start_matches('/').split_once('/')?;
+    let slot = SLOTS.into_iter().find(|s| s.name() == slot)?;
+    let file = cached(data_dir, id.parse().ok()?, slot)?;
+    let mime = match file.extension()?.to_str()? {
+        "png" => "image/png",
+        "ico" => "image/x-icon",
+        _ => "image/jpeg",
+    };
+    Some((std::fs::read(file).ok()?, mime))
+}
+
 fn clear(dir: &Path, stem: &str) {
     for e in EXTS {
         let _ = std::fs::remove_file(dir.join(format!("{stem}.{e}")));
@@ -277,5 +292,12 @@ mod tests {
         assert!(grid.join("9p.png").is_file() && grid.join("9_logo.png").is_file());
         uninstall(&grid, 9);
         assert_eq!(std::fs::read_dir(&grid).unwrap().count(), 0);
+        // The art: protocol serves cached art, and nothing outside it.
+        assert_eq!(serve(&base, "/9/portrait").map(|(b, m)| (b.len() > 1000, m)), Some((true, "image/png")));
+        assert!(serve(&base, "9%2Fportrait").is_some());
+        assert!(serve(&base, "/9/icon").is_none(), "no icon was made");
+        assert!(serve(&base, "/../9/portrait").is_none());
+        assert!(serve(&base, "/9/../../data.json").is_none());
+        assert!(serve(&base, "/abc/portrait").is_none());
     }
 }

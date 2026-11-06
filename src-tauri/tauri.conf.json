@@ -18,15 +18,12 @@
         "minWidth": 720,
         "minHeight": 540,
         "center": true,
-        "create": false
+        "create": false,
+        "backgroundColor": "#0d111a"
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data:; style-src 'self'; font-src 'self'; script-src 'self'; connect-src ipc: http://ipc.localhost",
-      "assetProtocol": {
-        "enable": true,
-        "scope": ["$DATA/SteamDrop/art/**"]
-      }
+      "csp": "default-src 'self'; img-src 'self' art: http://art.localhost data:; style-src 'self'; font-src 'self'; script-src 'self'; connect-src ipc: http://ipc.localhost"
     }
   },
   "bundle": {

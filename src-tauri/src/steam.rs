@@ -317,12 +317,34 @@ pub fn shutdown(steam: &Path) -> Result<(), String> {
 }
 
 /// True while Steam's Big Picture window is open.
-#[cfg(windows)]
 pub fn big_picture_open() -> bool {
-    let title: Vec<u16> = "Steam Big Picture Mode".encode_utf16().chain([0]).collect();
-    // SAFETY: a NUL-terminated title and no class name.
-    let hwnd = unsafe { windows_sys::Win32::UI::WindowsAndMessaging::FindWindowW(std::ptr::null(), title.as_ptr()) };
-    !hwnd.is_null()
+    #[cfg(windows)]
+    {
+        let title: Vec<u16> = "Steam Big Picture Mode".encode_utf16().chain([0]).collect();
+        // SAFETY: a NUL-terminated title and no class name.
+        let hwnd = unsafe { windows_sys::Win32::UI::WindowsAndMessaging::FindWindowW(std::ptr::null(), title.as_ptr()) };
+        !hwnd.is_null()
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+/// "When SteamDrop restarts Steam": whether Steam comes back in Big Picture, and why.
+/// "keep" (the default) reopens Big Picture only if its window was open right before.
+pub fn restart_mode(setting: &str, big_picture_was_open: bool) -> (bool, &'static str) {
+    match setting {
+        "bigpicture" => (true, "the setting says always Big Picture"),
+        "desktop" => (false, "the setting says always desktop mode"),
+        _ if big_picture_was_open => (true, "Big Picture was open right before the restart"),
+        _ => (false, "Big Picture wasn't open right before the restart"),
+    }
+}
+
+/// Decides and logs how Steam reopens. Call it right before closing Steam.
+pub fn reopen_in_big_picture(setting: &str) -> bool {
+    let (big_picture, why) = restart_mode(setting, big_picture_open());
+    crate::log::info(format!("Steam will reopen in {} because {why}.", if big_picture { "Big Picture" } else { "desktop mode" }));
+    big_picture
 }
 
 /// `SteamDrop.exe --start-big-picture`, run at Windows sign-in when the setting is on:
@@ -356,6 +378,15 @@ pub fn start(steam: &Path, big_picture: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn restart_mode_keeps_what_was_open() {
+        assert!(restart_mode("keep", true).0);
+        assert!(!restart_mode("keep", false).0, "desktop Steam must not come back in Big Picture");
+        assert!(restart_mode("bigpicture", false).0);
+        assert!(!restart_mode("desktop", true).0);
+        assert!(!restart_mode("", false).0, "older settings files default to keeping the mode");
+    }
 
     #[test]
     fn shortcut_ids_have_the_high_bit() {

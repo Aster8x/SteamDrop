@@ -40,6 +40,8 @@ pub struct Settings {
     pub chime_volume: u8,
     /// "Open Steam in Big Picture when Windows starts".
     pub big_picture_at_sign_in: bool,
+    /// "When SteamDrop restarts Steam": "keep", "bigpicture" or "desktop".
+    pub steam_restart_mode: String,
 }
 
 impl Default for Settings {
@@ -67,6 +69,7 @@ impl Default for Settings {
             chime: true,
             chime_volume: 70,
             big_picture_at_sign_in: false,
+            steam_restart_mode: "keep".into(),
         }
     }
 }
@@ -95,6 +98,8 @@ pub struct Data {
     /// Games added or changed while Steam was running; added again once Steam is closed,
     /// because Steam can write its old list back.
     pub pending_adds: Vec<u32>,
+    /// "Show SteamDrop in my Steam library" was changed while Steam was running.
+    pub pending_self: bool,
 }
 
 /// A new folder waiting for the user to confirm.
@@ -121,8 +126,8 @@ pub struct App {
     pub whats_new: Mutex<Option<crate::changelog::Section>>,
     /// Held while Couch mode is open; the process Steam started waits for it to be released.
     pub couch_lock: Mutex<Option<std::fs::File>>,
-    /// Steam was in Big Picture when it started SteamDrop.
-    pub big_picture: std::sync::atomic::AtomicBool,
+    /// When data.json was last read or written by this process.
+    seen: Mutex<Option<std::time::SystemTime>>,
     /// "Restart now" was chosen when leaving Couch mode.
     pub restart_after_couch: std::sync::atomic::AtomicBool,
 }
@@ -135,11 +140,26 @@ pub fn data_dir() -> PathBuf {
     base.join("SteamDrop")
 }
 
+/// The saved data, or None if data.json can't be read. A file that exists but doesn't parse is
+/// kept as data.json.broken, so starting fresh never quietly throws away the game list.
+fn read(dir: &Path) -> Option<Data> {
+    let bytes = std::fs::read(dir.join("data.json")).ok()?;
+    match serde_json::from_slice(&bytes) {
+        Ok(d) => Some(d),
+        Err(e) => {
+            let _ = std::fs::copy(dir.join("data.json"), dir.join("data.json.broken"));
+            crate::log::problem(format!("SteamDrop's data file couldn't be read ({e}); a copy was kept as data.json.broken."));
+            None
+        }
+    }
+}
+
 pub fn load(dir: &Path) -> Data {
-    std::fs::read(dir.join("data.json"))
-        .ok()
-        .and_then(|b| serde_json::from_slice(&b).ok())
-        .unwrap_or_default()
+    read(dir).unwrap_or_default()
+}
+
+fn modified(dir: &Path) -> Option<std::time::SystemTime> {
+    std::fs::metadata(dir.join("data.json")).and_then(|m| m.modified()).ok()
 }
 
 pub fn save(dir: &Path, data: &Data) -> Result<(), String> {
@@ -156,6 +176,13 @@ pub fn same_path(a: &str, b: &str) -> bool {
 }
 
 impl Data {
+    /// Everything written while Steam was running has now been written while it was closed.
+    pub fn clear_pending(&mut self) {
+        self.pending_removals.clear();
+        self.pending_adds.clear();
+        self.pending_self = false;
+    }
+
     pub fn is_known(&self, folder: &str) -> bool {
         self.known.iter().any(|k| same_path(k, folder)) || self.games.iter().any(|g| same_path(&g.folder, folder))
     }
@@ -172,6 +199,7 @@ impl App {
         let dir = data_dir();
         App {
             data: Mutex::new(load(&dir)),
+            seen: Mutex::new(modified(&dir)),
             dir,
             found: Mutex::new(vec![]),
             status: Mutex::new(String::new()),
@@ -185,7 +213,6 @@ impl App {
             update: Mutex::new(None),
             whats_new: Mutex::new(None),
             couch_lock: Mutex::new(None),
-            big_picture: Default::default(),
             restart_after_couch: Default::default(),
         }
     }
@@ -194,11 +221,27 @@ impl App {
         self.data.lock().unwrap().settings.clone()
     }
 
+    /// Picks up data.json when something else (another SteamDrop process) changed it, so every
+    /// window lists the same games.
+    pub fn reload_if_changed(&self) {
+        let on_disk = modified(&self.dir);
+        let mut seen = self.seen.lock().unwrap();
+        if on_disk.is_some() && on_disk != *seen {
+            if let Some(d) = read(&self.dir) {
+                *self.data.lock().unwrap() = d;
+                crate::log::info("Reloaded SteamDrop's data because it changed on disk.");
+            }
+            *seen = on_disk;
+        }
+    }
+
     /// Runs `f` on the data and saves it.
     pub fn update<T>(&self, f: impl FnOnce(&mut Data) -> T) -> Result<T, String> {
+        self.reload_if_changed();
         let mut d = self.data.lock().unwrap();
         let out = f(&mut d);
         save(&self.dir, &d)?;
+        *self.seen.lock().unwrap() = modified(&self.dir);
         Ok(out)
     }
 

@@ -448,7 +448,7 @@ Var AppStartMenuFolder
 Var AddToSteamCheckbox
 Var AddToSteamState
 Function SteamDropFinishShow
-  ${NSD_CreateCheckbox} 120u 130u 195u 10u "Add SteamDrop to Steam (for Couch mode)"
+  ${NSD_CreateCheckbox} 120u 130u 195u 10u "Show SteamDrop in my Steam library"
   Pop $AddToSteamCheckbox
   SetCtlColors $AddToSteamCheckbox "" "ffffff"
   ${NSD_Check} $AddToSteamCheckbox

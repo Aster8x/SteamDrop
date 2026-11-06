@@ -62,15 +62,18 @@ p { margin: .3rem 0 .8rem; }
 .tile { position: relative; aspect-ratio: 2 / 3; border-radius: 1rem; overflow: hidden; border: 0; padding: 0; background: var(--panel-2); color: var(--text); font: inherit; }
 .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tile .label { position: absolute; inset: auto 0 0 0; padding: 2.5rem .8rem .8rem; background: linear-gradient(transparent, rgba(0, 0, 0, .85)); font-weight: 700; text-align: left; opacity: 0; transition: opacity .12s; }
-.tile:focus .label, .tile.noart .label { opacity: 1; }
-.tile.noart { display: grid; place-items: center; }
+.tile:focus .label { opacity: 1; }
+/* Shown instead of art that's missing or won't load. */
+.titlecard { display: grid; place-items: center; width: 100%; height: 100%; padding: 1rem; text-align: center; font-family: "Chakra Petch", sans-serif; font-weight: 700; font-size: 1.3rem; background: linear-gradient(#1d2740, #0a0d15); color: var(--text); border-bottom: .4rem solid var(--accent); }
+.hero img, .hero .titlecard { width: 100%; height: 100%; object-fit: cover; }
+.hero .titlecard { display: none; }
 .empty { max-width: 46rem; margin: 4rem auto; text-align: center; }
 
 /* Detail */
 .detail { display: grid; grid-template-columns: 11rem 1fr; gap: 2rem; align-items: start; }
 .hero { height: 8rem; margin: -.5rem -2.5rem 1rem; background: center / cover no-repeat var(--panel); position: relative; }
 .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 30%, var(--bg)); }
-.cover { width: 100%; aspect-ratio: 2 / 3; border-radius: 1rem; object-fit: cover; background: var(--panel-2); margin-top: -4.5rem; position: relative; z-index: 1; box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, .6); }
+.cover { width: 100%; height: auto; aspect-ratio: 2 / 3; border-radius: 1rem; object-fit: cover; background: var(--panel-2); margin-top: -4.5rem; position: relative; z-index: 1; box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, .6); }
 .actions { display: grid; gap: .7rem; max-width: 34rem; margin-top: .8rem; }
 
 .btn {

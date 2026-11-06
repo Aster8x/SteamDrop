@@ -29,11 +29,15 @@ fn notify(app: &AppHandle, title: &str, body: &str) {
 
 /// Asks GitHub for a newer version. Failures are logged in plain words and returned.
 pub async fn check(app: &AppHandle) -> Result<Option<(Available, tauri_plugin_updater::Update)>, String> {
-    let checked = async { app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string()) }.await;
+    let checked = match app.updater() {
+        Ok(updater) => updater.check().await,
+        Err(e) => Err(e),
+    };
     let update = match checked {
         Ok(Some(u)) => u,
-        Ok(None) => {
-            log::info("Checked for updates: this is the latest version.");
+        // No release published yet (no latest.json, the page answers 404): there's nothing newer.
+        Ok(None) | Err(tauri_plugin_updater::Error::ReleaseNotFound) => {
+            log::info("Checked for updates: you're on the latest version.");
             return Ok(None);
         }
         Err(e) => {

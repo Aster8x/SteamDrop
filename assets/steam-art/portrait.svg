@@ -12,8 +12,7 @@
     <use href="#tile" x="268" y="720" width="100" height="150"/><use href="#tile" x="383" y="720" width="100" height="150"/>
     <use href="#tile" x="498" y="720" width="100" height="150"/>
   </g>
-  <use href="#drop" x="150" y="130" width="300" height="300"/>
-  <text x="300" y="570" text-anchor="middle" font-family="Chakra Petch" font-weight="700" font-size="96" fill="#eef2f8">SteamDrop</text>
-  <text x="300" y="632" text-anchor="middle" font-family="Atkinson Hyperlegible" font-weight="700" font-size="30" letter-spacing="8" fill="#9fb0cc">COUCH MODE</text>
+  <use href="#drop" x="150" y="160" width="300" height="300"/>
+  <text x="300" y="610" text-anchor="middle" font-family="Chakra Petch" font-weight="700" font-size="96" fill="#eef2f8">SteamDrop</text>
   <rect y="886" width="600" height="14" fill="#5cc8ff"/>
 </svg>

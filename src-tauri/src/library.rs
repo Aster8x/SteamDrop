@@ -216,14 +216,16 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
     let app2 = app.clone();
     let users2 = users.clone();
     let replaced2 = replaced.clone();
+    let mode = settings.steam_restart_mode.clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        let big_picture = restarting && steam::reopen_in_big_picture(&mode);
         if restarting {
             set_status(&app2, "Closing Steam for a moment...");
             log::info("Closing Steam so it picks up the new shortcuts.");
             steam::shutdown(&steam_dir)?;
         }
         if !was_running || restarting {
-            apply_pending(&dir, &snapshot, &steam::users(&steam_dir), &users2)?;
+            apply_pending(&steam_dir, &dir, &snapshot, &steam::users(&steam_dir), &users2)?;
         }
         set_status(&app2, "Adding to Steam...");
         let mut result = Ok(());
@@ -249,8 +251,7 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
         }
         if restarting {
             set_status(&app2, "Starting Steam...");
-            log::info("Starting Steam in Big Picture.");
-            steam::start(&steam_dir, true)?;
+            steam::start(&steam_dir, big_picture)?;
         }
         result
     })
@@ -264,8 +265,7 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
             d.mark_known(&g.folder);
         }
         if !was_running || restarting {
-            d.pending_removals.clear();
-            d.pending_adds.clear();
+            d.clear_pending();
         } else {
             d.pending_adds.extend(games.iter().map(|g| g.id));
             d.pending_removals.extend(&replaced);
@@ -319,17 +319,18 @@ async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<S
     let mut snapshot = state.data.lock().unwrap().clone();
     snapshot.pending_adds.retain(|id| !ids.contains(id));
     tauri::async_runtime::spawn_blocking(move || {
+        let big_picture = restarting && steam::reopen_in_big_picture(&snapshot.settings.steam_restart_mode);
         if restarting {
             set_status(&app2, "Closing Steam for a moment...");
             steam::shutdown(&steam_dir)?;
         }
-        let r = remove_blocking(&steam_dir, &dir, &ids2, false);
+        let r = remove_blocking(&steam_dir, &dir, &ids2, None);
         if !was_running || restarting {
-            apply_pending(&dir, &snapshot, &steam::users(&steam_dir), &users)?;
+            apply_pending(&steam_dir, &dir, &snapshot, &steam::users(&steam_dir), &users)?;
         }
         if restarting {
             set_status(&app2, "Starting Steam...");
-            steam::start(&steam_dir, false)?;
+            steam::start(&steam_dir, big_picture)?;
         }
         r
     })
@@ -341,8 +342,7 @@ async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<S
         if was_running && !restart {
             d.pending_removals.extend(&ids);
         } else {
-            d.pending_removals.clear();
-            d.pending_adds.clear();
+            d.clear_pending();
         }
     })?;
     let msg = if was_running && !restart { "Removed. Restart Steam to see the change." } else { "Removed from Steam." };
@@ -352,8 +352,10 @@ async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<S
 }
 
 /// The shared removal steps, also used by the uninstaller (which has no window).
-fn remove_blocking(steam_dir: &Path, data_dir: &Path, ids: &[u32], restart: bool) -> Result<(), String> {
-    if restart {
+/// With `restart` (the "When SteamDrop restarts Steam" setting), Steam is closed first and reopened after.
+fn remove_blocking(steam_dir: &Path, data_dir: &Path, ids: &[u32], restart: Option<&str>) -> Result<(), String> {
+    let big_picture = restart.is_some_and(steam::reopen_in_big_picture);
+    if restart.is_some() {
         steam::shutdown(steam_dir)?;
     }
     let mut result = Ok(());
@@ -368,8 +370,8 @@ fn remove_blocking(steam_dir: &Path, data_dir: &Path, ids: &[u32], restart: bool
     for id in ids {
         let _ = std::fs::remove_dir_all(art::cache_dir(data_dir, *id));
     }
-    if restart {
-        steam::start(steam_dir, false)?;
+    if restart.is_some() {
+        steam::start(steam_dir, big_picture)?;
     }
     result
 }
@@ -429,11 +431,8 @@ pub fn startup_repair(app: &AppHandle) {
         return;
     }
     let snapshot = state.data.lock().unwrap().clone();
-    if apply_pending(&state.dir, &snapshot, &steam::users(&steam_dir), &state.target_users(&steam_dir)).is_ok() {
-        let _ = state.update(|d| {
-            d.pending_removals.clear();
-            d.pending_adds.clear();
-        });
+    if apply_pending(&steam_dir, &state.dir, &snapshot, &steam::users(&steam_dir), &state.target_users(&steam_dir)).is_ok() {
+        let _ = state.update(|d| d.clear_pending());
     }
     if state.settings().steam_shortcut {
         let missing = self_shortcut().is_ok_and(|(id, _)| state.target_users(&steam_dir).iter().any(|(_, c)| !steam::present_ids(c).contains(&id)));
@@ -448,7 +447,10 @@ pub fn startup_repair(app: &AppHandle) {
 /// Writes again what was changed while Steam was running: removals Steam may have undone and
 /// games it may have dropped. Call only while Steam is closed.
 /// Removals go to every account; adds go to `targets` (the chosen accounts).
-pub fn apply_pending(data_dir: &Path, data: &Data, all: &[(String, PathBuf)], targets: &[(String, PathBuf)]) -> Result<(), String> {
+pub fn apply_pending(steam_dir: &Path, data_dir: &Path, data: &Data, all: &[(String, PathBuf)], targets: &[(String, PathBuf)]) -> Result<(), String> {
+    if data.pending_self {
+        set_self_shortcut(steam_dir, data_dir, data.settings.steam_shortcut)?;
+    }
     if data.pending_removals.is_empty() && data.pending_adds.is_empty() {
         return Ok(());
     }
@@ -482,20 +484,18 @@ pub fn apply_pending(data_dir: &Path, data: &Data, all: &[(String, PathBuf)], ta
     Ok(())
 }
 
-/// Closes Steam, applies pending changes, and starts it again (in Big Picture if asked).
-pub fn restart_steam_applying(app: &AppHandle, big_picture: bool) -> Result<(), String> {
+/// Closes Steam, applies pending changes, and starts it again in the mode the setting asks for.
+pub fn restart_steam_applying(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<App>();
     let steam_dir = state.steam_path().ok_or("Steam was not found. Set its folder in Settings.")?;
+    let big_picture = steam::reopen_in_big_picture(&state.settings().steam_restart_mode);
     set_status(app, "Restarting Steam...");
     steam::shutdown(&steam_dir)?;
     let snapshot = state.data.lock().unwrap().clone();
-    apply_pending(&state.dir, &snapshot, &steam::users(&steam_dir), &state.target_users(&steam_dir))?;
-    state.update(|d| {
-        d.pending_removals.clear();
-        d.pending_adds.clear();
-    })?;
+    apply_pending(&steam_dir, &state.dir, &snapshot, &steam::users(&steam_dir), &state.target_users(&steam_dir))?;
+    state.update(|d| d.clear_pending())?;
     steam::start(&steam_dir, big_picture)?;
-    log::info(if big_picture { "Restarted Steam in Big Picture." } else { "Restarted Steam." });
+    log::info(if big_picture { "Restarted Steam in Big Picture." } else { "Restarted Steam in desktop mode." });
     set_status(app, "Steam restarted.");
     emit_state(app);
     Ok(())
@@ -551,7 +551,8 @@ pub fn uninstall_cleanup() {
     let steam_dir = if custom.is_empty() { steam::detect_path() } else { Some(PathBuf::from(custom)) };
     let ids: Vec<u32> = data.games.iter().map(|g| g.id).collect();
     if let (Some(steam_dir), false) = (steam_dir, ids.is_empty()) {
-        if let Err(e) = remove_blocking(&steam_dir, &dir, &ids, steam::is_running()) {
+        let restart = steam::is_running().then_some(data.settings.steam_restart_mode.as_str());
+        if let Err(e) = remove_blocking(&steam_dir, &dir, &ids, restart) {
             log::problem(format!("Uninstall: could not remove SteamDrop's games from Steam: {e}"));
             return;
         }
@@ -582,6 +583,27 @@ mod tests {
     }
 
     #[test]
+    fn own_tile_on_and_off_touches_nothing_else() {
+        let base = std::env::temp_dir().join(format!("steamdrop-self-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let config = base.join("userdata/7/config");
+        std::fs::create_dir_all(config.join("grid")).unwrap();
+        let data_dir = base.join("data");
+        let exe = base.join("games/B/b.exe");
+        let game = steam::NewShortcut { id: 0x8000_0005, name: "B", exe: &exe, icon: String::new(), launch_options: "" };
+        steam::add(&config, &data_dir, "7", &[game]).unwrap();
+        std::fs::write(config.join("grid/2147483653p.png"), b"game art").unwrap();
+        let (own, _) = self_shortcut().unwrap();
+        set_self_shortcut(&base, &data_dir, true).unwrap();
+        assert_eq!(steam::present_ids(&config), vec![0x8000_0005, own]);
+        assert!(config.join(format!("grid/{own}p.png")).is_file(), "its own art is installed");
+        set_self_shortcut(&base, &data_dir, false).unwrap();
+        assert_eq!(steam::present_ids(&config), vec![0x8000_0005], "only SteamDrop's own tile goes");
+        assert!(!config.join(format!("grid/{own}p.png")).exists());
+        assert_eq!(std::fs::read(config.join("grid/2147483653p.png")).unwrap(), b"game art", "the game's art is untouched");
+    }
+
+    #[test]
     fn pending_changes_are_written_again() {
         let base = std::env::temp_dir().join(format!("steamdrop-pending-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
@@ -597,11 +619,11 @@ mod tests {
         let game = Game { id: 9, name: "A".into(), exe: exe.to_string_lossy().into(), folder: String::new(), steam_appid: None, added: 1 };
         let data = Data { games: vec![game], pending_removals: vec![5], pending_adds: vec![9], ..Default::default() };
         let users = vec![("42".to_string(), config.clone())];
-        apply_pending(&data_dir, &data, &users, &users).unwrap();
+        apply_pending(&base, &data_dir, &data, &users, &users).unwrap();
         assert_eq!(steam::present_ids(&config), vec![9]);
         assert!(config.join("grid/9p.png").is_file());
         // Running it again changes nothing.
-        apply_pending(&data_dir, &data, &users, &users).unwrap();
+        apply_pending(&base, &data_dir, &data, &users, &users).unwrap();
         assert_eq!(steam::present_ids(&config), vec![9]);
     }
 }

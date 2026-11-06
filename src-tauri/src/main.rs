@@ -83,6 +83,7 @@ struct StateView {
 
 #[tauri::command]
 fn get_state(app: AppHandle, state: State<App>) -> StateView {
+    state.reload_if_changed();
     let data = state.data.lock().unwrap().clone();
     let steam_path = state.steam_path();
     let users = steam_path.as_deref().map(steam::users).unwrap_or_default();
@@ -114,7 +115,7 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
         update: state.update.lock().unwrap().clone(),
         whats_new: state.whats_new.lock().unwrap().clone(),
         couch_pin_set: !secrets::couch_pin().is_empty(),
-        restart_needed: !data.pending_adds.is_empty() || !data.pending_removals.is_empty(),
+        restart_needed: !data.pending_adds.is_empty() || !data.pending_removals.is_empty() || data.pending_self,
         version: app.package_info().version.to_string(),
     }
 }
@@ -351,7 +352,7 @@ fn open_logs() -> Result<(), String> {
 async fn restart_steam(app: AppHandle, state: State<'_, App>) -> Result<(), String> {
     let _guard = state.busy.lock().await;
     let app2 = app.clone();
-    tauri::async_runtime::spawn_blocking(move || library::restart_steam_applying(&app2, true)).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || library::restart_steam_applying(&app2)).await.map_err(|e| e.to_string())?
 }
 
 /// Opens web pages (https only) and folders with the system's default handler.
@@ -446,44 +447,54 @@ fn set_couch_pin(app: AppHandle, old: String, new: String) -> Result<(), String>
     Ok(())
 }
 
-/// "Add SteamDrop to Steam" setting.
+/// "Show SteamDrop in my Steam library". Written right away when Steam is closed; otherwise it's a
+/// pending change, applied the next time SteamDrop restarts Steam or starts while Steam is closed.
 #[tauri::command]
 async fn set_steam_shortcut(app: AppHandle, state: State<'_, App>, on: bool) -> Result<String, String> {
-    state.update(|d| d.settings.steam_shortcut = on)?;
     let steam_dir = state.steam_path().ok_or("Steam was not found. Set its folder in Settings.")?;
-    let dir = state.dir.clone();
-    tauri::async_runtime::spawn_blocking(move || library::set_self_shortcut(&steam_dir, &dir, on))
-        .await
-        .map_err(|e| e.to_string())??;
+    let running = steam::is_running();
+    state.update(|d| {
+        d.settings.steam_shortcut = on;
+        d.pending_self = running;
+    })?;
+    if !running {
+        let dir = state.dir.clone();
+        tauri::async_runtime::spawn_blocking(move || library::set_self_shortcut(&steam_dir, &dir, on))
+            .await
+            .map_err(|e| e.to_string())??;
+    }
     library::emit_state(&app);
-    let shown = if on { "SteamDrop is in your Steam library" } else { "SteamDrop was removed from Steam" };
-    Ok(if steam::is_running() { format!("{shown} after Steam restarts.") } else { format!("{shown}.") })
+    let shown = if on { "SteamDrop will show in your Steam library" } else { "SteamDrop's tile will be removed from your Steam library" };
+    Ok(if running { format!("{shown} after Steam restarts.") } else { format!("Done: {}.", if on { "SteamDrop is in your Steam library" } else { "SteamDrop's tile is gone from your Steam library" }) })
 }
 
+// Window commands are async: Tauri runs sync commands on the main thread, and building or closing a
+// webview inside the calling webview's own callback deadlocks on Windows (a blank window that never loads).
 #[tauri::command]
-fn open_couch(app: AppHandle) {
+async fn open_couch(app: AppHandle) {
     couch::open(&app, couch::View::Couch);
 }
 
 #[tauri::command]
-fn close_couch(app: AppHandle, state: State<App>, restart: bool) {
+async fn close_couch(app: AppHandle, state: State<'_, App>, restart: bool) -> Result<(), String> {
     // The restart happens after the window (and the process Steam started) is gone; see couch::closed.
     state.restart_after_couch.store(restart, std::sync::atomic::Ordering::SeqCst);
     if let Some(w) = app.get_webview_window(couch::COUCH) {
         let _ = w.destroy();
     }
+    Ok(())
 }
 
 /// The view switch button and F11.
 #[tauri::command]
-fn switch_view(app: AppHandle, from: String) {
+async fn switch_view(app: AppHandle, from: String) {
     couch::switch(&app, &from);
 }
 
 /// "Hide": the desktop window goes to the tray; Couch mode minimizes, back to Steam.
 /// Either way SteamDrop keeps its Steam session, so Steam can bring it back.
 #[tauri::command]
-fn hide_window(app: AppHandle, label: String) {
+async fn hide_window(app: AppHandle, label: String) {
     if let Some(w) = app.get_webview_window(&label) {
         let _ = if label == couch::COUCH { w.minimize() } else { w.hide() };
     }
@@ -491,7 +502,7 @@ fn hide_window(app: AppHandle, label: String) {
 
 /// "Close": the window goes away; SteamDrop keeps watching from the tray.
 #[tauri::command]
-fn close_window(app: AppHandle, label: String) {
+async fn close_window(app: AppHandle, label: String) {
     if let Some(w) = app.get_webview_window(&label) {
         let _ = w.destroy();
     }
@@ -531,7 +542,7 @@ fn main() {
         let _ = secrets::set_couch_pin("");
         return;
     }
-    // Used by the installer's "Add SteamDrop to Steam" and by the uninstaller.
+    // Used by the installer's "Show SteamDrop in my Steam library" and by the uninstaller.
     if std::env::args().any(|a| a == "--add-to-steam") {
         library::add_to_steam_from_installer();
         return;
@@ -553,23 +564,27 @@ fn main() {
         couch::run_from_steam();
         return;
     }
-    let big_picture = args.iter().any(|a| a == "--big-picture") || (from_steam && couch::started_in_big_picture());
     // Elsewhere (development builds) the Steam launch opens its view in this same process.
     let open_view = couch::parse_view(&args).or_else(|| {
-        from_steam.then(|| couch::view_for(&state::load(&state::data_dir()).settings.steam_view, big_picture))
+        from_steam.then(|| couch::view_for(&state::load(&state::data_dir()).settings.steam_view, couch::started_in_big_picture()))
     });
     let start_hidden = args.iter().any(|a| a == "--tray");
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
-            if args.iter().any(|a| a == "--big-picture") {
-                app.state::<App>().big_picture.store(true, std::sync::atomic::Ordering::SeqCst);
-            }
             match couch::parse_view(&args) {
                 Some(view) => couch::open(app, view),
                 None => show_window(app),
             }
         }))
+        // Game art for both windows: art://<game id>/<slot>, served only from SteamDrop's art cache.
+        .register_uri_scheme_protocol("art", |ctx, request| {
+            let dir = ctx.app_handle().state::<App>().dir.clone();
+            match art::serve(&dir, request.uri().path()) {
+                Some((bytes, mime)) => tauri::http::Response::builder().header("Content-Type", mime).body(bytes).unwrap(),
+                None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
+            }
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -615,7 +630,6 @@ fn main() {
             quit
         ])
         .setup(move |app| {
-            app.state::<App>().big_picture.store(big_picture, std::sync::atomic::Ordering::SeqCst);
             log::info(format!(
                 "SteamDrop {} started{}.",
                 app.package_info().version,

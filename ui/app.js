@@ -1,5 +1,5 @@
 "use strict";
-const { invoke, convertFileSrc } = window.__TAURI__.core;
+const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
 const REPO = "https://github.com/Aster8x/SteamDrop";
@@ -109,7 +109,7 @@ async function checkNow() {
   render();
   try {
     const found = await invoke("check_now");
-    checkMsg = found ? null : { ok: true, text: `You have the latest version (${S.version}).` };
+    checkMsg = found ? null : { ok: true, text: `You're on the latest version (${S.version}).` };
   } catch (e) {
     checkMsg = { ok: false, text: String(e) };
   }
@@ -247,7 +247,10 @@ function render() {
   const light = S.settings.theme === "light";
   $("#theme").textContent = light ? "☾" : "☀";
   const target = $(`#view-${view}`);
+  // Re-rendering replaces the elements; keep the same spot focused for keyboard and controller users.
+  const at = focusables().indexOf(document.activeElement);
   target.replaceChildren(...({ games: gamesView, settings: settingsView, about: aboutView })[view]());
+  if (at >= 0 && document.activeElement === document.body) focusables()[Math.min(at, focusables().length - 1)]?.focus({ preventScroll: true });
 }
 
 function relative(folder, path) {
@@ -299,7 +302,7 @@ function foundCard(f) {
 
 function gameCard(g) {
   const cover = h("button", { class: "cover", onclick: () => showDetails(g), "aria-label": `Details for ${g.name}` },
-    g.portrait ? h("img", { src: `${convertFileSrc(g.portrait)}?v=${g.added}`, alt: "" }) : null);
+    SD.art(g, "portrait"));
   return h("div", { class: "card" }, cover,
     h("div", { class: "body" },
       h("div", { class: "name" }, g.name),
@@ -349,7 +352,7 @@ async function showDetails(g) {
   const infoBox = h("div", {}, h("p", { class: "muted" }, "Loading game details..."));
   dlg.replaceChildren(h("div", { class: "inner" },
     h("div", { class: "info" },
-      g.portrait ? h("img", { src: `${convertFileSrc(g.portrait)}?v=${g.added}`, alt: "" }) : h("div", {}),
+      SD.art(g, "portrait"),
       h("div", {}, h("h2", {}, g.name), infoBox)),
     h("div", { class: "actions" },
       btn("Open game folder", () => invoke("open", { target: g.folder }).catch((e) => showStatus(String(e), true)), "small"),
@@ -587,6 +590,10 @@ function settingsView() {
       h("h2", {}, "Steam"),
       h("p", {}, h("strong", {}, "Steam folder: "), h("span", { class: "path" }, S.steam.path || "not found"), " ", h("span", { class: "muted" }, steamNote)),
       S.steam.path ? accountsPicker(st) : null,
+      setting("When SteamDrop restarts Steam", "Keep current mode: Steam comes back in Big Picture only if Big Picture was open just before, otherwise in the normal desktop window.",
+        h("div", { class: "seg", role: "group", "aria-label": "When SteamDrop restarts Steam" },
+          [["keep", "Keep current mode"], ["bigpicture", "Always Big Picture"], ["desktop", "Always desktop mode"]].map(([v, label]) =>
+            h("button", { "aria-pressed": String((st.steam_restart_mode || "keep") === v), onclick: () => saveSettings({ steam_restart_mode: v }) }, label)))),
       h("div", { class: "row" },
         btn("Choose Steam folder...", async () => {
           const p = await invoke("pick_folder");
@@ -635,8 +642,8 @@ function settingsView() {
     h("div", { class: "panel" },
       h("h2", {}, "Couch mode"),
       h("p", { class: "muted" }, "A full-screen view for the TV that you control with a gamepad. It opens when you start SteamDrop from your Steam library (for example in Big Picture)."),
-      setting("Add SteamDrop to Steam", "Puts SteamDrop in your Steam library with its own artwork, so you can open it from the couch.",
-        toggle(st.steam_shortcut, (v) => run(() => invoke("set_steam_shortcut", { on: v })), "Add SteamDrop to Steam")),
+      setting("Show SteamDrop in my Steam library", "A SteamDrop tile with its own artwork in your Steam library, so you can open it from the couch. Turning it off removes only that tile; your games stay.",
+        toggle(st.steam_shortcut, (v) => run(() => invoke("set_steam_shortcut", { on: v })), "Show SteamDrop in my Steam library")),
       setting("When opened from Steam", "Auto: Couch mode in Big Picture (and on a Steam Deck), this window in normal Steam. You can switch anytime with F11.",
         h("div", { class: "seg", role: "group", "aria-label": "When opened from Steam" },
           [["auto", "Auto"], ["couch", "Always Couch mode"], ["window", "Always window"]].map(([v, label]) =>
@@ -699,20 +706,35 @@ $("#c-close").addEventListener("click", () => invoke("close_window", { label: "m
 $("#c-quit").addEventListener("click", quitSteamDrop);
 document.addEventListener("keydown", (e) => { if (e.key === "F11") { e.preventDefault(); switchView(); } });
 
-// The desktop window isn't built for a controller, but Y and View work here too.
-// Only read while a controller is connected (the Gamepad API has no button events).
-const padDown = new Set();
-function pollPad() {
-  const pads = [...(navigator.getGamepads?.() || [])].filter(Boolean);
-  if (!pads.length) return;
-  for (const [i, act] of [[3, scanNow], [8, switchView]]) {
-    const down = pads.some((p) => p.buttons[i]?.pressed);
-    if (down && !padDown.has(i) && document.hasFocus()) act();
-    if (down) padDown.add(i); else padDown.delete(i);
-  }
-  requestAnimationFrame(pollPad);
+/* ---------- controller (same code as Couch mode, in shared.js) ----------
+   D-pad / stick move focus, A selects, B closes a dialog (or goes back to Games), LB/RB switch tabs,
+   Y = Scan now, View = back to Couch mode. */
+const TABS = ["games", "settings", "about"];
+function focusables() {
+  const dlg = $("#dialog");
+  const root = dlg.open ? dlg : document;
+  return [...root.querySelectorAll("button, input, select, a[href], summary")].filter((el) => !el.disabled && el.offsetParent !== null);
 }
-window.addEventListener("gamepadconnected", () => requestAnimationFrame(pollPad));
+function padPress(action) {
+  if (!document.hasFocus()) return;
+  document.body.classList.add("pad");
+  const dlg = $("#dialog");
+  const moves = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  if (moves[action]) SD.move(...moves[action], focusables());
+  else if (action === "a") document.activeElement?.click();
+  else if (action === "b") {
+    if (dlg.open) { dlg.dispatchEvent(new Event("cancel")); dlg.close(); }
+    else if (view !== "games") { view = "games"; render(); }
+  } else if ((action === "lb" || action === "rb") && !dlg.open) {
+    view = TABS[(TABS.indexOf(view) + (action === "rb" ? 1 : TABS.length - 1)) % TABS.length];
+    render();
+    focusables()[0]?.focus();
+  } else if (action === "y") scanNow();
+  else if (action === "view") switchView();
+}
+SD.startPad(padPress, () => {});
+// The big focus ring is for controller use; a mouse click turns it back to normal.
+document.addEventListener("mousedown", () => document.body.classList.remove("pad"));
 
 /* ---------- start ---------- */
 for (const t of document.querySelectorAll(".tab")) {
@@ -720,5 +742,8 @@ for (const t of document.querySelectorAll(".tab")) {
 }
 $("#theme").addEventListener("click", () => saveSettings({ theme: S.settings.theme === "light" ? "dark" : "light" }));
 listen("changed", refresh);
+// Games added while this window was hidden or closed show up as soon as it's back.
+window.addEventListener("focus", refresh);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 listen("status", (e) => showStatus(e.payload));
 refresh().then(() => { if (S.status) showStatus(S.status); });

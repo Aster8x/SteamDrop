@@ -8,7 +8,6 @@
   <rect width="920" height="430" fill="url(#bg)"/>
   <rect width="920" height="430" fill="url(#glow)"/>
   <use href="#drop" x="70" y="75" width="260" height="260"/>
-  <text x="352" y="228" font-family="Chakra Petch" font-weight="700" font-size="90" fill="#eef2f8">SteamDrop</text>
-  <text x="356" y="282" font-family="Atkinson Hyperlegible" font-weight="700" font-size="30" letter-spacing="8" fill="#9fb0cc">COUCH MODE</text>
+  <text x="352" y="238" font-family="Chakra Petch" font-weight="700" font-size="90" fill="#eef2f8">SteamDrop</text>
   <rect y="418" width="920" height="12" fill="#5cc8ff"/>
 </svg>

@@ -84,7 +84,7 @@ Both views have the same control bar: **Scan now**, **Hide** ("Back to Steam" in
 
 For a gaming PC on the TV, turn on **Settings → App → "Open Steam in Big Picture when Windows starts"**: after you sign in, Steam opens straight into Big Picture (unless it's already there).
 
-The installer has an **Add SteamDrop to Steam** box (on by default). You can change it later in Settings → Couch mode, where there's also an **Open Couch mode** button. Changes made in Couch mode show in Steam's library after Steam restarts. When you leave Couch mode, SteamDrop offers to restart Steam for you and brings you back to Big Picture.
+The installer has a **Show SteamDrop in my Steam library** box (on by default). You can change it later in Settings → Couch mode, where there's also an **Open Couch mode** button. Changes made in Couch mode show in Steam's library after Steam restarts. When you leave Couch mode, SteamDrop offers to restart Steam for you and brings you back to Big Picture.
 
 ## Screenshots
 
@@ -108,6 +108,9 @@ No. It only adds games that are already on your PC to your Steam library.
 
 **Will it touch my game files?**
 No. It only reads them to find the right .exe. The one exception is if you turn on "Also save art in the game folder", which adds a `SteamDrop art` folder with a copy of the pictures.
+
+**Will Steam come back in Big Picture after SteamDrop restarts it?**
+Only if Big Picture was open right before. Settings → Steam → "When SteamDrop restarts Steam" can make it always Big Picture or always the desktop window instead.
 
 **Steam has to restart? Why?**
 Steam only reads its list of non-Steam games when it starts. SteamDrop closes Steam for a moment, adds the game and opens Steam again. If Steam is open and you'd rather not restart, SteamDrop can add the game anyway and it shows up the next time Steam starts.
