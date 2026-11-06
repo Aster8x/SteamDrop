@@ -36,7 +36,7 @@ const logo = () => $(".brand svg").cloneNode(true);
 async function refresh() {
   S = await invoke("get_state");
   Z.sync(S.settings.zoom_window);
-  document.documentElement.dataset.theme = S.settings.theme === "light" ? "light" : "dark";
+  SD.applyTheme(S.settings.theme);
   render();
   maybeShowDialogs();
 }
@@ -456,6 +456,18 @@ function setting(title, text, control) {
   return h("div", { class: "setting" }, h("div", { class: "text" }, h("strong", {}, title), h("span", {}, text)), control);
 }
 
+/** Theme cards, each drawn in its own colors. Pointing at or focusing one previews it; clicking keeps it. */
+function themePicker(st) {
+  const saved = SD.themeId(st.theme);
+  const restore = () => SD.applyTheme(S.settings.theme);
+  return h("div", { class: "themes", role: "radiogroup", "aria-label": "Theme", onmouseleave: restore,
+    onfocusout: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) restore(); } },
+    SD.THEMES.map(([id, name]) => h("button", {
+      class: "theme", role: "radio", "aria-checked": String(id === saved), "data-theme": id,
+      onmouseenter: () => SD.applyTheme(id), onfocus: () => SD.applyTheme(id), onclick: () => saveSettings({ theme: id }),
+    }, h("span", { class: "swatches", "aria-hidden": "true" }, h("i"), h("i"), h("i"), h("i")), h("span", {}, name))));
+}
+
 /** SteamGridDB key box: dots by default, the eye button shows it only while held down. */
 function keyField() {
   const input = h("input", {
@@ -687,17 +699,18 @@ function settingsView() {
           onchange: (e) => saveSettings({ chime_volume: Number(e.target.value) }) }),
         h("span", { class: "muted" }, `${st.chime_volume}%`),
         btn("Test", () => invoke("test_chime", { volume: Number($("#chime-volume").value) }), "small", { always: true })) : null,
+      h("div", { class: "row" }, btn("Quit SteamDrop", () => invoke("quit"), "", { always: true }))),
+
+    h("div", { class: "panel" },
+      h("h2", {}, "Appearance"),
+      h("p", { class: "muted" }, "Point at a theme (or move to it with the keyboard or a controller) to try it; click it to keep it. Couch mode uses the same theme."),
+      themePicker(st),
       setting("Interface size", "Makes everything in this window bigger or smaller. Shortcuts: Ctrl and plus, Ctrl and minus, Ctrl and 0 to reset, or Ctrl and the mouse wheel.",
         h("div", { class: "row nowrap zoom", role: "group", "aria-label": "Interface size" },
           btn("−", () => Z.step(-1), "small", { always: true, "aria-label": "Smaller", disabled: st.zoom_window <= 50 }),
           h("span", { class: "zoom-level", "aria-live": "polite" }, `${st.zoom_window}%`),
           btn("+", () => Z.step(1), "small", { always: true, "aria-label": "Bigger", disabled: st.zoom_window >= 200 }),
-          btn("Reset", Z.reset, "small", { always: true, disabled: st.zoom_window === 100 }))),
-      setting("Look", "Dark or light colors.",
-        h("div", { class: "seg", role: "group", "aria-label": "Look" },
-          h("button", { "aria-pressed": String(st.theme !== "light"), onclick: () => saveSettings({ theme: "dark" }) }, "Dark"),
-          h("button", { "aria-pressed": String(st.theme === "light"), onclick: () => saveSettings({ theme: "light" }) }, "Light"))),
-      h("div", { class: "row" }, btn("Quit SteamDrop", () => invoke("quit"), "", { always: true }))),
+          btn("Reset", Z.reset, "small", { always: true, disabled: st.zoom_window === 100 })))),
 
     h("div", { class: "panel" },
       h("h2", {}, "Couch mode"),

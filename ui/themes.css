@@ -1,0 +1,70 @@
+/* Color themes for both views, as CSS variables only. An element with data-theme="<id>" gets that
+   theme's colors (the page root, and the small previews in Settings). Palettes and licenses: THIRD_PARTY.md. */
+:root, [data-theme="dark"] {
+  --bg: #0d111a; --panel: #161c2a; --panel-2: #1e2638; --border: #2c3650;
+  --text: #eef2f8; --muted: #aab4c8; --accent: #5cc8ff; --accent-ink: #052131;
+  --danger: #ff7b7b; --ok: #6fdc9b; --warn: #ffc95c; --logo-bg: #151b2a;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  --bg: #f1f4f9; --panel: #ffffff; --panel-2: #e9eef6; --border: #ccd5e3;
+  --text: #121826; --muted: #485470; --accent: #0b74b0; --accent-ink: #ffffff;
+  --danger: #c22f2f; --ok: #1a7f45; --warn: #8a5a00; --logo-bg: #151b2a;
+  --shadow: 0 10px 30px rgba(20, 30, 50, .12);
+  color-scheme: light;
+}
+/* Dracula (draculatheme.com) */
+[data-theme="dracula"] {
+  --bg: #21222c; --panel: #282a36; --panel-2: #343746; --border: #44475a;
+  --text: #f8f8f2; --muted: color-mix(in srgb, #f8f8f2 65%, #6272a4); --accent: #bd93f9; --accent-ink: #21222c;
+  --danger: #ff5555; --ok: #50fa7b; --warn: #ffb86c; --logo-bg: #21222c;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+/* Nord (nordtheme.com) */
+[data-theme="nord"] {
+  --bg: #2e3440; --panel: #3b4252; --panel-2: #434c5e; --border: #4c566a;
+  --text: #eceff4; --muted: #d8dee9; --accent: #88c0d0; --accent-ink: #2e3440;
+  --danger: color-mix(in srgb, #bf616a 50%, #eceff4); --ok: #a3be8c; --warn: #ebcb8b; --logo-bg: #2e3440;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  color-scheme: dark;
+}
+/* Catppuccin Mocha (catppuccin.com) */
+[data-theme="catppuccin"] {
+  --bg: #11111b; --panel: #1e1e2e; --panel-2: #313244; --border: #45475a;
+  --text: #cdd6f4; --muted: #a6adc8; --accent: #cba6f7; --accent-ink: #11111b;
+  --danger: #f38ba8; --ok: #a6e3a1; --warn: #f9e2af; --logo-bg: #181825;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+/* Gruvbox Dark (github.com/morhetz/gruvbox) */
+[data-theme="gruvbox"] {
+  --bg: #1d2021; --panel: #282828; --panel-2: #3c3836; --border: #504945;
+  --text: #ebdbb2; --muted: #bdae93; --accent: #fabd2f; --accent-ink: #282828;
+  --danger: #fb4934; --ok: #b8bb26; --warn: #fe8019; --logo-bg: #282828;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+/* Tokyo Night (github.com/enkia/tokyo-night-vscode-theme) */
+[data-theme="tokyonight"] {
+  --bg: #16161e; --panel: #1a1b26; --panel-2: #292e42; --border: #414868;
+  --text: #c0caf5; --muted: #a9b1d6; --accent: #7aa2f7; --accent-ink: #16161e;
+  --danger: #f7768e; --ok: #9ece6a; --warn: #e0af68; --logo-bg: #1a1b26;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+/* Terminal: green on black, bright enough to read comfortably. */
+[data-theme="terminal"] {
+  --bg: #000000; --panel: #050d07; --panel-2: #0c1f10; --border: #1d5a2a;
+  --text: #4dff7c; --muted: #36d463; --accent: #4dff7c; --accent-ink: #000000;
+  --danger: #ff6b6b; --ok: #4dff7c; --warn: #ffd23f; --logo-bg: #000000;
+  --shadow: 0 0 0 1px #1d5a2a;
+  color-scheme: dark;
+}
+/* Shared by every theme. */
+:root, [data-theme] {
+  --accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
+  --danger-soft: color-mix(in srgb, var(--danger) 14%, transparent);
+  --warn-soft: color-mix(in srgb, var(--warn) 14%, transparent);
+}

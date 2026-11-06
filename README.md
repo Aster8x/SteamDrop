@@ -46,8 +46,8 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 - **Safe.** SteamDrop backs up Steam's shortcuts file before every change. "Remove from Steam" removes only the shortcut, never your game files.
 - **Light on your PC.** The window is fully closed while SteamDrop sits in the tray. The installer is only a few megabytes.
 - **A friendly chime** when a game has been added, loud enough to hear over Big Picture (volume and on/off in Settings).
-- **Dark and light looks**, large readable text (Atkinson Hyperlegible).
-- **Interface size:** Ctrl and plus, Ctrl and minus, Ctrl and 0, or Ctrl and the mouse wheel make everything bigger or smaller (50% to 200%), with LT and RT on a controller. The desktop window and Couch mode each remember their own size (Settings → App → "Interface size", with Reset).
+- **Themes** (Settings → Appearance): SteamDrop Dark, SteamDrop Light, Dracula, Nord, Catppuccin Mocha, Gruvbox Dark, Tokyo Night and Terminal (green on black). Point at one to try it, click to keep it; Couch mode uses the same theme. Large readable text (Atkinson Hyperlegible) in every theme.
+- **Interface size:** Ctrl and plus, Ctrl and minus, Ctrl and 0, or Ctrl and the mouse wheel make everything bigger or smaller (50% to 200%), with LT and RT on a controller. The desktop window and Couch mode each remember their own size (Settings → Appearance → "Interface size", with Reset).
 - **Stays up to date:** checks for new versions on startup and once a day, shows what changed, and can install updates by itself (never while you're playing).
 
 ## Folder rules
@@ -163,6 +163,7 @@ Run the tests with `cargo test --manifest-path src-tauri/Cargo.toml`. For releas
 ## Credits
 
 - Built with [Tauri](https://tauri.app/).
+- Color themes based on [Dracula](https://draculatheme.com/), [Nord](https://www.nordtheme.com/), [Catppuccin](https://catppuccin.com/), [Gruvbox](https://github.com/morhetz/gruvbox) and [Tokyo Night](https://github.com/enkia/tokyo-night-vscode-theme) (all MIT).
 - Fonts: [Chakra Petch](https://github.com/m4rc1e/Chakra-Petch) and [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), under the SIL Open Font License.
 - Artwork from the Steam store and [SteamGridDB](https://www.steamgriddb.com/), fetched when needed.
 

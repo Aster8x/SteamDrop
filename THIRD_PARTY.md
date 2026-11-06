@@ -22,6 +22,18 @@ The full list of Rust crates and their licenses is in `src-tauri/Cargo.lock`.
 - **Chakra Petch**, Copyright 2018 The Chakra Petch Project Authors. SIL Open Font License 1.1, see `ui/fonts/OFL-ChakraPetch.txt`.
 - **Atkinson Hyperlegible**, Copyright 2020 Braille Institute of America, Inc. SIL Open Font License 1.1, see `ui/fonts/OFL-AtkinsonHyperlegible.txt`.
 
+## Color themes
+
+The themes in Settings → Appearance use colors from these palettes (only the color values, as CSS variables in `ui/themes.css`; no code or files from them are bundled). Some colors are blended a little for readable text.
+
+- **[Dracula](https://draculatheme.com/)** by Zeno Rocha and the Dracula Theme contributors, MIT License.
+- **[Nord](https://www.nordtheme.com/)** by Sven Greb (Arctic Ice Studio), MIT License.
+- **[Catppuccin](https://catppuccin.com/)** (Mocha flavor) by the Catppuccin organization, MIT License.
+- **[Gruvbox](https://github.com/morhetz/gruvbox)** by Pavel Pertsev (morhetz), MIT/X11 License.
+- **[Tokyo Night](https://github.com/enkia/tokyo-night-vscode-theme)** by Enkia, MIT License.
+
+SteamDrop Dark, SteamDrop Light and Terminal are SteamDrop's own.
+
 ## Online services (used at runtime, nothing is bundled)
 
 - **Steam store and CDN** (Valve Corporation): official game artwork and store details, fetched from public URLs when a game is added or its details are opened.

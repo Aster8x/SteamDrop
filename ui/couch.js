@@ -150,6 +150,7 @@ function settingsScreen() {
       ? push({ name: "pin", title: "Enter your current PIN to turn it off", done: (old) => run(() => invoke("set_couch_pin", { old, new: "" })) })
       : push({ name: "pin", title: "Choose a 4-digit PIN", done: (pin) => run(() => invoke("set_couch_pin", { old: "", new: pin })) }),
       { value: onoff(S.couch_pin_set), on: S.couch_pin_set }),
+    button("theme", "Theme", () => { push({ name: "themes" }); document.querySelector(`[data-key="theme-${SD.themeId(st.theme)}"]`)?.focus(); }, { value: SD.themeName(st.theme), on: true }),
     button("zoom", "Interface size", () => Z.reset(), { value: `${st.zoom_couch}%`, on: st.zoom_couch !== 100, note: "(LT smaller, RT bigger, A resets)" }),
     button("exit", "Leave Couch mode", leave)),
     h("p", { class: "muted" }, `SteamDrop ${S.version}. More settings are in SteamDrop on your desktop.`)];
@@ -167,6 +168,16 @@ function activityScreen() {
     focusFirst();
   });
   return [h("h1", {}, "Activity"), list];
+}
+
+/** Themes: moving onto one previews it on the whole screen, A keeps it, B goes back to the saved one. */
+function themesScreen() {
+  const saved = SD.themeId(S.settings.theme);
+  return [h("h1", {}, "Theme"), h("p", { class: "muted" }, "Move to a theme to try it. A keeps it, B goes back."),
+    h("div", { class: "actions" }, SD.THEMES.map(([id, name]) =>
+      h("button", { class: "btn f", "data-key": `theme-${id}`, "data-theme": id, onfocus: () => SD.applyTheme(id),
+        onclick: () => { stack.pop(); save({ theme: id }); } },
+        h("span", { class: "text" }, name), h("span", { class: "value on" }, id === saved ? "In use" : ""))))];
 }
 
 /** B on the Library: leave for Steam (the default), quit, or stay. */
@@ -189,7 +200,7 @@ function checklistScreen(sc) {
       button("list-no", sc.no, () => { stack.pop(); sc.cancel?.(); render(); })))];
 }
 
-const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, pin: pinScreen, leave: leaveScreen, exit: exitScreen, checklist: checklistScreen };
+const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, pin: pinScreen, leave: leaveScreen, exit: exitScreen, checklist: checklistScreen, themes: themesScreen };
 const current = () => stack.length ? SCREENS[stack.at(-1).name](stack.at(-1)) : SCREENS[tab]();
 
 /* ---------- control bar ---------- */
@@ -214,6 +225,8 @@ function controlBar() {
 /* ---------- navigation ---------- */
 function render() {
   const keep = document.activeElement?.dataset?.key;
+  // The saved theme, except while trying themes on the Theme screen.
+  if (stack.at(-1)?.name !== "themes") SD.applyTheme(S.settings.theme);
   for (const t of document.querySelectorAll(".tab")) t.classList.toggle("active", t.dataset.tab === tab);
   $("#screen").replaceChildren(...current());
   $("#controls").replaceChildren(...controlBar());

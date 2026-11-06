@@ -103,5 +103,12 @@ window.SD = (() => {
     };
   }
 
-  return { startPad, move, art, zoom };
+  /* Color themes (the colors themselves are in themes.css). */
+  const THEMES = [["dark", "SteamDrop Dark"], ["light", "SteamDrop Light"], ["dracula", "Dracula"], ["nord", "Nord"],
+    ["catppuccin", "Catppuccin Mocha"], ["gruvbox", "Gruvbox Dark"], ["tokyonight", "Tokyo Night"], ["terminal", "Terminal"]];
+  const themeId = (id) => THEMES.some((t) => t[0] === id) ? id : "dark";
+  const themeName = (id) => THEMES.find((t) => t[0] === themeId(id))[1];
+  const applyTheme = (id) => { document.documentElement.dataset.theme = themeId(id); };
+
+  return { startPad, move, art, zoom, THEMES, themeId, themeName, applyTheme };
 })();

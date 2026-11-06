@@ -3,45 +3,6 @@
 @font-face { font-family: "Atkinson Hyperlegible"; src: url(fonts/AtkinsonHyperlegible-Regular.ttf); font-weight: 400; }
 @font-face { font-family: "Atkinson Hyperlegible"; src: url(fonts/AtkinsonHyperlegible-Bold.ttf); font-weight: 700; }
 
-:root, [data-theme="dark"] {
-  --bg: #0d111a;
-  --panel: #161c2a;
-  --panel-2: #1e2638;
-  --border: #2c3650;
-  --text: #eef2f8;
-  --muted: #aab4c8;
-  --accent: #5cc8ff;
-  --accent-ink: #052131;
-  --accent-soft: rgba(92, 200, 255, .14);
-  --danger: #ff7b7b;
-  --danger-soft: rgba(255, 123, 123, .14);
-  --ok: #6fdc9b;
-  --warn: #ffc95c;
-  --warn-soft: rgba(255, 201, 92, .13);
-  --logo-bg: #151b2a;
-  --shadow: 0 10px 30px rgba(0, 0, 0, .35);
-  color-scheme: dark;
-}
-[data-theme="light"] {
-  --bg: #f1f4f9;
-  --panel: #ffffff;
-  --panel-2: #e9eef6;
-  --border: #ccd5e3;
-  --text: #121826;
-  --muted: #485470;
-  --accent: #0b74b0;
-  --accent-ink: #ffffff;
-  --accent-soft: rgba(11, 116, 176, .1);
-  --danger: #c22f2f;
-  --danger-soft: rgba(194, 47, 47, .1);
-  --ok: #1a7f45;
-  --warn: #8a5a00;
-  --warn-soft: rgba(200, 140, 0, .14);
-  --logo-bg: #151b2a;
-  --shadow: 0 10px 30px rgba(20, 30, 50, .12);
-  color-scheme: light;
-}
-
 * { box-sizing: border-box; }
 html { font-size: 17px; }
 body {
@@ -226,7 +187,7 @@ dialog {
   background: var(--panel); color: var(--text); box-shadow: var(--shadow);
   width: min(680px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem);
 }
-dialog::backdrop { background: rgba(5, 8, 14, .65); }
+dialog::backdrop { background: rgba(0, 0, 0, .6); }
 dialog .inner { padding: 1.6rem 1.7rem; }
 dialog .actions { display: flex; flex-wrap: wrap; gap: .7rem; justify-content: flex-end; margin-top: 1.4rem; }
 .info { display: grid; grid-template-columns: 170px 1fr; gap: 1.4rem; }
@@ -290,7 +251,7 @@ textarea.report { width: 100%; font: .85rem/1.4 Consolas, monospace; background:
 /* Controller use: a big, clear focus ring on whatever is selected. */
 body.pad :focus { outline: 4px solid var(--accent); outline-offset: 3px; box-shadow: 0 0 0 8px var(--accent-soft); }
 /* Shown instead of art that's missing or won't load. */
-.titlecard { display: grid; place-items: center; width: 100%; height: 100%; aspect-ratio: 2 / 3; padding: 1rem; text-align: center; font-family: "Chakra Petch", sans-serif; font-weight: 700; font-size: 1.1rem; background: linear-gradient(#1d2740, #0a0d15); color: #eef2f8; border-bottom: 5px solid var(--accent); border-radius: inherit; }
+.titlecard { display: grid; place-items: center; width: 100%; height: 100%; aspect-ratio: 2 / 3; padding: 1rem; text-align: center; font-family: "Chakra Petch", sans-serif; font-weight: 700; font-size: 1.1rem; background: linear-gradient(var(--panel-2), var(--bg)); color: var(--text); border-bottom: 5px solid var(--accent); border-radius: inherit; }
 .info .titlecard { border-radius: 12px; }
 .card .actions .btn { min-width: 0; }
 
@@ -307,3 +268,16 @@ body.pad :focus { outline: 4px solid var(--accent); outline-offset: 3px; box-sha
   .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
 .zoom-level { min-width: 3.6rem; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Theme picker: each card shows its own theme's colors. */
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: .6rem; margin: .4rem 0 .8rem; }
+.theme { font: inherit; font-weight: 700; display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; padding: .7rem .9rem; border-radius: 12px; border: 2px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; text-align: left; }
+.theme:hover { border-color: var(--accent); }
+.theme[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.theme[aria-checked="true"]::after { content: "In use"; font-size: .8rem; color: var(--accent); }
+.swatches { display: flex; gap: .3rem; }
+.swatches i { width: 1.4rem; height: 1.4rem; border-radius: 50%; border: 1px solid var(--border); }
+.swatches i:nth-child(1) { background: var(--bg); }
+.swatches i:nth-child(2) { background: var(--panel-2); }
+.swatches i:nth-child(3) { background: var(--accent); }
+.swatches i:nth-child(4) { background: var(--text); }
