@@ -4,10 +4,12 @@
 window.SD = (() => {
   const { convertFileSrc } = window.__TAURI__.core;
 
-  /* Gamepad (standard mapping, so Xbox and PlayStation pads both work: 0 A, 1 B, 3 Y, 4 LB, 5 RB,
-     8 View/Share, 9 Menu/Options, 12-15 D-pad; axes 0/1 left stick). The Gamepad API has no button
-     events, so pads are read every frame, and only while one is connected. */
-  const BUTTONS = { 0: "a", 1: "b", 3: "y", 4: "lb", 5: "rb", 8: "view", 9: "menu", 12: "up", 13: "down", 14: "left", 15: "right" };
+  const { invoke } = window.__TAURI__.core;
+
+  /* Gamepad (standard mapping, so Xbox and PlayStation pads both work: 0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB,
+     6 LT, 7 RT, 8 View/Share, 9 Menu/Options, 12-15 D-pad; axes 0/1 left stick). The Gamepad API has
+     no button events, so pads are read every frame, and only while one is connected. */
+  const BUTTONS = { 0: "a", 1: "b", 2: "x", 3: "y", 4: "lb", 5: "rb", 6: "lt", 7: "rt", 8: "view", 9: "menu", 12: "up", 13: "down", 14: "left", 15: "right" };
   const REPEATS = new Set(["up", "down", "left", "right"]);
 
   function startPad(press, release) {
@@ -67,5 +69,39 @@ window.SD = (() => {
     return img;
   }
 
-  return { startPad, move, art };
+  /* "Interface size": Ctrl+plus, Ctrl+minus, Ctrl+0 and Ctrl+wheel (LT/RT on a controller call step),
+     50 to 200 percent in steps of 10, saved per view in the setting `field`. */
+  function zoom(field, save) {
+    let level = null;
+    const set = (l) => {
+      l = Math.max(50, Math.min(200, Math.round(l / 10) * 10));
+      if (l === level) return level;
+      level = l;
+      invoke("set_zoom", { level }).catch(() => {});
+      return level;
+    };
+    const change = (l) => { const before = level; if (set(l) !== before) save({ [field]: level }); };
+    document.addEventListener("keydown", (e) => {
+      if (!e.ctrlKey || e.altKey) return;
+      if (e.key === "+" || e.key === "=" || e.code === "NumpadAdd") change(level + 10);
+      else if (e.key === "-" || e.code === "NumpadSubtract") change(level - 10);
+      else if (e.key === "0" || e.code === "Numpad0") change(100);
+      else return;
+      e.preventDefault();
+    });
+    document.addEventListener("wheel", (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      change(level + (e.deltaY < 0 ? 10 : -10));
+    }, { passive: false });
+    return {
+      /** Call with the saved level after each refresh (applies it the first time and after changes elsewhere). */
+      sync: (saved) => set(saved || 100),
+      step: (d) => change(level + d * 10),
+      reset: () => change(100),
+      get level() { return level; },
+    };
+  }
+
+  return { startPad, move, art, zoom };
 })();

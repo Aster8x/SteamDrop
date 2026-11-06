@@ -61,6 +61,7 @@ First release.
 - Folders moved or renamed into a watched folder are added like copies. Games moved out are never removed from Steam automatically: they show under "Missing games" with "Find it" and "Remove from Steam".
 - "When SteamDrop restarts Steam": "Keep current mode" (default; Big Picture only if it was open right before), "Always Big Picture" or "Always desktop mode". Every restart uses it and logs which mode it chose and why.
 - Full controller support in the desktop window too (same controls as Couch mode, with a clear focus ring; View goes back to Couch mode).
+- Interface size: Ctrl+plus, Ctrl+minus, Ctrl+0 and Ctrl+mouse wheel (LT/RT on a controller), 50% to 200% in steps of 10, saved separately for the desktop window and Couch mode, with an "Interface size" setting and Reset. Both views are slightly more compact by default.
 - Leaving Couch mode after changes asks "Restart Steam to apply changes?". SteamDrop then restarts Steam once Couch mode has closed (back into Big Picture) and writes the changes while Steam is closed, so Steam can't bring back a removed game.
 
 [Unreleased]: https://github.com/Aster8x/SteamDrop/compare/v0.1.0...HEAD

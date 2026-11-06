@@ -43,7 +43,7 @@
 }
 
 * { box-sizing: border-box; }
-html { font-size: 18px; }
+html { font-size: 17px; }
 body {
   margin: 0;
   background: var(--bg);
@@ -306,3 +306,4 @@ body.pad :focus { outline: 4px solid var(--accent); outline-offset: 3px; box-sha
   .activity li { grid-template-columns: 1fr; gap: 0; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
+.zoom-level { min-width: 3.6rem; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }

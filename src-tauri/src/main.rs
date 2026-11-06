@@ -541,6 +541,12 @@ async fn close_couch(app: AppHandle, state: State<'_, App>, restart: bool) -> Re
     Ok(())
 }
 
+/// "Interface size": zooms the calling window (50 to 200 percent).
+#[tauri::command]
+async fn set_zoom(window: tauri::WebviewWindow, level: u16) -> Result<(), String> {
+    window.set_zoom(f64::from(level.clamp(50, 200)) / 100.0).map_err(|e| e.to_string())
+}
+
 /// The view switch button and F11.
 #[tauri::command]
 async fn switch_view(app: AppHandle, from: String) {
@@ -690,6 +696,7 @@ fn main() {
             open_couch,
             close_couch,
             switch_view,
+            set_zoom,
             hide_window,
             close_window,
             scan_now,

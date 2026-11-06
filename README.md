@@ -47,6 +47,7 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 - **Light on your PC.** The window is fully closed while SteamDrop sits in the tray. The installer is only a few megabytes.
 - **A friendly chime** when a game has been added, loud enough to hear over Big Picture (volume and on/off in Settings).
 - **Dark and light looks**, large readable text (Atkinson Hyperlegible).
+- **Interface size:** Ctrl and plus, Ctrl and minus, Ctrl and 0, or Ctrl and the mouse wheel make everything bigger or smaller (50% to 200%), with LT and RT on a controller. The desktop window and Couch mode each remember their own size (Settings → App → "Interface size", with Reset).
 - **Stays up to date:** checks for new versions on startup and once a day, shows what changed, and can install updates by itself (never while you're playing).
 
 ## Folder rules
@@ -76,6 +77,7 @@ Play from the sofa? SteamDrop can add **itself** to your Steam library, with its
 | B (Circle) | Back |
 | LB / RB (L1 / R1) | Switch between Library, Settings and Activity |
 | Y (Triangle) | Scan now: look for new games right away |
+| LT / RT (L2 / R2) | Interface size: smaller / bigger |
 | View (Share) | Switch to the desktop window |
 | Menu (Options) | Back to Steam (SteamDrop keeps running) |
 | B on the Library | Leave: **Back to Steam** (selected), **Quit SteamDrop** or **Cancel** |

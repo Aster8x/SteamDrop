@@ -1,7 +1,8 @@
 "use strict";
 // Couch mode: a full-screen, controller-first view of SteamDrop.
 // Xbox and PlayStation pads through the Gamepad API (standard mapping), plus keyboard:
-// arrows = D-pad, Enter/Space = A, Escape/Backspace = B, Q/E or PageUp/PageDown = LB/RB.
+// arrows = D-pad, Enter/Space = A, Escape/Backspace = B, Q/E or PageUp/PageDown = LB/RB,
+// Ctrl+plus/minus/0 or Ctrl+wheel (LT/RT on a pad) = interface size.
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
@@ -149,6 +150,7 @@ function settingsScreen() {
       ? push({ name: "pin", title: "Enter your current PIN to turn it off", done: (old) => run(() => invoke("set_couch_pin", { old, new: "" })) })
       : push({ name: "pin", title: "Choose a 4-digit PIN", done: (pin) => run(() => invoke("set_couch_pin", { old: "", new: pin })) }),
       { value: onoff(S.couch_pin_set), on: S.couch_pin_set }),
+    button("zoom", "Interface size", () => Z.reset(), { value: `${st.zoom_couch}%`, on: st.zoom_couch !== 100, note: "(LT smaller, RT bigger, A resets)" }),
     button("exit", "Leave Couch mode", leave)),
     h("p", { class: "muted" }, `SteamDrop ${S.version}. More settings are in SteamDrop on your desktop.`)];
 }
@@ -217,6 +219,7 @@ function render() {
   $("#controls").replaceChildren(...controlBar());
   const hints = [h("span", {}, h("b", { class: "a" }, "A"), "Select"), h("span", {}, h("b", { class: "b" }, "B"), stack.length ? "Back" : tab === "library" ? "Leave" : "Library")];
   if (!stack.length) hints.push(h("span", {}, h("b", {}, "LB"), h("b", {}, "RB"), "Switch"));
+  hints.push(h("span", {}, h("b", {}, "LT"), h("b", {}, "RT"), "Size"));
   $("#hints").replaceChildren(...hints);
   const again = keep && document.querySelector(`.f[data-key="${CSS.escape(keep)}"]`);
   if (again) again.focus({ preventScroll: true }); else focusFirst();
@@ -255,6 +258,8 @@ function switchTab(step) {
   stack = [];
   render();
 }
+
+const Z = SD.zoom("zoom_couch", (patch) => save(patch));
 
 async function save(patch) {
   try { await invoke("save_settings", { patch }); } catch (e) { toast(String(e), true); }
@@ -296,6 +301,8 @@ function press(action) {
   else if (action === "menu") backToSteam();
   else if (action === "lb") switchTab(-1);
   else if (action === "rb") switchTab(1);
+  else if (action === "lt") Z.step(-1);
+  else if (action === "rt") Z.step(1);
   else if (action === "up") move(0, -1);
   else if (action === "down") move(0, 1);
   else if (action === "left") move(-1, 0);
@@ -320,6 +327,7 @@ document.addEventListener("click", (e) => { if (e.target.closest?.("[data-hold]"
 /* ---------- start ---------- */
 async function refresh() {
   S = await invoke("get_state");
+  Z.sync(S.settings.zoom_couch);
   render();
   maybeAsk();
 }

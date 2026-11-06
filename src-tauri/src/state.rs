@@ -42,6 +42,9 @@ pub struct Settings {
     pub big_picture_at_sign_in: bool,
     /// "When SteamDrop restarts Steam": "keep", "bigpicture" or "desktop".
     pub steam_restart_mode: String,
+    /// "Interface size" in percent (50 to 200), separately for the desktop window and Couch mode.
+    pub zoom_window: u16,
+    pub zoom_couch: u16,
 }
 
 impl Default for Settings {
@@ -70,6 +73,8 @@ impl Default for Settings {
             chime_volume: 70,
             big_picture_at_sign_in: false,
             steam_restart_mode: "keep".into(),
+            zoom_window: 100,
+            zoom_couch: 100,
         }
     }
 }

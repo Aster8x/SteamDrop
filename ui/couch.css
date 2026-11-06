@@ -15,7 +15,7 @@
   --accent-ink: #052131;
   --danger: #ff7b7b;
   --ok: #6fdc9b;
-  font-size: clamp(16px, 1.45vw, 30px);
+  font-size: clamp(15px, 1.3vw, 27px);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }

@@ -35,6 +35,7 @@ const logo = () => $(".brand svg").cloneNode(true);
 /* ---------- state and status ---------- */
 async function refresh() {
   S = await invoke("get_state");
+  Z.sync(S.settings.zoom_window);
   document.documentElement.dataset.theme = S.settings.theme === "light" ? "light" : "dark";
   render();
   maybeShowDialogs();
@@ -195,6 +196,8 @@ async function run(fn) {
     await refresh();
   }
 }
+
+const Z = SD.zoom("zoom_window", (patch) => saveSettings(patch));
 
 async function saveSettings(patch) {
   S.settings = { ...S.settings, ...patch };
@@ -684,6 +687,12 @@ function settingsView() {
           onchange: (e) => saveSettings({ chime_volume: Number(e.target.value) }) }),
         h("span", { class: "muted" }, `${st.chime_volume}%`),
         btn("Test", () => invoke("test_chime", { volume: Number($("#chime-volume").value) }), "small", { always: true })) : null,
+      setting("Interface size", "Makes everything in this window bigger or smaller. Shortcuts: Ctrl and plus, Ctrl and minus, Ctrl and 0 to reset, or Ctrl and the mouse wheel.",
+        h("div", { class: "row nowrap zoom", role: "group", "aria-label": "Interface size" },
+          btn("−", () => Z.step(-1), "small", { always: true, "aria-label": "Smaller", disabled: st.zoom_window <= 50 }),
+          h("span", { class: "zoom-level", "aria-live": "polite" }, `${st.zoom_window}%`),
+          btn("+", () => Z.step(1), "small", { always: true, "aria-label": "Bigger", disabled: st.zoom_window >= 200 }),
+          btn("Reset", Z.reset, "small", { always: true, disabled: st.zoom_window === 100 }))),
       setting("Look", "Dark or light colors.",
         h("div", { class: "seg", role: "group", "aria-label": "Look" },
           h("button", { "aria-pressed": String(st.theme !== "light"), onclick: () => saveSettings({ theme: "dark" }) }, "Dark"),
@@ -759,7 +768,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "F11") { e.preventDe
 
 /* ---------- controller (same code as Couch mode, in shared.js) ----------
    D-pad / stick move focus, A selects, B closes a dialog (or goes back to Games), LB/RB switch tabs,
-   Y = Scan now, View = back to Couch mode. */
+   Y = Scan now, View = back to Couch mode, LT/RT = interface size. */
 const TABS = ["games", "settings", "about"];
 function focusables() {
   const dlg = $("#dialog");
@@ -782,6 +791,8 @@ function padPress(action) {
     focusables()[0]?.focus();
   } else if (action === "y") scanNow();
   else if (action === "view") switchView();
+  else if (action === "lt") Z.step(-1);
+  else if (action === "rt") Z.step(1);
 }
 SD.startPad(padPress, () => {});
 // The big focus ring is for controller use; a mouse click turns it back to normal.
