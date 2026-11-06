@@ -144,7 +144,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 
 41. **Several games at once** (use test games you don't need for deleting):
     - Desktop: tick two games' boxes; a bar says "2 selected". Ctrl+click a cover adds or removes it; click one game's box, then Shift+click another cover: everything between is selected. "Select all" and "Clear" work.
-    - "Re-fetch art" gets new art for all of them with one Steam restart. "Re-check game file": rename a selected game's .exe, re-check, and the game now uses the best file in its folder; games whose file still exists keep it. "Remove from Steam" lists the games first.
+    - "Re-fetch art" gets new art for all of them with one Steam restart. "Re-check game file": games whose file still exists keep it. To see a change, use a test folder you made yourself, not a real game: copy `C:\Windows\notepad.exe` into a new folder in a watched folder, let SteamDrop add it, rename that copy, then re-check: it now uses the renamed copy. "Remove from Steam" lists the games first.
     - "Delete games" lists them; the Delete button only works after typing DELETE (and the PIN, if set). The folders go to the Recycle Bin and the games leave Steam, with one restart. On a USB stick, those folders are refused and stay.
     - Controller (both views): X ticks the focused game, holding X for a second ticks all. In Couch mode the bar sits above the Library; "Delete games" needs A held for 2 seconds, then the PIN if set. B clears the selection.
 

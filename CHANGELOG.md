@@ -25,7 +25,7 @@ First release.
 - Settings fit small and scaled windows (800x600, 125% and 150%): a control moves under its description when there isn't room, and the window never opens bigger than the screen. Couch mode fits small screens too.
 - Faster Steam restarts: no fixed waits, Steam is checked every quarter second with a fast process list, the changes are written and Steam is started again right away (even if writing failed), it's force-closed only after a minute, and the time of each step is logged.
 - New games and deleted game folders that arrive close together are handled together: one question with a tick per game ("3 new games found. Add them to Steam?", "2 game folders were deleted. Remove them from Steam?") and one Steam restart. Changes made during a restart wait for one follow-up restart.
-- A game that shows up in Steam as its store version (with a "Purchase" button) is explained in the README: the game itself tells Steam its App ID; SteamDrop never does.
+- A game that shows up in Steam as its store version (with a "Purchase" button) is explained in the README as a known Steam limitation: the game itself tells Steam its App ID; SteamDrop never does.
 
 ### Added
 
