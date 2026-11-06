@@ -1,29 +1,51 @@
-//! The "new game added" chime. Synthesized here, so there's no audio file from anywhere else:
-//! a soft three-note bell (C6, E6, G6) about a second long.
+//! The "new game added" sound. Synthesized here, so there's no audio file from anywhere else.
+//! Three sounds: "soft" (a modern two-note chime, the default), "coin" (an 8-bit pickup) and "pop".
+
+use std::f32::consts::TAU;
 
 const RATE: u32 = 44_100;
-const NOTES: [(f32, f32); 3] = [(0.0, 1046.50), (0.11, 1318.51), (0.22, 1567.98)];
-const LENGTH: f32 = 1.2;
 
-/// The chime as a 16-bit mono WAV file, at `volume` (0 to 100).
-pub fn wav(volume: u8) -> Vec<u8> {
-    let n = (RATE as f32 * LENGTH) as usize;
-    let mut samples: Vec<f32> = (0..n)
-        .map(|i| {
-            let t = i as f32 / RATE as f32;
-            NOTES
+/// One sound's samples (before volume), `len` seconds long.
+fn render(len: f32, f: impl Fn(f32) -> f32) -> Vec<f32> {
+    (0..(RATE as f32 * len) as usize).map(|i| f(i as f32 / RATE as f32)).collect()
+}
+
+/// Soft attack, then an exponential fade at `decay` per second.
+fn env(dt: f32, attack: f32, decay: f32) -> f32 {
+    if dt < 0.0 { 0.0 } else if dt < attack { dt / attack } else { (-(dt - attack) * decay).exp() }
+}
+
+fn samples(sound: &str) -> Vec<f32> {
+    match sound {
+        // Square-wave B5 then a held E6, like an old console's coin pickup.
+        "coin" => render(1.0, |t| {
+            let square = |f: f32, dt: f32| if (f * dt).fract() < 0.5 { 1.0 } else { -1.0 };
+            if t < 0.07 { 0.5 * square(987.77, t) } else { 0.5 * env(t - 0.07, 0.002, 5.0) * square(1318.51, t - 0.07) }
+        }),
+        // A short drop in pitch (a bubble-like pop) with a quick fade.
+        "pop" => render(1.0, |t| {
+            // Phase of a sine sweeping 1100 -> 330 Hz exponentially over about 50 ms.
+            let k = 40.0;
+            let phase = 330.0 * t + (1100.0 - 330.0) * (1.0 - (-k * t).exp()) / k;
+            env(t, 0.002, 22.0) * (TAU * phase).sin()
+        }),
+        // A5 then E6, pure tones with a slightly detuned copy for warmth.
+        _ => render(1.4, |t| {
+            [(0.0, 880.0), (0.14, 1318.51)]
                 .iter()
-                .filter(|(start, _)| t >= *start)
                 .map(|(start, f)| {
                     let dt = t - start;
-                    // Quick 5 ms attack, then a bell-like fade; a quiet octave adds shimmer.
-                    let env = if dt < 0.005 { dt / 0.005 } else { (-(dt - 0.005) * 4.5).exp() };
-                    let w = std::f32::consts::TAU * f * dt;
-                    env * (w.sin() + 0.25 * (2.0 * w).sin())
+                    env(dt, 0.012, 3.2) * ((TAU * f * dt).sin() + 0.4 * (TAU * (f + 1.5) * dt).sin())
                 })
                 .sum()
-        })
-        .collect();
+        }),
+    }
+}
+
+/// The sound as a 16-bit mono WAV file, at `volume` (0 to 100).
+pub fn wav(volume: u8, sound: &str) -> Vec<u8> {
+    let mut samples = samples(sound);
+    let n = samples.len();
     // Fade the last 50 ms so it never ends with a click, then scale to the chosen volume.
     let fade = (RATE as f32 * 0.05) as usize;
     for (k, s) in samples.iter_mut().rev().take(fade).enumerate() {
@@ -54,37 +76,40 @@ pub fn wav(volume: u8) -> Vec<u8> {
 
 /// Plays the chime without waiting. Windows mixes it with other sound, so it's heard over Big Picture too.
 #[cfg(windows)]
-pub fn play(volume: u8) {
+pub fn play(volume: u8, sound: &str) {
     use std::sync::Mutex;
     use windows_sys::Win32::Media::Audio::{PlaySoundW, SND_ASYNC, SND_MEMORY, SND_NODEFAULT};
     // The sound must stay in memory while Windows plays it.
     static SOUND: Mutex<Vec<u8>> = Mutex::new(Vec::new());
-    let mut sound = SOUND.lock().unwrap_or_else(|e| e.into_inner());
+    let mut buffer = SOUND.lock().unwrap_or_else(|e| e.into_inner());
     // SAFETY: stopping first (null sound) means the old buffer is no longer read before it's replaced;
     // the new buffer lives in the static until the next call stops it again.
     unsafe {
         PlaySoundW(std::ptr::null(), std::ptr::null_mut(), 0);
-        *sound = wav(volume);
-        PlaySoundW(sound.as_ptr() as *const u16, std::ptr::null_mut(), SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+        *buffer = wav(volume, sound);
+        PlaySoundW(buffer.as_ptr() as *const u16, std::ptr::null_mut(), SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
     }
 }
 
 #[cfg(not(windows))]
-pub fn play(_: u8) {}
+pub fn play(_: u8, _: &str) {}
 
 #[cfg(test)]
 mod tests {
     #[test]
-    fn makes_a_valid_wav_at_the_right_volume() {
-        let loud = super::wav(100);
-        assert_eq!(&loud[..4], b"RIFF");
-        assert_eq!(&loud[8..16], b"WAVEfmt ");
-        assert_eq!(loud.len(), 44 + (44_100.0 * 1.2) as usize * 2);
+    fn makes_valid_wavs_at_the_right_volume() {
         let peak = |w: &[u8]| w[44..].chunks(2).map(|c| i16::from_le_bytes([c[0], c[1]]).unsigned_abs()).max().unwrap();
-        assert!(peak(&loud) > 19_000 && peak(&loud) < 20_000, "60% of full scale");
-        assert!(peak(&super::wav(50)) < peak(&loud) / 2 + 2);
-        assert_eq!(peak(&super::wav(0)), 0);
-        // Small: about 100 KB.
-        assert!(loud.len() < 110_000);
+        for sound in ["soft", "coin", "pop"] {
+            let loud = super::wav(100, sound);
+            assert_eq!(&loud[..4], b"RIFF");
+            assert_eq!(&loud[8..16], b"WAVEfmt ");
+            let secs = (loud.len() - 44) as f32 / 2.0 / 44_100.0;
+            assert!((1.0..=2.0).contains(&secs), "{sound} lasts 1 to 2 seconds");
+            assert!(peak(&loud) > 19_000 && peak(&loud) < 20_000, "{sound}: 60% of full scale");
+            assert!(peak(&super::wav(50, sound)) < peak(&loud) / 2 + 2);
+            assert_eq!(peak(&super::wav(0, sound)), 0);
+        }
+        assert_ne!(super::wav(100, "soft"), super::wav(100, "pop"));
+        assert_eq!(super::wav(100, "unknown"), super::wav(100, "soft"), "anything else is the default");
     }
 }

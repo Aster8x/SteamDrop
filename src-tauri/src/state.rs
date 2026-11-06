@@ -38,6 +38,8 @@ pub struct Settings {
     /// "Play a sound when a game is added", and its volume (0 to 100).
     pub chime: bool,
     pub chime_volume: u8,
+    /// "soft", "coin" or "pop".
+    pub chime_sound: String,
     /// "Open Steam in Big Picture when Windows starts".
     pub big_picture_at_sign_in: bool,
     /// "When SteamDrop restarts Steam": "keep", "bigpicture" or "desktop".
@@ -74,6 +76,7 @@ impl Default for Settings {
             accounts: vec![],
             chime: true,
             chime_volume: 70,
+            chime_sound: "soft".into(),
             big_picture_at_sign_in: false,
             steam_restart_mode: "keep".into(),
             zoom_window: 100,

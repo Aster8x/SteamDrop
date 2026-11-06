@@ -35,6 +35,7 @@ pub fn show_window(app: &AppHandle) {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
+        couch::sync_lock(app, None);
         return;
     }
     let app2 = app.clone();
@@ -572,13 +573,13 @@ async fn switch_view(app: AppHandle, from: String) {
     couch::switch(&app, &from);
 }
 
-/// "Hide": the desktop window goes to the tray; Couch mode minimizes, back to Steam.
-/// Either way SteamDrop keeps its Steam session, so Steam can bring it back.
+/// "Hide": the window goes to the tray. That ends a Steam session, so Steam shows Play again.
 #[tauri::command]
 async fn hide_window(app: AppHandle, label: String) {
     if let Some(w) = app.get_webview_window(&label) {
-        let _ = if label == couch::COUCH { w.minimize() } else { w.hide() };
+        let _ = w.hide();
     }
+    couch::sync_lock(&app, None);
 }
 
 /// "Close": the window goes away; SteamDrop keeps watching from the tray.
@@ -589,10 +590,10 @@ async fn close_window(app: AppHandle, label: String) {
     }
 }
 
-/// The "Test" button next to the chime volume.
+/// The "Preview" buttons next to each sound.
 #[tauri::command]
-fn test_chime(volume: u8) {
-    chime::play(volume);
+fn test_chime(volume: u8, sound: String) {
+    chime::play(volume, &sound);
 }
 
 /// "Scan now": look at the watched folders right away.
@@ -607,8 +608,11 @@ fn scan_now(app: AppHandle) -> String {
     }
 }
 
+/// "Quit SteamDrop": ends the process Steam started too, so Steam never keeps showing SteamDrop as running.
+/// Async: exiting closes the windows, which must not happen inside a window's own callback.
 #[tauri::command]
-fn quit(app: AppHandle) {
+async fn quit(app: AppHandle) {
+    steam::end_helpers();
     app.exit(0);
 }
 
@@ -653,10 +657,6 @@ fn main() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
-            if args.iter().any(|a| a == "--resume") {
-                couch::resume(app);
-                return;
-            }
             match couch::parse_view(&args) {
                 Some(view) => {
                     // Asked by the process Steam started: a Steam session until the last window closes.

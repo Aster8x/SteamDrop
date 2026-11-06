@@ -76,7 +76,7 @@ function libraryScreen() {
       h("span", { class: "label" }, g.name))))];
 }
 
-/* ---------- several games at once: X ticks the focused game, holding X ticks all ---------- */
+/* ---------- several games at once: X selects the focused game, holding X selects all ---------- */
 const selected = new Set();
 const nGames = (n) => `${n} game${n === 1 ? "" : "s"}`;
 function clearSelection() { selected.clear(); stack = []; render(); }
@@ -237,12 +237,12 @@ function exitScreen() {
   return [h("div", { class: "pin" }, h("h1", {}, "Leave SteamDrop?"),
     h("p", { class: "muted" }, "Back to Steam keeps SteamDrop running, so it still adds new games."),
     h("div", { class: "actions" },
-      button("exit-steam", "Back to Steam", () => { stack.pop(); render(); backToSteam(); }),
+      button("exit-steam", "Back to Steam", () => { stack.pop(); backToSteam(); render(); }),
       button("exit-quit", "Quit SteamDrop", () => { stack.pop(); quitScreen(); }, { kind: "danger" }),
       button("exit-cancel", "Cancel", back)))];
 }
 
-/** One question about several games, each with its own tick: A ticks or unticks. */
+/** One question about several games, each with its own checkbox: A selects or unselects. */
 function checklistScreen(sc) {
   const picked = sc.items.filter((i) => i.on).map((i) => i.key);
   return [h("div", { class: "pin wide" }, h("h1", {}, sc.title), h("p", { class: "muted" }, sc.text),
@@ -261,7 +261,9 @@ async function scanNow() {
   try { toast((await invoke("scan_now")) || "Done."); } catch (e) { toast(String(e), true); }
 }
 const switchView = () => invoke("switch_view", { from: "couch" });
-const backToSteam = () => invoke("hide_window", { label: "couch" });
+// Closes Couch mode (SteamDrop stays in the tray), so Steam shows Play again and Play reopens it.
+// With changes waiting for a Steam restart, it asks first, like leaving Couch mode.
+const backToSteam = () => S.restart_needed ? push({ name: "leave" }) : invoke("close_couch", { restart: false });
 const quitScreen = () => push({ name: "confirm", title: "Stop adding new games?", text: "SteamDrop will stop watching your folders until you start it again.", yes: "Quit SteamDrop", action: () => invoke("quit") });
 
 function controlBar() {
@@ -280,10 +282,10 @@ function render() {
   // The saved theme, except while trying themes on the Theme screen.
   if (stack.at(-1)?.name !== "themes") SD.applyTheme(S.settings.theme);
   for (const t of document.querySelectorAll(".tab")) t.classList.toggle("active", t.dataset.tab === tab);
-  $("#screen").replaceChildren(...current());
+  SD.fill($("#screen"), current());
   $("#controls").replaceChildren(...controlBar());
   const hints = [h("span", {}, h("b", { class: "a" }, "A"), "Select"), h("span", {}, h("b", { class: "b" }, "B"), stack.length ? "Back" : tab !== "library" ? "Library" : selected.size ? "Clear selection" : "Leave")];
-  if (!stack.length && tab === "library" && S.games.length) hints.push(h("span", {}, h("b", { class: "x" }, "X"), "Tick game (hold: all)"));
+  if (!stack.length && tab === "library" && S.games.length) hints.push(h("span", {}, h("b", { class: "x" }, "X"), "Select game (hold: all)"));
   if (!stack.length) hints.push(h("span", {}, h("b", {}, "LB"), h("b", {}, "RB"), "Switch"));
   hints.push(h("span", {}, h("b", {}, "LT"), h("b", {}, "RT"), "Size"));
   $("#hints").replaceChildren(...hints);

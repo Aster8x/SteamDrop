@@ -52,92 +52,45 @@ fn open_lock() -> std::io::Result<std::fs::File> {
     std::fs::OpenOptions::new().read(true).write(true).create(true).truncate(false).share_mode(0).open(dir.join("steam-session.lock"))
 }
 
-/// `SteamDrop.exe --from-steam`: open the right view in the app, then wait until every window is closed.
-///
-/// This is the process Steam tracks, and it has no view of its own (the views live in the app), so
-/// Steam's "Resume" had nothing to bring to the front. It now shows a tiny, see-through "SteamDrop"
-/// window for Steam to focus; when Steam activates it, the app is asked to come to the front
-/// (`--resume`: Couch mode while Big Picture is open). The window's message loop replaces the old sleep loop.
+/// `SteamDrop.exe --from-steam`: open the right view in the app, then wait while a SteamDrop window is shown.
+/// This is the process Steam tracks as "running". It starts nothing else (extra processes it once started
+/// for "Resume" could outlive SteamDrop and leave Steam showing it as running), and it exits as soon as no
+/// window is shown, or no SteamDrop app is left at all.
 #[cfg(windows)]
 pub fn run_from_steam() {
-    use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
-    use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-    use windows_sys::Win32::UI::WindowsAndMessaging::*;
-    use std::sync::atomic::{AtomicBool, AtomicU64};
+    use std::os::windows::process::CommandExt;
     use std::time::{Duration, Instant};
-
-    static EXE: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
-    static START: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
-    static SEEN_OPEN: AtomicBool = AtomicBool::new(false);
-    static LAST_RESUME_MS: AtomicU64 = AtomicU64::new(0);
     let Ok(exe) = std::env::current_exe() else { return };
     let big_picture = started_in_big_picture();
     let setting = crate::state::load(&crate::state::data_dir()).settings.steam_view;
     let view = view_for(&setting, big_picture);
-    let mut child = std::process::Command::new(&exe);
-    child.arg(if view == View::Couch { "--open-view=couch" } else { "--open-view=window" });
-    if child.spawn().is_err() {
+    let arg = if view == View::Couch { "--open-view=couch" } else { "--open-view=window" };
+    // If this starts SteamDrop itself, take it out of Steam's job when Steam allows that, so Steam doesn't
+    // treat the tray app as part of the game (and wait for it when closing). CREATE_BREAKAWAY_FROM_JOB.
+    let started = std::process::Command::new(&exe).arg(arg).creation_flags(0x0100_0000).spawn();
+    if started.is_err() && std::process::Command::new(&exe).arg(arg).spawn().is_err() {
         return;
     }
-    let _ = EXE.set(exe);
-    let _ = START.set(Instant::now());
-
-    unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
-        let start = *START.get().unwrap();
-        match msg {
-            // Steam's "Resume" activates this window. Not in the first moments (that's the launch itself),
-            // and at most once a second.
-            WM_ACTIVATE if (wp & 0xFFFF) as u32 != WA_INACTIVE && start.elapsed() > Duration::from_secs(2) => {
-                let now = start.elapsed().as_millis() as u64;
-                if now.saturating_sub(LAST_RESUME_MS.swap(now, Ordering::SeqCst)) > 1000 {
-                    // This process is in front right now, so it may let the app take the foreground.
-                    AllowSetForegroundWindow(ASFW_ANY);
-                    let _ = std::process::Command::new(EXE.get().unwrap()).arg("--resume").spawn();
-                }
-                0
-            }
-            WM_TIMER => {
-                // Error 32 = sharing violation: the app holds the lock, so a SteamDrop window is open.
-                let open = matches!(open_lock(), Err(e) if e.raw_os_error() == Some(32));
-                if open {
-                    SEEN_OPEN.store(true, Ordering::SeqCst);
-                } else if SEEN_OPEN.load(Ordering::SeqCst) || start.elapsed() > Duration::from_secs(60) {
-                    PostQuitMessage(0);
-                }
-                0
-            }
-            _ => DefWindowProcW(hwnd, msg, wp, lp),
-        }
-    }
-
-    let class: Vec<u16> = "SteamDropSession".encode_utf16().chain([0]).collect();
-    let title: Vec<u16> = "SteamDrop".encode_utf16().chain([0]).collect();
-    // SAFETY: plain Win32 window setup with NUL-terminated strings that outlive the window;
-    // the window procedure only touches the statics above.
-    unsafe {
-        let instance = GetModuleHandleW(std::ptr::null());
-        let wc = WNDCLASSW { lpfnWndProc: Some(proc), hInstance: instance, lpszClassName: class.as_ptr(), ..std::mem::zeroed() };
-        RegisterClassW(&wc);
-        // 1x1 and almost fully transparent: nothing to see, but a real visible window Steam can focus.
-        // A tool window, so it adds no second button to the taskbar.
-        let hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW, class.as_ptr(), title.as_ptr(), WS_POPUP, 0, 0, 1, 1, std::ptr::null_mut(), std::ptr::null_mut(), instance, std::ptr::null());
-        if hwnd.is_null() {
+    let me = std::process::id();
+    let name = exe.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let start = Instant::now();
+    let mut seen_open = false;
+    loop {
+        // shortcut: checks twice a second; a named event would avoid that, if it ever matters.
+        std::thread::sleep(Duration::from_millis(500));
+        // Error 32 = sharing violation: the app holds the lock, so a SteamDrop window is shown.
+        let open = matches!(open_lock(), Err(e) if e.raw_os_error() == Some(32));
+        // Watchdog: the app (or the process handing over to it) must still exist.
+        let app_alive = crate::steam::processes().iter().any(|p| p.pid != me && p.name == name);
+        if open && app_alive {
+            seen_open = true;
+        } else if seen_open || !app_alive || start.elapsed() > Duration::from_secs(60) {
             return;
-        }
-        SetLayeredWindowAttributes(hwnd, 0, 1, LWA_ALPHA);
-        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-        // shortcut: checks the lock twice a second; a named event would avoid that, if it ever matters.
-        SetTimer(hwnd, 1, 500, None);
-        let mut msg: MSG = std::mem::zeroed();
-        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
         }
     }
 }
 
-/// Steam's "Resume" (see run_from_steam) and Big Picture opening during a Steam session: bring
-/// SteamDrop to the front. While Big Picture is open that's Couch mode, switching the desktop window
+/// Big Picture opening during a Steam session: bring SteamDrop to the front. While Big Picture is open that's Couch mode, switching the desktop window
 /// over rather than opening a second view.
 pub fn resume(app: &AppHandle) {
     if !crate::steam::big_picture_open() {
@@ -150,9 +103,10 @@ pub fn resume(app: &AppHandle) {
     }
 }
 
-/// Holds the session lock while any SteamDrop window exists (`closing` is about to go away).
+/// Holds the session lock while a SteamDrop window is shown (`closing` is about to go away). Hidden
+/// windows don't count, so Steam shows Play again (not a "Resume" that can't bring anything back).
 pub fn sync_lock(app: &AppHandle, closing: Option<&str>) {
-    let any = [MAIN, COUCH].iter().any(|l| Some(*l) != closing && app.get_webview_window(l).is_some());
+    let any = [MAIN, COUCH].iter().any(|l| Some(*l) != closing && app.get_webview_window(l).is_some_and(|w| w.is_visible().unwrap_or(false)));
     let state = app.state::<App>();
     let mut lock = state.couch_lock.lock().unwrap();
     if !any {
@@ -183,6 +137,7 @@ pub fn open(app: &AppHandle, view: View) {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
+        sync_lock(app, None);
         return;
     }
     let app2 = app.clone();

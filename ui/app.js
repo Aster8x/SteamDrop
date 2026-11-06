@@ -113,7 +113,7 @@ const askedFound = new Set();  // folders already shown in a "new games found" q
 const askedGone = new Set();   // games already shown in a "folders were deleted" question
 const addable = () => S.found.filter((f) => !f.installer_only && f.candidates.length);
 
-/** A list of ticked checkboxes; `selected()` gives the keys still ticked. */
+/** A list of checked checkboxes; `selected()` gives the keys still checked. */
 function checklist(items, label) {
   const el = h("div", { class: "exe-list", role: "group", "aria-label": label },
     items.map((i) => h("label", { class: "exe-option" },
@@ -147,7 +147,7 @@ async function showFoundBatch() {
   items.forEach((f) => askedFound.add(f.folder));
   const list = checklist(items.map((f) => ({ key: f.folder, name: f.title, note: relative(f.folder, f.candidates[0].path) })), "New games");
   const choice = await ask(`${items.length} new games found. Add them to Steam?`,
-    [h("p", {}, "Untick any you don't want yet. SteamDrop picked the file that starts each game; to change one, press \"Not now\" and use that game's card on the Games page."), list.el],
+    [h("p", {}, "Unselect any you don't want yet. SteamDrop picked the file that starts each game; to change one, press \"Not now\" and use that game's card on the Games page."), list.el],
     [{ label: "Not now", value: null }, { label: "Add selected", value: "add", kind: "primary" }]);
   dialogFor = null;
   const picked = choice === "add" ? items.filter((f) => list.selected().includes(f.folder)) : [];
@@ -306,7 +306,7 @@ function render() {
   // Matched by what it is, not where it was: a list that grew must not move focus onto, say, a Remove button.
   const at = focusables().indexOf(document.activeElement);
   const was = controlId(document.activeElement);
-  target.replaceChildren(...({ games: gamesView, settings: settingsView, about: aboutView })[view]());
+  SD.fill(target, ({ games: gamesView, settings: settingsView, about: aboutView })[view]());
   if (at < 0 || document.activeElement !== document.body) return;
   const now = focusables();
   const same = now.filter((el) => controlId(el) === was);
@@ -366,12 +366,15 @@ function foundCard(f) {
       btn("Not now", () => invoke("dismiss_found", { folder: f.folder }), "", { title: "SteamDrop won't ask about this folder again." })));
 }
 
+/** The sounds SteamDrop can play when a game is added (made in chime.rs). */
+const SOUNDS = [["soft", "Soft chime"], ["coin", "Retro coin"], ["pop", "Pop"]];
+
 /* ---------- selecting several games ---------- */
 const selected = new Set();   // ids of selected games
 let lastPick = null;          // for Shift+click ranges
 const gridGames = () => S.games.filter((g) => !g.folder_missing);
 
-/** A click on a game's tick box, or Ctrl/Shift+click on its cover: toggle it, or with Shift select a range. */
+/** A click on a game's checkbox, or Ctrl/Shift+click on its cover: toggle it, or with Shift select a range. */
 function pick(e, id) {
   const order = gridGames().map((g) => g.id);
   if (e.shiftKey && lastPick !== null && order.includes(lastPick)) {
@@ -442,9 +445,9 @@ function gameCard(g) {
   const cover = h("button", { class: "cover", "aria-label": `Details for ${g.name}`,
     onclick: (e) => { if (e.ctrlKey || e.shiftKey) pick(e, g.id); else showDetails(g); } },
     SD.art(g, "portrait"));
-  const tick = h("label", { class: "pick", title: "Select (Ctrl+click or Shift+click a cover too)" },
+  const box = h("label", { class: "pick", title: "Select (Ctrl+click or Shift+click a cover too)" },
     h("input", { type: "checkbox", checked: selected.has(g.id), "aria-label": `Select ${g.name}`, onclick: (e) => { e.preventDefault(); pick(e, g.id); } }));
-  return h("div", { class: `card ${selected.has(g.id) ? "selected" : ""}`, "data-id": g.id }, tick, cover,
+  return h("div", { class: `card ${selected.has(g.id) ? "selected" : ""}`, "data-id": g.id }, box, cover,
     h("div", { class: "body" },
       h("div", { class: "name" }, g.name),
       g.folder_missing ? h("div", {}, h("span", { class: "badge warn" }, "Game file missing")) :
@@ -514,7 +517,7 @@ async function showDetails(g) {
   }
   if (info) {
     const row = (label, value) => value ? [h("dt", {}, label), h("dd", {}, value)] : [];
-    infoBox.replaceChildren(
+    SD.fill(infoBox,
       info.description ? h("p", {}, info.description) : null,
       h("dl", {},
         row("Developer", info.developers.join(", ")),
@@ -803,15 +806,21 @@ function settingsView() {
       st.keep_big_picture ? exceptionsList(st) : null,
       setting("Keep running in the tray when closed", "Closing the window keeps SteamDrop watching your folders. Quit it from the tray icon.",
         toggle(st.close_to_tray, (v) => saveSettings({ close_to_tray: v }), "Keep running in the tray when closed")),
-      setting("Play a sound when a game is added", "A short chime, so you hear it even while Steam's Big Picture is on screen.",
-        toggle(st.chime, (v) => saveSettings({ chime: v }), "Play a sound when a game is added")),
+      setting("Sound when a game is added", "A short sound, so you hear it even while Steam's Big Picture is on screen.",
+        h("div", { class: "seg", role: "group", "aria-label": "Sound when a game is added" },
+          [...SOUNDS, ["off", "Off"]].map(([v, label]) => h("button", {
+            "aria-pressed": String(v === "off" ? !st.chime : st.chime && (st.chime_sound || "soft") === v),
+            onclick: () => saveSettings(v === "off" ? { chime: false } : { chime: true, chime_sound: v }),
+          }, label)))),
+      h("div", { class: "row sounds" }, h("span", { class: "muted" }, "Preview:"),
+        SOUNDS.map(([v, label]) => btn(`▶ ${label}`, () => invoke("test_chime", { volume: Number($("#chime-volume")?.value ?? st.chime_volume), sound: v }),
+          "small", { always: true, "aria-label": `Preview ${label}` }))),
       st.chime ? h("div", { class: "row volume" },
         h("label", { for: "chime-volume" }, "Volume"),
         h("input", { id: "chime-volume", type: "range", min: "0", max: "100", step: "5", value: String(st.chime_volume),
           oninput: (e) => { e.target.nextSibling.textContent = `${e.target.value}%`; },
           onchange: (e) => saveSettings({ chime_volume: Number(e.target.value) }) }),
-        h("span", { class: "muted" }, `${st.chime_volume}%`),
-        btn("Test", () => invoke("test_chime", { volume: Number($("#chime-volume").value) }), "small", { always: true })) : null,
+        h("span", { class: "muted" }, `${st.chime_volume}%`)) : null,
       h("div", { class: "row" }, btn("Quit SteamDrop", () => invoke("quit"), "", { always: true }))),
 
     h("div", { class: "panel" },
@@ -894,7 +903,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "F11") { e.preventDe
 
 /* ---------- controller (same code as Couch mode, in shared.js) ----------
    D-pad / stick move focus, A selects, B closes a dialog (or goes back to Games), LB/RB switch tabs,
-   Y = Scan now, View = back to Couch mode, LT/RT = interface size, X = tick a game (hold: all). */
+   Y = Scan now, View = back to Couch mode, LT/RT = interface size, X = select a game (hold: all). */
 const TABS = ["games", "settings", "about"];
 function focusables() {
   const dlg = $("#dialog");
@@ -921,7 +930,7 @@ function padPress(action) {
   else if (action === "rt") Z.step(1);
   else if (action === "x" && !dlg.open) xHold = setTimeout(() => { xHold = null; selectAll(); }, 1000);
 }
-/* X ticks the focused game; holding X for a second selects all. */
+/* X selects the focused game; holding X for a second selects all. */
 let xHold = null;
 function padRelease(action) {
   if (action !== "x" || !xHold) return;

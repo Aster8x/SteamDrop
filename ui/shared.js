@@ -110,5 +110,8 @@ window.SD = (() => {
   const themeName = (id) => THEMES.find((t) => t[0] === themeId(id))[1];
   const applyTheme = (id) => { document.documentElement.dataset.theme = themeId(id); };
 
-  return { startPad, move, art, zoom, THEMES, themeId, themeName, applyTheme };
+  /** Replaces an element's content; leaves out null and false (replaceChildren would show them as text). */
+  const fill = (el, ...kids) => el.replaceChildren(...kids.flat().filter((k) => k != null && k !== false));
+
+  return { startPad, move, art, zoom, THEMES, themeId, themeName, applyTheme, fill };
 })();

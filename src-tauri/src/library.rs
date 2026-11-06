@@ -314,7 +314,7 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
     };
     notify(app, "Added to Steam", &msg);
     if settings.chime {
-        crate::chime::play(settings.chime_volume);
+        crate::chime::play(settings.chime_volume, &settings.chime_sound);
     }
     set_status(app, &msg);
     emit_state(app);
@@ -409,6 +409,11 @@ const SELF_ART: [(art::Slot, &[u8]); 5] = [
     (art::Slot::Logo, include_bytes!("../steam-art/logo.png")),
     (art::Slot::Icon, include_bytes!("../steam-art/icon.png")),
 ];
+
+/// SteamDrop's own shortcut id: Steam may report it as the running "game" while SteamDrop is open from it.
+pub fn self_id() -> Option<u32> {
+    self_shortcut().ok().map(|(id, _)| id)
+}
 
 fn self_shortcut() -> Result<(u32, PathBuf), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -538,6 +543,16 @@ pub fn restart_steam_applying(app: &AppHandle) -> Result<(), String> {
     let snapshot = state.data.lock().unwrap().clone();
     let write = || apply_pending(&steam_dir, &state.dir, &snapshot, &steam::users(&steam_dir), &state.target_users(&steam_dir));
     let running = steam::is_running();
+    if running && steam::game_running(&snapshot.games) {
+        // Steam won't close while a game runs; wait for it rather than force anything.
+        set_status(app, "A game is running. Steam restarts once you close it.");
+        log::info("A game is running, so the Steam restart waits until it closes.");
+        let t = std::time::Instant::now();
+        while steam::game_running(&snapshot.games) {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+        log::info(format!("The game closed after {} s; restarting Steam now.", t.elapsed().as_secs()));
+    }
     if running {
         set_status(app, "Restarting Steam...");
         steam::restart_with(&steam_dir, &snapshot.settings.steam_restart_mode, write)?;

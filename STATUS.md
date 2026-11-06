@@ -11,7 +11,7 @@ Version 0.1.0, first complete build. Everything in the spec is implemented. It h
   - title-card rendering and installing art into a grid folder and removing it again;
   - detecting files that are still open, using the Windows share-mode check;
   - loading old or partial settings files;
-  - log rotation (5 files of 1 MB);
+  - daily log files, the 14-day and 20 MB limits, and reading across days;
   - hiding user names in bug reports;
   - saving the SteamGridDB key in Credential Manager and keeping it out of the bug report (run under Wine's Credential Manager);
   - reading the changelog and picking the versions between two releases;
@@ -65,7 +65,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 16. **Tray:** close the window. SteamDrop should stay in the tray, and Task Manager should show no WebView2 processes for it. Click the tray icon and the window should come back. Turn "Keep running in the tray" off, and closing should quit.
 17. **Run on startup:** turn it on, sign out and back in. SteamDrop should start in the tray with no window.
 18. **While closed:** quit SteamDrop, copy a game into the watched folder, and start SteamDrop. It should find the game.
-19. **Several Steam accounts** (if you have them): by default a new game shows up for each. In Settings → Steam, "Add games to" lists every account by its Steam name; choose "Only these accounts", untick one, add a game, and check it only appears for the ticked accounts. Removing it must remove it from all of them.
+19. **Several Steam accounts** (if you have them): by default a new game shows up for each. In Settings → Steam, "Add games to" lists every account by its Steam name; choose "Only these accounts", unselect one, add a game, and check it only appears for the selected accounts. Removing it must remove it from all of them.
 20. **Uninstall,** three times:
     - with both boxes unchecked: games stay in Steam;
     - with "Remove SteamDrop's games from Steam" checked: they're gone from Steam after it restarts;
@@ -95,7 +95,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Turn on "Install updates automatically", start a game from Steam, and trigger a check. The update must wait until the game is closed, then install, restart SteamDrop and show a notification.
     - Unplug the network and press "Check now": you get a short message, and the Activity list says the check failed. No error pop-ups.
 27. **Couch mode setup:**
-    - On the installer's last page, "Show SteamDrop in my Steam library" is ticked.
+    - On the installer's last page, "Show SteamDrop in my Steam library" is selected.
     - After installing and restarting Steam, SteamDrop is in the library with its own cover, banner, background, logo and icon.
     - Settings → Couch mode can turn this off and on again.
 28. **Couch mode with a controller** (try an Xbox and a PlayStation controller if you have both):
@@ -108,10 +108,10 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 31. **Opening from Steam:**
     - Start SteamDrop from desktop Steam: the normal window opens. Start it from Big Picture (or a Steam Deck): Couch mode opens.
     - Change "When opened from Steam" to "Always Couch mode" or "Always window" and check it's respected.
-    - F11 or the switch button changes views; Steam keeps showing SteamDrop as running the whole time, and as stopped only after the last window closes.
+    - F11 or the switch button changes views; Steam keeps showing SteamDrop as running the whole time, and as stopped once no SteamDrop window is shown (closed or hidden).
 32. **Control bar:** Scan now finds a game you copied while SteamDrop was paused (Y on a controller). In the desktop window, Hide sends the window to the tray, Close closes it but the tray icon stays, and Quit SteamDrop asks "Stop adding new games?" and then exits. Couch mode's bar has only Scan now (Y), Window view (View) and Back to Steam (Menu); leaving and quitting are behind B (see test 38).
 33. **Big Picture at sign-in:** turn on Settings → App → "Open Steam in Big Picture when Windows starts", sign out and back in: Steam opens in Big Picture. With Steam already set to start in Big Picture, nothing extra happens. Turn it off and sign in again: Steam starts as usual. Uninstalling removes it.
-34. **Chime:** Settings → App → "Play a sound when a game is added" is on. "Test" plays a short three-note chime at the slider's volume. Add a game while Big Picture is open: you hear the chime. Turn it off: no sound.
+34. **Sound:** Settings → App → "Sound when a game is added" is on "Soft chime". Each Preview button plays its sound (Soft chime, Retro coin, Pop) at the slider's volume, even when the sound is Off. Choose one, add a game while Big Picture is open: you hear that sound. Choose Off: no sound, and the volume slider is hidden.
 35. **Delete game:**
     - Use a test game you don't need. Holding A for under 2 seconds does nothing; holding it for 2 seconds moves the folder to the Recycle Bin (check that you can restore it) and removes the game.
     - Set a PIN in Couch mode's Settings: deleting now asks for it, and a wrong PIN refuses.
@@ -130,11 +130,11 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - In the desktop window with a controller: D-pad/stick move a clearly visible focus ring, A selects, B closes dialogs, LB/RB switch tabs, Y scans, View goes back to Couch mode.
 
 38. **Fixes from the second laptop test** (install the new build over the old one):
-    - **Resume:** open SteamDrop from desktop Steam (the window opens), switch Steam to Big Picture, then press SteamDrop's "Resume" in Big Picture. SteamDrop comes to the front as full-screen Couch mode, and there is only one SteamDrop view (the desktop window was switched, not doubled). Also: just switching Steam to Big Picture while the SteamDrop window from Steam is open should switch it to Couch mode by itself after a moment.
+    - **Big Picture switch:** open SteamDrop from desktop Steam (the window opens), then switch Steam to Big Picture: after a moment SteamDrop switches to full-screen Couch mode by itself, with only one SteamDrop view. (Resume is replaced by Play; see test 43.)
     - **Couch mode B:** on the Library, B opens "Leave SteamDrop?" with "Back to Steam" selected. A on it goes back to Big Picture with SteamDrop still running. "Quit SteamDrop" shows the "Stop adding new games?" warning first. "Cancel" stays. On Settings or Activity, B goes back to the Library. The control bar has no Close or Quit, and no two hints share a button.
     - **Settings layout:** look through Settings in a small window and at 125% and 150% Windows scaling (Settings → System → Display → Scale), on a 1366x768 laptop if you have one. Nothing is cut off and there's no sideways scrolling; where space is tight, the switch or buttons sit under their description. The window never opens bigger than the screen.
-    - **Batches:** delete two game folders (from a watched folder) a few seconds apart. One question appears: "2 game folders were deleted. Remove them from Steam?" with a tick for each. Untick one, press "Remove selected": only the ticked game goes, with one Steam restart. "Keep in Steam" leaves them under Missing games. Moving a game folder to another place inside the watched folders is not reported as deleted.
-    - Copy three game folders in at once (Automatic mode off): one question "3 new games found. Add them to Steam?". Untick one and press "Add selected": two games are added with one Steam restart, and the third stays as a card on the Games page. With Automatic mode on, all three are added with one restart. The same questions show in Couch mode (A ticks, B leaves it for later).
+    - **Batches:** delete two game folders (from a watched folder) a few seconds apart. One question appears: "2 game folders were deleted. Remove them from Steam?" with a checkbox for each. Unselect one, press "Remove selected": only the selected game goes, with one Steam restart. "Keep in Steam" leaves them under Missing games. Moving a game folder to another place inside the watched folders is not reported as deleted.
+    - Copy three game folders in at once (Automatic mode off): one question "3 new games found. Add them to Steam?". Unselect one and press "Add selected": two games are added with one Steam restart, and the third stays as a card on the Games page. With Automatic mode on, all three are added with one restart. The same questions show in Couch mode (A selects or unselects, B leaves it for later).
     - **Faster Steam restarts:** add a game with Steam open and let SteamDrop restart it. The Activity list has a line like "Steam restart: closing Steam took 2.1 s, writing changes 0.1 s, starting it 0.0 s". Steam opens right after it has closed (the old fixed 2-second wait is gone).
     - **Store game in "Recent":** see the README FAQ "A game shows up in Steam as the store version". SteamDrop's own shortcut for such a game still starts it.
 
@@ -143,16 +143,26 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 40. **Themes:** in Settings → Appearance, pointing at a theme (or moving to it with Tab or the D-pad) shows it on the whole window right away; moving away goes back; clicking keeps it. Try all eight and check text is easy to read everywhere, including dialogs (Remove a game), the Missing games box and error messages. Open Couch mode: it uses the same theme. In Couch mode, Settings → Theme previews each theme as you move over it, A keeps it, B goes back to the old one. The sun/moon button at the top still switches between SteamDrop Dark and Light.
 
 41. **Several games at once** (use test games you don't need for deleting):
-    - Desktop: tick two games' boxes; a bar says "2 selected". Ctrl+click a cover adds or removes it; click one game's box, then Shift+click another cover: everything between is selected. "Select all" and "Clear" work.
+    - Desktop: select two games with their checkboxes; a bar says "2 selected". Ctrl+click a cover adds or removes it; click one game's box, then Shift+click another cover: everything between is selected. "Select all" and "Clear" work.
     - "Re-fetch art" gets new art for all of them with one Steam restart. "Re-check game file": games whose file still exists keep it. To see a change, use a test folder you made yourself, not a real game: copy `C:\Windows\notepad.exe` into a new folder in a watched folder, let SteamDrop add it, rename that copy, then re-check: it now uses the renamed copy. "Remove from Steam" lists the games first.
     - "Delete games" lists them; the Delete button only works after typing DELETE (and the PIN, if set). The folders go to the Recycle Bin and the games leave Steam, with one restart. On a USB stick, those folders are refused and stay.
-    - Controller (both views): X ticks the focused game, holding X for a second ticks all. In Couch mode the bar sits above the Library; "Delete games" needs A held for 2 seconds, then the PIN if set. B clears the selection.
+    - Controller (both views): X selects the focused game, holding X for a second selects all. In Couch mode the bar sits above the Library; "Delete games" needs A held for 2 seconds, then the PIN if set. B clears the selection.
 
 42. **Keep Big Picture in front** (Settings → App, off by default):
     - Turn it on, open Big Picture, then open another app from the desktop (for example Notepad with Win+R → notepad). About two seconds later Big Picture is back in front, and Activity says "Keep Big Picture in front: notepad.exe took the focus, so SteamDrop brought Big Picture back."
     - Start a game from Big Picture, then Alt+Tab to another app: Big Picture does not jump over it while the game runs. Switch to SteamDrop's window or Couch mode, lock the PC (Win+L), or start something that asks for permission: none of these are pushed away.
     - Add notepad.exe under "Except these apps": Notepad now stays in front. Turn the setting off: nothing is brought back any more.
     - If Windows refuses (rare), Activity says so instead.
+
+43. **Fixes from the third laptop test** (install the new build over the old one):
+    - **No phantom "Resume":** with SteamDrop in the tray and Steam in Big Picture, press Play on SteamDrop: Couch mode opens and Steam shows it as running. Press Menu (or B → "Back to Steam"): Couch mode closes, and within a second Steam shows **Play** again (not Resume). Press Play: Couch mode opens again. Repeat a few times.
+    - Open Couch mode from Steam, then B → "Quit SteamDrop" → confirm: the tray icon is gone, Task Manager shows no SteamDrop.exe, and Steam shows Play. Big Picture never gets stuck on the loading logo.
+    - End SteamDrop.exe in Task Manager while Couch mode is open from Steam: within a second Steam shows Play.
+    - From desktop Steam, open SteamDrop (window), press Hide: Steam shows Play again.
+    - **Fast restarts:** open Couch mode from Steam, add a game so SteamDrop restarts Steam (or Settings → leave Couch mode → "Restart now"). Steam closes within about 1 to 2 seconds of "Restarting Steam...", and Activity has "Steam restart: closing Steam took ... s". Start a game from Steam, then add a game from the desktop window: SteamDrop says "A game is running. Steam restarts once you close it." and restarts Steam right after you close the game.
+    - **No "null":** Couch mode's Library starts straight with the first game; a game's details in the desktop window never show "null".
+    - **Wording:** the Couch hint says "Select game (hold: all)"; nothing says "tick".
+    - **Logs:** `%APPDATA%\SteamDrop\logs` has one file per day named `steamdrop-YYYY-MM-DD.log` (old `steamdrop.log` files are gone). Settings → Help → Activity and "Copy bug report" include lines from earlier days.
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 

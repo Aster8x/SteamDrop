@@ -301,7 +301,8 @@ pub fn game_running(games: &[crate::state::Game]) -> bool {
             .open_subkey(r"Software\Valve\Steam")
             .and_then(|k| k.get_value("RunningAppID"))
             .unwrap_or(0);
-        if steam_game != 0 {
+        // SteamDrop itself, opened from Steam, is never a game.
+        if steam_game != 0 && Some(steam_game) != crate::library::self_id() {
             return true;
         }
     }
@@ -357,6 +358,8 @@ pub fn shutdown(steam: &Path) -> Result<(), String> {
     if !is_running() {
         return Ok(());
     }
+    // Steam waits for SteamDrop's own Steam session like for a game; end it first so Steam closes right away.
+    end_helpers();
     std::process::Command::new(steam.join("steam.exe"))
         .arg("-shutdown")
         .spawn()
@@ -379,22 +382,41 @@ pub fn shutdown(steam: &Path) -> Result<(), String> {
     Err("Steam did not close. Close Steam yourself, then try again.".into())
 }
 
-fn force_close() {
+/// Ends the processes Steam started for SteamDrop (`--from-steam`, children of steam.exe) and anything
+/// they started, except this process. Steam then stops showing SteamDrop as running.
+pub fn end_helpers() {
+    let doomed = helper_pids(&processes(), std::process::id());
+    if !doomed.is_empty() {
+        crate::log::info("Ended SteamDrop's Steam session, so Steam no longer shows it as running.");
+    }
+    doomed.into_iter().for_each(terminate);
+}
+
+fn helper_pids(procs: &[Proc], me: u32) -> Vec<u32> {
+    let steam: Vec<u32> = procs.iter().filter(|p| p.name == "steam.exe").map(|p| p.pid).collect();
+    let helpers: Vec<u32> = procs.iter().filter(|p| p.name == "steamdrop.exe" && steam.contains(&p.parent)).map(|p| p.pid).collect();
+    procs.iter().filter(|p| p.pid != me && p.name == "steamdrop.exe" && (helpers.contains(&p.pid) || helpers.contains(&p.parent))).map(|p| p.pid).collect()
+}
+
+fn terminate(pid: u32) {
     #[cfg(windows)]
-    for Proc { pid, name, .. } in processes() {
-        if name == "steam.exe" {
-            use windows_sys::Win32::Foundation::CloseHandle;
-            use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
-            // SAFETY: the handle is checked before use and closed after.
-            unsafe {
-                let h = OpenProcess(PROCESS_TERMINATE, 0, pid);
-                if !h.is_null() {
-                    TerminateProcess(h, 1);
-                    CloseHandle(h);
-                }
+    {
+        use windows_sys::Win32::Foundation::CloseHandle;
+        use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+        // SAFETY: the handle is checked before use and closed after.
+        unsafe {
+            let h = OpenProcess(PROCESS_TERMINATE, 0, pid);
+            if !h.is_null() {
+                TerminateProcess(h, 1);
+                CloseHandle(h);
             }
         }
     }
+    let _ = pid;
+}
+
+fn force_close() {
+    processes().into_iter().filter(|p| p.name == "steam.exe").for_each(|p| terminate(p.pid));
 }
 
 /// The one way SteamDrop restarts Steam: decide the mode, close Steam, run `write`
@@ -518,6 +540,16 @@ mod tests {
         assert!(may_keep_focus(5, &procs, &except, 5).is_some(), "this process");
         assert!(may_keep_focus(8, &procs, &except, 99).is_some(), "an exception, whatever its case");
         assert!(may_keep_focus(42, &procs, &except, 99).is_some(), "a process that's already gone");
+    }
+
+    #[test]
+    fn only_steamdrops_steam_session_is_ended() {
+        let p = |pid, parent, name: &str| Proc { pid, parent, name: name.into() };
+        // 2 is Steam; 3 is the helper it started, 4 what the helper started; 5 is the tray app; 6 a game.
+        let procs = vec![p(1, 0, "explorer.exe"), p(2, 1, "steam.exe"), p(3, 2, "steamdrop.exe"), p(4, 3, "steamdrop.exe"), p(5, 1, "steamdrop.exe"), p(6, 2, "game.exe")];
+        assert_eq!(helper_pids(&procs, 5), vec![3, 4]);
+        // The tray app started by the helper (when it wasn't running yet) never ends itself.
+        assert_eq!(helper_pids(&procs, 4), vec![3]);
     }
 
     #[test]
