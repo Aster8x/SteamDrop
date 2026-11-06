@@ -148,6 +148,12 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - "Delete games" lists them; the Delete button only works after typing DELETE (and the PIN, if set). The folders go to the Recycle Bin and the games leave Steam, with one restart. On a USB stick, those folders are refused and stay.
     - Controller (both views): X ticks the focused game, holding X for a second ticks all. In Couch mode the bar sits above the Library; "Delete games" needs A held for 2 seconds, then the PIN if set. B clears the selection.
 
+42. **Keep Big Picture in front** (Settings → App, off by default):
+    - Turn it on, open Big Picture, then open another app from the desktop (for example Notepad with Win+R → notepad). About two seconds later Big Picture is back in front, and Activity says "Keep Big Picture in front: notepad.exe took the focus, so SteamDrop brought Big Picture back."
+    - Start a game from Big Picture, then Alt+Tab to another app: Big Picture does not jump over it while the game runs. Switch to SteamDrop's window or Couch mode, lock the PC (Win+L), or start something that asks for permission: none of these are pushed away.
+    - Add notepad.exe under "Except these apps": Notepad now stays in front. Turn the setting off: nothing is brought back any more.
+    - If Windows refuses (rare), Activity says so instead.
+
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 
 ## How to publish a new version

@@ -209,6 +209,12 @@ async fn pick_exe(app: AppHandle, folder: String) -> Option<String> {
         .map(|p| p.to_string())
 }
 
+/// "Except these apps" → "Choose an app...": any program on the PC.
+#[tauri::command]
+async fn pick_app(app: AppHandle) -> Option<String> {
+    app.dialog().file().set_title("Choose an app that may stay in front of Big Picture").add_filter("Programs", &["exe"]).blocking_pick_file().map(|p| p.to_string())
+}
+
 /// How many folders are already inside a folder about to be watched.
 #[tauri::command]
 fn count_subfolders(state: State<App>, path: String) -> usize {
@@ -677,6 +683,7 @@ fn main() {
             save_settings,
             pick_folder,
             pick_exe,
+            pick_app,
             count_subfolders,
             add_existing_games,
             find_game,

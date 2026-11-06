@@ -238,7 +238,7 @@ pub fn closed(app: &AppHandle, label: &str) {
             let me = std::process::id();
             let exe = std::env::current_exe().ok().and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_lowercase())).unwrap_or_default();
             let t = std::time::Instant::now();
-            while t.elapsed() < std::time::Duration::from_secs(5) && crate::steam::processes().iter().any(|(pid, n)| *pid != me && *n == exe) {
+            while t.elapsed() < std::time::Duration::from_secs(5) && crate::steam::processes().iter().any(|p| p.pid != me && p.name == exe) {
                 std::thread::sleep(std::time::Duration::from_millis(250));
             }
             crate::library::request_restart(&app);

@@ -292,3 +292,4 @@ body.pad :focus { outline: 4px solid var(--accent); outline-offset: 3px; box-sha
 .name-list { max-height: 30vh; overflow-y: auto; margin: .4rem 0 1rem; padding-left: 1.2rem; }
 .name-list li { margin: .2rem 0; }
 dialog label.small { display: block; margin: .8rem 0 .3rem; }
+.exceptions { margin: 0 0 .8rem; padding-top: .2rem; }

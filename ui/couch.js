@@ -195,6 +195,7 @@ function settingsScreen() {
     toggle("auto_restart", "Restart Steam automatically", "auto_restart"),
     toggle("notify", "Show notifications", "notify"),
     toggle("art_folder", "Also save art in the game folder", "art_in_game_folder"),
+    toggle("keep_bp", "Keep Big Picture in front", "keep_big_picture"),
     button("shortcut", "Show SteamDrop in my Steam library", () => run(() => invoke("set_steam_shortcut", { on: !st.steam_shortcut })),
       { value: onoff(st.steam_shortcut), on: st.steam_shortcut }),
     button("pin", "PIN needed to delete games", () => S.couch_pin_set

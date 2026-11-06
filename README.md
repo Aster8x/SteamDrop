@@ -92,6 +92,8 @@ Steam's **Resume** button brings SteamDrop back to the front, as Couch mode whil
 
 For a gaming PC on the TV, turn on **Settings → App → "Open Steam in Big Picture when Windows starts"**: after you sign in, Steam opens straight into Big Picture (unless it's already there).
 
+**Keep Big Picture in front** (Settings → App, off by default): while Big Picture is open and no game is running, SteamDrop brings Big Picture back a moment after another app takes over the screen, like an update window or a chat app popping up. It never pushes away games started from Steam, SteamDrop itself, Windows' permission prompts or the lock screen, and you can list apps it should leave alone under **Except these apps**. Windows sometimes doesn't allow an app to change what's in front, so it may not catch everything. Each time it acts, it says so in the Activity list.
+
 The installer has a **Show SteamDrop in my Steam library** box (on by default). You can change it later in Settings → Couch mode, where there's also an **Open Couch mode** button. Changes made in Couch mode show in Steam's library after Steam restarts. When you leave Couch mode, SteamDrop offers to restart Steam for you and brings you back to Big Picture.
 
 ## Screenshots

@@ -249,10 +249,17 @@ pub fn remove(config: &Path, data_dir: &Path, user: &str, ids: &[u32]) -> Result
     save(config, data_dir, user, root)
 }
 
-/// Running processes as (process id, lower-case .exe name), from Windows' process
-/// snapshot. Much faster than starting `tasklist`, so Steam can be checked often.
+/// A running process: its id, its parent's id and its lower-case .exe name.
+pub struct Proc {
+    pub pid: u32,
+    pub parent: u32,
+    pub name: String,
+}
+
+/// Running processes, from Windows' process snapshot. Much faster than starting `tasklist`,
+/// so Steam can be checked often.
 #[cfg(windows)]
-pub fn processes() -> Vec<(u32, String)> {
+pub fn processes() -> Vec<Proc> {
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS};
     let mut list = Vec::new();
@@ -267,7 +274,7 @@ pub fn processes() -> Vec<(u32, String)> {
         let mut ok = Process32FirstW(snap, &mut e) != 0;
         while ok {
             let len = e.szExeFile.iter().position(|&c| c == 0).unwrap_or(e.szExeFile.len());
-            list.push((e.th32ProcessID, String::from_utf16_lossy(&e.szExeFile[..len]).to_lowercase()));
+            list.push(Proc { pid: e.th32ProcessID, parent: e.th32ParentProcessID, name: String::from_utf16_lossy(&e.szExeFile[..len]).to_lowercase() });
             ok = Process32NextW(snap, &mut e) != 0;
         }
         CloseHandle(snap);
@@ -276,12 +283,12 @@ pub fn processes() -> Vec<(u32, String)> {
 }
 
 #[cfg(not(windows))]
-pub fn processes() -> Vec<(u32, String)> {
+pub fn processes() -> Vec<Proc> {
     Vec::new()
 }
 
 pub fn is_running() -> bool {
-    processes().iter().any(|(_, n)| n == "steam.exe")
+    processes().iter().any(|p| p.name == "steam.exe")
 }
 
 /// True while a game started from Steam is running: a Steam game (Steam's RunningAppID)
@@ -301,8 +308,41 @@ pub fn game_running(games: &[crate::state::Game]) -> bool {
     let running = processes();
     games.iter().any(|g| {
         let name = Path::new(&g.exe).file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
-        running.iter().any(|(_, n)| *n == name)
+        running.iter().any(|p| p.name == name)
     })
+}
+
+/// Apps "Keep Big Picture in front" never fights: Windows' sign-in, lock and permission screens, its
+/// Start menu, search and Task Manager, Steam itself, and SteamDrop.
+const ALWAYS_ALLOWED: [&str; 12] = [
+    "lockapp.exe", "logonui.exe", "consent.exe", "credentialuibroker.exe", "taskmgr.exe", "startmenuexperiencehost.exe",
+    "searchhost.exe", "searchapp.exe", "shellexperiencehost.exe", "steam.exe", "steamwebhelper.exe", "gameoverlayui.exe",
+];
+
+/// Why the window of process `pid` may keep the focus over Big Picture, or None if Big Picture
+/// should come back: SteamDrop itself, the apps above, the user's exceptions, and anything started
+/// from Steam (a game, or a game's own launcher).
+pub fn may_keep_focus(pid: u32, procs: &[Proc], except: &[String], me: u32) -> Option<String> {
+    let find = |id: u32| procs.iter().find(|p| p.pid == id);
+    let name = find(pid).map(|p| p.name.clone()).unwrap_or_default();
+    if pid == me || name == "steamdrop.exe" {
+        return Some("it's SteamDrop".into());
+    }
+    if name.is_empty() || ALWAYS_ALLOWED.contains(&name.as_str()) {
+        return Some(format!("{name} is part of Windows or Steam"));
+    }
+    if except.iter().any(|x| x.eq_ignore_ascii_case(&name)) {
+        return Some(format!("{name} is in your exceptions"));
+    }
+    let mut at = find(pid);
+    for _ in 0..10 {
+        let Some(p) = at.and_then(|p| find(p.parent)).filter(|p| p.pid != 0) else { break };
+        if p.name == "steam.exe" {
+            return Some(format!("{name} was started from Steam"));
+        }
+        at = Some(p);
+    }
+    None
 }
 
 /// How often Steam is checked while closing, and how long it gets before it is force-closed.
@@ -341,7 +381,7 @@ pub fn shutdown(steam: &Path) -> Result<(), String> {
 
 fn force_close() {
     #[cfg(windows)]
-    for (pid, name) in processes() {
+    for Proc { pid, name, .. } in processes() {
         if name == "steam.exe" {
             use windows_sys::Win32::Foundation::CloseHandle;
             use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
@@ -464,6 +504,20 @@ mod tests {
         assert!(r.unwrap_err().starts_with("Could not start Steam"));
         let r = restart_with(missing, "desktop", || Err("disk full".into()));
         assert_eq!(r.unwrap_err(), "disk full");
+    }
+
+    #[test]
+    fn big_picture_is_only_brought_back_over_other_apps() {
+        let p = |pid, parent, name: &str| Proc { pid, parent, name: name.into() };
+        let procs = vec![p(1, 0, "explorer.exe"), p(2, 1, "steam.exe"), p(3, 2, "launcher.exe"), p(4, 3, "game.exe"), p(5, 1, "discord.exe"), p(6, 1, "lockapp.exe"), p(7, 1, "steamdrop.exe"), p(8, 1, "notepad.exe")];
+        let except = vec!["Notepad.exe".to_string()];
+        assert!(may_keep_focus(5, &procs, &except, 99).is_none(), "an app that took the focus");
+        assert!(may_keep_focus(4, &procs, &except, 99).is_some(), "a game started from Steam, through its launcher");
+        assert!(may_keep_focus(6, &procs, &except, 99).is_some(), "the lock screen");
+        assert!(may_keep_focus(7, &procs, &except, 99).is_some(), "SteamDrop");
+        assert!(may_keep_focus(5, &procs, &except, 5).is_some(), "this process");
+        assert!(may_keep_focus(8, &procs, &except, 99).is_some(), "an exception, whatever its case");
+        assert!(may_keep_focus(42, &procs, &except, 99).is_some(), "a process that's already gone");
     }
 
     #[test]

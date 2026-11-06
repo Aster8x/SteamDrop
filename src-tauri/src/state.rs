@@ -45,6 +45,9 @@ pub struct Settings {
     /// "Interface size" in percent (50 to 200), separately for the desktop window and Couch mode.
     pub zoom_window: u16,
     pub zoom_couch: u16,
+    /// "Keep Big Picture in front" (off by default) and the apps it leaves alone (lower-case .exe names).
+    pub keep_big_picture: bool,
+    pub keep_big_picture_except: Vec<String>,
 }
 
 impl Default for Settings {
@@ -75,6 +78,8 @@ impl Default for Settings {
             steam_restart_mode: "keep".into(),
             zoom_window: 100,
             zoom_couch: 100,
+            keep_big_picture: false,
+            keep_big_picture_except: vec![],
         }
     }
 }

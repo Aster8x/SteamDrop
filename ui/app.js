@@ -665,6 +665,26 @@ function missingPanel(missing) {
       h("div", { class: "row" }, btn("Find it", () => find(g), "small"), btn("Remove from Steam", () => removeGame(g), "small danger"))))));
 }
 
+/** "Except these apps" for Keep Big Picture in front: programs (by .exe name) that may stay in front. */
+function exceptionsList(st) {
+  const list = st.keep_big_picture_except || [];
+  const add = (name) => {
+    name = name.trim().split(/[\\/]/).pop().toLowerCase();
+    if (!name) return;
+    if (!name.endsWith(".exe")) name += ".exe";
+    if (!list.includes(name)) saveSettings({ keep_big_picture_except: [...list, name] });
+  };
+  const input = h("input", { type: "text", placeholder: "For example discord.exe", "aria-label": "App to allow", spellcheck: "false",
+    onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); add(input.value); } } });
+  return h("div", { class: "sub exceptions" },
+    h("strong", {}, "Except these apps"),
+    h("p", { class: "muted small" }, "These may stay in front of Big Picture."),
+    list.length ? h("ul", { class: "folder-list" }, list.map((x) => h("li", {}, h("span", { class: "path" }, x),
+      btn("Remove", () => saveSettings({ keep_big_picture_except: list.filter((y) => y !== x) }), "small")))) : h("p", { class: "muted small" }, "None yet."),
+    h("div", { class: "row" }, h("div", { class: "grow" }, input), btn("Add", () => add(input.value), "small"),
+      btn("Choose an app...", async () => { const p = await invoke("pick_app"); if (p) add(p); }, "small")));
+}
+
 /** "Add games to": every Steam account on this PC, or a checklist of chosen ones. */
 function accountsPicker(st) {
   const accounts = S.steam.accounts || [];
@@ -767,6 +787,9 @@ function settingsView() {
         toggle(st.run_on_startup, (v) => saveSettings({ run_on_startup: v }), "Run when Windows starts")),
       setting("Open Steam in Big Picture when Windows starts", "For a gaming PC on the TV: when you sign in to Windows, Steam opens in Big Picture, its full-screen mode for controllers. If Steam is already in Big Picture, nothing changes. This works even if SteamDrop itself doesn't start with Windows.",
         toggle(st.big_picture_at_sign_in, (v) => saveSettings({ big_picture_at_sign_in: v }), "Open Steam in Big Picture when Windows starts")),
+      setting("Keep Big Picture in front", "While Big Picture is open and no game is running, SteamDrop brings it back a moment after another app takes over the screen (an update window, a chat app). It never pushes away games started from Steam, SteamDrop itself, Windows' permission prompts or the lock screen. Windows sometimes doesn't allow an app to change what's in front, so it may not catch everything.",
+        toggle(st.keep_big_picture, (v) => saveSettings({ keep_big_picture: v }), "Keep Big Picture in front")),
+      st.keep_big_picture ? exceptionsList(st) : null,
       setting("Keep running in the tray when closed", "Closing the window keeps SteamDrop watching your folders. Quit it from the tray icon.",
         toggle(st.close_to_tray, (v) => saveSettings({ close_to_tray: v }), "Keep running in the tray when closed")),
       setting("Play a sound when a game is added", "A short chime, so you hear it even while Steam's Big Picture is on screen.",

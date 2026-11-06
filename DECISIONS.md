@@ -144,6 +144,8 @@ Why things are the way they are. Newest decisions go at the bottom of each secti
 - **One restart path:** `steam::restart_with` decides the mode, closes Steam (asking with `-shutdown`, checking every 250 ms with the Toolhelp process snapshot instead of starting `tasklist`), writes, and always starts Steam again, even if the write failed. It force-closes Steam only after 60 seconds. Adding and removing with Steam open write right away and keep the change pending; `library::request_restart` then runs one restart that applies all pending changes. Requests while one is waiting share it; changes during a restart get one follow-up restart.
 - **Batches:** the watcher holds folders that finished copying, and game folders that disappeared, until 4 seconds after the last one and until no other folder is still on its way (at most 90 seconds). A deleted folder whose name reappears in the same batch is a move, handled as before. Deleted folders are never removed from Steam unasked.
 
+- **Keep Big Picture in front** uses the same foreground hook. Two seconds after another window takes the focus (and still has it), Big Picture is brought back by briefly joining the front app's input (`AttachThreadInput`) and calling `SetForegroundWindow`, which Windows can still refuse. It leaves alone SteamDrop, Windows' sign-in, lock, permission and shell windows, Steam's own windows, the user's exceptions, anything whose parent chain leads to `steam.exe` (games and their launchers), and everything while a game runs.
+
 ## Left out on purpose
 
 - Removing a shortcut automatically when its game folder is deleted. SteamDrop asks instead ("Remove selected" / "Keep in Steam"), because deleting things from Steam unasked felt wrong.
