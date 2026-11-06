@@ -118,7 +118,7 @@ pub fn gone(app: &AppHandle, folders: Vec<PathBuf>, new: &[PathBuf]) {
         .unwrap()
         .games
         .iter()
-        .filter(|g| folders.iter().any(|f| same_path(&g.folder, &f.to_string_lossy())))
+        .filter(|g| folders.iter().any(|f| same_path(&g.folder, &f.to_string_lossy())) && !state.deleting.lock().unwrap().contains(&g.id))
         .filter(|g| !Path::new(&g.exe).is_file() && !new.iter().any(|n| name(n) == name(Path::new(&g.folder))))
         .cloned()
         .collect();
@@ -564,7 +564,20 @@ fn games_by_id(app: &AppHandle, ids: &[u32]) -> Vec<Game> {
 /// "Delete game" (one, or several selected): each folder goes to the Recycle Bin, then the shortcuts
 /// and art of the ones that went are removed in one go. A folder that can't be recycled stays, with its shortcut.
 pub async fn delete_games(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
-    let games = games_by_id(app, &ids);
+    let deleting = &app.state::<App>().deleting;
+    deleting.lock().unwrap().extend(&ids);
+    let result = delete_games_inner(app, &ids, restart).await;
+    // Kept past the watcher's longest batch wait (BATCH_MAX), so the folders' events are handed over by then.
+    let (app2, ids2) = (app.clone(), ids);
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(120));
+        app2.state::<App>().deleting.lock().unwrap().retain(|id| !ids2.contains(id));
+    });
+    result
+}
+
+async fn delete_games_inner(app: &AppHandle, ids: &[u32], restart: bool) -> Result<String, String> {
+    let games = games_by_id(app, ids);
     if games.is_empty() {
         return Err("That game is no longer in the list.".into());
     }

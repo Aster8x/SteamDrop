@@ -127,6 +127,8 @@ pub struct App {
     pub found: Mutex<Vec<Found>>,
     /// Games whose folder was deleted, waiting for "Remove selected" or "Keep in Steam".
     pub gone: Mutex<Vec<u32>>,
+    /// Games SteamDrop is deleting right now, so their folders vanishing isn't asked about.
+    pub deleting: Mutex<Vec<u32>>,
     pub status: Mutex<String>,
     /// Only one Steam change at a time.
     pub busy: tauri::async_runtime::Mutex<()>,
@@ -287,6 +289,7 @@ impl App {
             dir,
             found: Mutex::new(vec![]),
             gone: Mutex::new(vec![]),
+            deleting: Mutex::new(vec![]),
             status: Mutex::new(String::new()),
             busy: tauri::async_runtime::Mutex::new(()),
             http: reqwest::Client::builder()

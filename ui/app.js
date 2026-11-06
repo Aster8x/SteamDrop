@@ -302,10 +302,21 @@ function render() {
   const light = S.settings.theme === "light";
   $("#theme").textContent = light ? "☾" : "☀";
   const target = $(`#view-${view}`);
-  // Re-rendering replaces the elements; keep the same spot focused for keyboard and controller users.
+  // Re-rendering replaces the elements; focus the same control again for keyboard and controller users.
+  // Matched by what it is, not where it was: a list that grew must not move focus onto, say, a Remove button.
   const at = focusables().indexOf(document.activeElement);
+  const was = controlId(document.activeElement);
   target.replaceChildren(...({ games: gamesView, settings: settingsView, about: aboutView })[view]());
-  if (at >= 0 && document.activeElement === document.body) focusables()[Math.min(at, focusables().length - 1)]?.focus({ preventScroll: true });
+  if (at < 0 || document.activeElement !== document.body) return;
+  const now = focusables();
+  const same = now.filter((el) => controlId(el) === was);
+  (same.length === 1 ? same[0] : now[Math.min(at, now.length - 1)])?.focus({ preventScroll: true });
+}
+
+/** What a control is: its kind, label and text, and the game card it sits in. */
+function controlId(el) {
+  if (!el || el === document.body) return null;
+  return [el.tagName, el.type || "", el.getAttribute("aria-label") || "", el.textContent.trim().slice(0, 60), el.closest("[data-id]")?.dataset.id || "", el.closest(".panel")?.querySelector("h2")?.textContent || ""].join("|");
 }
 
 function relative(folder, path) {
