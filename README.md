@@ -42,6 +42,7 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 - **Automatic mode** (off by default). Turn it on and SteamDrop adds games, restarts Steam and tells you, all by itself. Or keep it off and confirm each game with one click.
 - **Complete folders only.** If a folder contains only an installer, SteamDrop skips it and tells you to install the game first.
 - **Full artwork** in every slot Steam uses: portrait cover, wide banner, hero background, logo and icon. Only real artwork from Steam or SteamGridDB, or a clean text title card.
+- **Several games at once:** tick games on the Games page (or Ctrl+click and Shift+click their covers, or press X on a controller; hold X to tick all), then **Re-fetch art**, **Re-check game file**, **Remove from Steam** or **Delete games** for all of them together, with one Steam restart. Deleting lists the games first and needs DELETE typed (in Couch mode: hold A for 2 seconds), plus the PIN if one is set.
 - **Game details** (description, developer, genres) from the Steam store, with a link to the store page.
 - **Safe.** SteamDrop backs up Steam's shortcuts file before every change. "Remove from Steam" removes only the shortcut, never your game files.
 - **Light on your PC.** The window is fully closed while SteamDrop sits in the tray. The installer is only a few megabytes.
@@ -78,6 +79,7 @@ Play from the sofa? SteamDrop can add **itself** to your Steam library, with its
 | LB / RB (L1 / R1) | Switch between Library, Settings and Activity |
 | Y (Triangle) | Scan now: look for new games right away |
 | LT / RT (L2 / R2) | Interface size: smaller / bigger |
+| X (Square) | Tick the selected game; hold to tick all |
 | View (Share) | Switch to the desktop window |
 | Menu (Options) | Back to Steam (SteamDrop keeps running) |
 | B on the Library | Leave: **Back to Steam** (selected), **Quit SteamDrop** or **Cancel** |

@@ -281,3 +281,14 @@ body.pad :focus { outline: 4px solid var(--accent); outline-offset: 3px; box-sha
 .swatches i:nth-child(2) { background: var(--panel-2); }
 .swatches i:nth-child(3) { background: var(--accent); }
 .swatches i:nth-child(4) { background: var(--text); }
+
+/* Selecting several games */
+.card { position: relative; }
+.card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.pick { position: absolute; top: .5rem; left: .5rem; z-index: 2; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: color-mix(in srgb, var(--panel) 85%, transparent); cursor: pointer; }
+.pick input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.selbar { position: sticky; bottom: .8rem; z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .7rem 1rem; border-radius: 14px; background: var(--panel-2); border: 2px solid var(--accent); box-shadow: var(--shadow); }
+.selbar .count { margin-right: auto; }
+.name-list { max-height: 30vh; overflow-y: auto; margin: .4rem 0 1rem; padding-left: 1.2rem; }
+.name-list li { margin: .2rem 0; }
+dialog label.small { display: block; margin: .8rem 0 .3rem; }

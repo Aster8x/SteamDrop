@@ -476,15 +476,28 @@ fn exe_candidates(folder: String) -> Vec<exe::Candidate> {
     exe::candidates(&PathBuf::from(folder))
 }
 
-/// Couch mode's "Delete game" (after holding A). Checks the PIN when one is set.
+/// "Delete game" for one or several games (after holding A, or typing DELETE on the desktop).
+/// Checks the PIN when one is set.
 #[tauri::command]
-async fn delete_game(app: AppHandle, id: u32, pin: String) -> Result<String, String> {
+async fn delete_games(app: AppHandle, ids: Vec<u32>, pin: String, restart: bool) -> Result<String, String> {
     let saved = secrets::couch_pin();
     if !saved.is_empty() && pin != saved {
         log::info("Someone tried to delete a game with a wrong PIN.");
         return Err("That PIN isn't right.".into());
     }
-    library::delete_game(&app, id).await
+    library::delete_games(&app, ids, restart).await
+}
+
+/// "Re-fetch art" for the selected games.
+#[tauri::command]
+async fn refetch_art(app: AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
+    library::refetch_art(&app, ids, restart).await
+}
+
+/// "Re-check game file" for the selected games.
+#[tauri::command]
+async fn recheck_games(app: AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
+    library::recheck(&app, ids, restart).await
 }
 
 /// Sets, changes or removes (empty `new`) the Couch mode PIN. Changing it needs the old one.
@@ -690,7 +703,9 @@ fn main() {
             dismiss_update,
             ack_whats_new,
             exe_candidates,
-            delete_game,
+            delete_games,
+            refetch_art,
+            recheck_games,
             set_couch_pin,
             set_steam_shortcut,
             open_couch,

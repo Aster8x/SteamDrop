@@ -69,10 +69,61 @@ function libraryScreen() {
     return [h("div", { class: "empty" }, h("h1", {}, "No games yet"),
       h("p", { class: "muted" }, "Copy a game folder into one of SteamDrop's watched folders and it shows up here. You can choose watched folders in SteamDrop on your desktop."))];
   }
-  return [h("div", { class: "grid" }, S.games.map((g) =>
-    h("button", { class: "tile f", "data-key": `game-${g.id}`, "aria-label": g.name, onclick: () => push({ name: "detail", id: g.id }) },
+  return [selected.size ? selectionBar() : null, h("div", { class: "grid" }, S.games.map((g) =>
+    h("button", { class: `tile f ${selected.has(g.id) ? "selected" : ""}`, "data-key": `game-${g.id}`, "aria-label": g.name, "aria-pressed": String(selected.has(g.id)), onclick: () => push({ name: "detail", id: g.id }) },
       SD.art(g, "portrait"),
+      selected.has(g.id) ? h("span", { class: "check", "aria-hidden": "true" }, "✓") : null,
       h("span", { class: "label" }, g.name))))];
+}
+
+/* ---------- several games at once: X ticks the focused game, holding X ticks all ---------- */
+const selected = new Set();
+const nGames = (n) => `${n} game${n === 1 ? "" : "s"}`;
+function clearSelection() { selected.clear(); stack = []; render(); }
+function selectionBar() {
+  const ids = [...selected];
+  const n = ids.length;
+  return h("div", { class: "selbar" }, h("h2", {}, `${n} selected`),
+    button("sel-art", "Re-fetch art", () => run(() => invoke("refetch_art", { ids, restart: false }), clearSelection)),
+    button("sel-exe", "Re-check game file", () => run(() => invoke("recheck_games", { ids, restart: false }), clearSelection)),
+    button("sel-remove", "Remove from Steam", () => push({ name: "confirm", title: `Remove ${nGames(n)} from Steam?`,
+      text: `${names(ids)}. Only the Steam shortcuts and their artwork are removed; the game files stay where they are.`,
+      yes: "Remove from Steam", action: () => run(() => invoke("remove_games", { ids, restart: false }), clearSelection) })),
+    button("sel-delete", n === 1 ? "Delete game" : "Delete games", () => push({ name: "bulkdelete", ids }), { kind: "danger" }),
+    button("sel-clear", "Clear", clearSelection));
+}
+const names = (ids) => ids.map((id) => game(id)?.name).filter(Boolean).join(", ");
+
+/** Deleting several games: lists them, then hold A for 2 seconds (and the PIN, if one is set). */
+function bulkDeleteScreen(sc) {
+  const note = S.couch_pin_set ? "(hold A, then PIN)" : "(hold A for 2 seconds)";
+  return [h("div", { class: "pin wide" }, h("h1", {}, `Delete ${nGames(sc.ids.length)}?`),
+    h("p", { class: "muted" }, "These folders go to the Recycle Bin and the games are removed from Steam. Folders on drives without a Recycle Bin are not deleted."),
+    h("ul", { class: "names" }, sc.ids.map((id) => game(id)).filter(Boolean).map((g) => h("li", {}, g.name))),
+    h("div", { class: "actions" },
+      button("bulk-delete", `Delete ${nGames(sc.ids.length)}`, null, { kind: "danger", hold: true, note }),
+      button("bulk-cancel", "Cancel", back)))];
+}
+function bulkDelete(ids) {
+  const go = (pin) => run(() => invoke("delete_games", { ids, pin, restart: false }), clearSelection);
+  stack.pop();
+  if (S.couch_pin_set) push({ name: "pin", title: `Enter your PIN to delete ${nGames(ids.length)}`, done: go });
+  else go("");
+}
+let xHold = null;
+function xDown() {
+  if (stack.length || tab !== "library") return;
+  xHold = setTimeout(() => { xHold = null; S.games.forEach((g) => selected.add(g.id)); toast(`All ${nGames(S.games.length)} selected.`); render(); }, 1000);
+}
+function xUp() {
+  if (!xHold) return;
+  clearTimeout(xHold);
+  xHold = null;
+  const key = document.activeElement?.dataset?.key || "";
+  if (!key.startsWith("game-")) return;
+  const id = Number(key.slice(5));
+  if (selected.has(id)) selected.delete(id); else selected.add(id);
+  render();
 }
 
 function detailScreen({ id }) {
@@ -96,7 +147,7 @@ function detailScreen({ id }) {
 }
 
 function deleteGame(g) {
-  const go = (pin) => run(() => invoke("delete_game", { id: g.id, pin }), backToTab);
+  const go = (pin) => run(() => invoke("delete_games", { ids: [g.id], pin, restart: false }), backToTab);
   if (S.couch_pin_set) push({ name: "pin", title: `Enter your PIN to delete "${g.name}"`, done: go });
   else go("");
 }
@@ -200,7 +251,7 @@ function checklistScreen(sc) {
       button("list-no", sc.no, () => { stack.pop(); sc.cancel?.(); render(); })))];
 }
 
-const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, pin: pinScreen, leave: leaveScreen, exit: exitScreen, checklist: checklistScreen, themes: themesScreen };
+const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, pin: pinScreen, leave: leaveScreen, exit: exitScreen, checklist: checklistScreen, themes: themesScreen, bulkdelete: bulkDeleteScreen };
 const current = () => stack.length ? SCREENS[stack.at(-1).name](stack.at(-1)) : SCREENS[tab]();
 
 /* ---------- control bar ---------- */
@@ -230,7 +281,8 @@ function render() {
   for (const t of document.querySelectorAll(".tab")) t.classList.toggle("active", t.dataset.tab === tab);
   $("#screen").replaceChildren(...current());
   $("#controls").replaceChildren(...controlBar());
-  const hints = [h("span", {}, h("b", { class: "a" }, "A"), "Select"), h("span", {}, h("b", { class: "b" }, "B"), stack.length ? "Back" : tab === "library" ? "Leave" : "Library")];
+  const hints = [h("span", {}, h("b", { class: "a" }, "A"), "Select"), h("span", {}, h("b", { class: "b" }, "B"), stack.length ? "Back" : tab !== "library" ? "Library" : selected.size ? "Clear selection" : "Leave")];
+  if (!stack.length && tab === "library" && S.games.length) hints.push(h("span", {}, h("b", { class: "x" }, "X"), "Tick game (hold: all)"));
   if (!stack.length) hints.push(h("span", {}, h("b", {}, "LB"), h("b", {}, "RB"), "Switch"));
   hints.push(h("span", {}, h("b", {}, "LT"), h("b", {}, "RT"), "Size"));
   $("#hints").replaceChildren(...hints);
@@ -248,6 +300,7 @@ function push(sc) { stack.push(sc); render(); }
 function back() {
   if (stack.length) { stack.pop(); render(); }
   else if (tab !== "library") { tab = "library"; render(); }
+  else if (selected.size) clearSelection();
   else push({ name: "exit" });
 }
 
@@ -314,6 +367,7 @@ function press(action) {
   else if (action === "menu") backToSteam();
   else if (action === "lb") switchTab(-1);
   else if (action === "rb") switchTab(1);
+  else if (action === "x") xDown();
   else if (action === "lt") Z.step(-1);
   else if (action === "rt") Z.step(1);
   else if (action === "up") move(0, -1);
@@ -321,11 +375,11 @@ function press(action) {
   else if (action === "left") move(-1, 0);
   else if (action === "right") move(1, 0);
 }
-function release(action) { if (action === "a") holdEnd(); }
+function release(action) { if (action === "a") holdEnd(); else if (action === "x") xUp(); }
 const move = (dx, dy) => SD.move(dx, dy, [...document.querySelectorAll("#screen .f, #controls .f")]);
 
 /* Keyboard */
-const KEYS = { F11: "view", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "a", " ": "a", Escape: "b", Backspace: "b", q: "lb", Q: "lb", PageUp: "lb", e: "rb", E: "rb", PageDown: "rb" };
+const KEYS = { x: "x", X: "x", F11: "view", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "a", " ": "a", Escape: "b", Backspace: "b", q: "lb", Q: "lb", PageUp: "lb", e: "rb", E: "rb", PageDown: "rb" };
 document.addEventListener("keydown", (e) => {
   const action = KEYS[e.key];
   if (!action) return;
@@ -379,6 +433,7 @@ function maybeAsk() {
 document.addEventListener("held", (e) => {
   const sc = stack.at(-1);
   if (e.target.dataset.key === "delete" && sc?.name === "detail") deleteGame(game(sc.id));
+  if (e.target.dataset.key === "bulk-delete" && sc?.name === "bulkdelete") bulkDelete(sc.ids);
 });
 listen("changed", refresh);
 // Games added while this view was hidden or closed show up as soon as it's back.

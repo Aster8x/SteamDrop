@@ -557,19 +557,98 @@ pub fn restart_steam_applying(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Couch mode's "Delete game": the folder goes to the Recycle Bin, then the shortcut and art go.
-pub async fn delete_game(app: &AppHandle, id: u32) -> Result<String, String> {
-    let game = app.state::<App>().data.lock().unwrap().games.iter().find(|g| g.id == id).cloned();
-    let game = game.ok_or("That game is no longer in the list.")?;
-    let folder = PathBuf::from(&game.folder);
-    let recycled = tauri::async_runtime::spawn_blocking(move || crate::recycle::recycle(&folder)).await.map_err(|e| e.to_string())?;
-    if let Err(e) = recycled {
-        log::problem(format!("Could not delete \"{}\": {e}", game.name));
-        return Err(e);
+fn games_by_id(app: &AppHandle, ids: &[u32]) -> Vec<Game> {
+    app.state::<App>().data.lock().unwrap().games.iter().filter(|g| ids.contains(&g.id)).cloned().collect()
+}
+
+/// "Delete game" (one, or several selected): each folder goes to the Recycle Bin, then the shortcuts
+/// and art of the ones that went are removed in one go. A folder that can't be recycled stays, with its shortcut.
+pub async fn delete_games(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
+    let games = games_by_id(app, &ids);
+    if games.is_empty() {
+        return Err("That game is no longer in the list.".into());
     }
-    log::info(format!("Moved the folder of \"{}\" to the Recycle Bin: {}", game.name, game.folder));
-    remove(app, vec![id], false).await?;
-    Ok(format!("\"{}\" was moved to the Recycle Bin and removed from Steam.", game.name))
+    let mut gone = vec![];
+    let mut failed = vec![];
+    for game in games {
+        let folder = PathBuf::from(&game.folder);
+        match tauri::async_runtime::spawn_blocking(move || crate::recycle::recycle(&folder)).await.map_err(|e| e.to_string())? {
+            Ok(()) => {
+                log::info(format!("Moved the folder of \"{}\" to the Recycle Bin: {}", game.name, game.folder));
+                gone.push(game);
+            }
+            Err(e) => {
+                log::problem(format!("Could not delete \"{}\": {e}", game.name));
+                failed.push((game.name, e));
+            }
+        }
+    }
+    if !gone.is_empty() {
+        remove(app, gone.iter().map(|g| g.id).collect(), restart).await?;
+    }
+    let names = |list: Vec<String>| list.iter().map(|n| format!("\"{n}\"")).collect::<Vec<_>>().join(", ");
+    match (gone.is_empty(), failed.is_empty()) {
+        (_, true) => Ok(format!("{} moved to the Recycle Bin and removed from Steam.", names(gone.into_iter().map(|g| g.name).collect()))),
+        (true, false) if failed.len() == 1 => Err(failed.remove(0).1),
+        _ => Err(format!(
+            "Deleted {}. Not deleted: {} ({}).",
+            if gone.is_empty() { "nothing".into() } else { names(gone.into_iter().map(|g| g.name).collect()) },
+            names(failed.iter().map(|f| f.0.clone()).collect()),
+            failed[0].1
+        )),
+    }
+}
+
+/// "Re-fetch art" for one or several games: forget the cached art and add them again, in one go.
+pub async fn refetch_art(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
+    let dir = app.state::<App>().dir.clone();
+    let items: Vec<Add> = games_by_id(app, &ids)
+        .into_iter()
+        .map(|g| {
+            let _ = std::fs::remove_dir_all(art::cache_dir(&dir, g.id));
+            let _ = std::fs::remove_dir_all(PathBuf::from(&g.folder).join(art::GAME_FOLDER_ART));
+            Add { folder: g.folder.into(), exe: g.exe.into(), name: g.name, replaces: None }
+        })
+        .collect();
+    if items.is_empty() {
+        return Err("Those games are no longer in the list.".into());
+    }
+    add(app, items, restart).await
+}
+
+/// The file a re-check settles on: the current one while it exists (it may be the user's own pick),
+/// otherwise the best match in the folder.
+fn rechecked_exe(game: &Game, candidates: &[exe::Candidate]) -> Option<PathBuf> {
+    let current = PathBuf::from(&game.exe);
+    if current.is_file() {
+        return Some(current);
+    }
+    candidates.first().map(|c| c.path.clone())
+}
+
+/// "Re-check game file": games whose file is gone (an update renamed it, say) get the best match in
+/// their folder; the others keep theirs. All changes go to Steam in one go.
+pub async fn recheck(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
+    let excluded = app.state::<App>().settings().excluded;
+    let mut changes = vec![];
+    let mut notes = vec![];
+    for g in games_by_id(app, &ids) {
+        let mut found = exe::candidates(Path::new(&g.folder));
+        found.retain(|c| !excluded.iter().any(|x| c.path.starts_with(x)));
+        match rechecked_exe(&g, &found) {
+            Some(exe) if exe.to_string_lossy() == g.exe => notes.push(format!("\"{}\" is fine", g.name)),
+            Some(exe) => {
+                log::info(format!("Re-check: \"{}\" now starts with {}", g.name, exe.display()));
+                notes.push(format!("\"{}\" now uses {}", g.name, exe.file_name().unwrap_or_default().to_string_lossy()));
+                changes.push(Add { folder: g.folder.clone().into(), exe, name: g.name, replaces: Some(g.id) });
+            }
+            None => notes.push(format!("\"{}\" has no game file", g.name)),
+        }
+    }
+    if !changes.is_empty() {
+        add(app, changes, restart).await?;
+    }
+    Ok(format!("Checked: {}.", notes.join(", ")))
 }
 
 /// `SteamDrop.exe --add-to-steam` (from the installer): turn the setting on and add the shortcut.
@@ -636,6 +715,21 @@ mod tests {
         found.candidates.truncate(1);
         let other = Game { exe: game.exe.replace("x64", "bin"), ..game };
         assert_eq!(relocated_exe(&other, &new, &found), found.candidates.first().map(|c| c.path.clone()));
+    }
+
+    #[test]
+    fn a_recheck_keeps_a_working_file_and_replaces_a_missing_one() {
+        let base = std::env::temp_dir().join(format!("steamdrop-recheck-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("Game")).unwrap();
+        std::fs::write(base.join("Game/launcher.exe"), b"x").unwrap();
+        std::fs::write(base.join("Game/Game.exe"), b"x").unwrap();
+        let found = inspect(&base.join("Game")).candidates;
+        let mine = Game { id: 1, name: "Game".into(), exe: base.join("Game/launcher.exe").to_string_lossy().into(), folder: base.join("Game").to_string_lossy().into(), steam_appid: None, added: 1 };
+        assert_eq!(rechecked_exe(&mine, &found), Some(base.join("Game/launcher.exe")), "the user's pick stays while it exists");
+        let renamed = Game { exe: base.join("Game/Game-old.exe").to_string_lossy().into(), ..mine };
+        assert_eq!(rechecked_exe(&renamed, &found), found.first().map(|c| c.path.clone()), "a missing file gets the best match");
+        assert_eq!(rechecked_exe(&renamed, &[]), None);
     }
 
     #[test]

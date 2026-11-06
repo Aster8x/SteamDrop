@@ -142,6 +142,12 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 
 40. **Themes:** in Settings → Appearance, pointing at a theme (or moving to it with Tab or the D-pad) shows it on the whole window right away; moving away goes back; clicking keeps it. Try all eight and check text is easy to read everywhere, including dialogs (Remove a game), the Missing games box and error messages. Open Couch mode: it uses the same theme. In Couch mode, Settings → Theme previews each theme as you move over it, A keeps it, B goes back to the old one. The sun/moon button at the top still switches between SteamDrop Dark and Light.
 
+41. **Several games at once** (use test games you don't need for deleting):
+    - Desktop: tick two games' boxes; a bar says "2 selected". Ctrl+click a cover adds or removes it; click one game's box, then Shift+click another cover: everything between is selected. "Select all" and "Clear" work.
+    - "Re-fetch art" gets new art for all of them with one Steam restart. "Re-check game file": rename a selected game's .exe, re-check, and the game now uses the best file in its folder; games whose file still exists keep it. "Remove from Steam" lists the games first.
+    - "Delete games" lists them; the Delete button only works after typing DELETE (and the PIN, if set). The folders go to the Recycle Bin and the games leave Steam, with one restart. On a USB stick, those folders are refused and stay.
+    - Controller (both views): X ticks the focused game, holding X for a second ticks all. In Couch mode the bar sits above the Library; "Delete games" needs A held for 2 seconds, then the PIN if set. B clears the selection.
+
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 
 ## How to publish a new version

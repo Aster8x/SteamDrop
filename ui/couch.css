@@ -116,3 +116,11 @@ p { margin: .3rem 0 .8rem; }
   .hints { flex-wrap: wrap; gap: .6rem 1.4rem; padding: .7rem 1.2rem; }
   .row { grid-template-columns: 1fr; gap: .2rem; }
 }
+
+/* Several games selected */
+.tile.selected { box-shadow: 0 0 0 .3rem var(--accent); }
+.tile .check { position: absolute; top: .6rem; right: .6rem; display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.selbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .7rem; align-items: center; margin: 0 .6rem 1rem; padding: 1rem; border-radius: 1rem; background: var(--panel); border: .15rem solid var(--accent); }
+.selbar h2 { margin: 0; }
+.names { text-align: left; max-height: 30vh; overflow-y: auto; margin: 0 0 1rem; }
+.hints b.x { background: #3a7bd5; color: #fff; }

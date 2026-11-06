@@ -35,6 +35,7 @@ const logo = () => $(".brand svg").cloneNode(true);
 /* ---------- state and status ---------- */
 async function refresh() {
   S = await invoke("get_state");
+  for (const id of [...selected]) if (!S.games.some((g) => g.id === id && !g.folder_missing)) selected.delete(id);
   Z.sync(S.settings.zoom_window);
   SD.applyTheme(S.settings.theme);
   render();
@@ -354,10 +355,85 @@ function foundCard(f) {
       btn("Not now", () => invoke("dismiss_found", { folder: f.folder }), "", { title: "SteamDrop won't ask about this folder again." })));
 }
 
+/* ---------- selecting several games ---------- */
+const selected = new Set();   // ids of selected games
+let lastPick = null;          // for Shift+click ranges
+const gridGames = () => S.games.filter((g) => !g.folder_missing);
+
+/** A click on a game's tick box, or Ctrl/Shift+click on its cover: toggle it, or with Shift select a range. */
+function pick(e, id) {
+  const order = gridGames().map((g) => g.id);
+  if (e.shiftKey && lastPick !== null && order.includes(lastPick)) {
+    const [a, b] = [order.indexOf(lastPick), order.indexOf(id)].sort((x, y) => x - y);
+    order.slice(a, b + 1).forEach((x) => selected.add(x));
+  } else if (selected.has(id)) selected.delete(id);
+  else selected.add(id);
+  lastPick = id;
+  render();
+}
+function selectAll() { gridGames().forEach((g) => selected.add(g.id)); render(); }
+function clearSelection() { selected.clear(); lastPick = null; render(); }
+const picked = () => S.games.filter((g) => selected.has(g.id));
+const nameList = (games) => h("ul", { class: "name-list" }, games.map((g) => h("li", {}, h("strong", {}, g.name), " ", h("span", { class: "path muted small" }, g.folder))));
+const nGames = (n) => `${n} game${n === 1 ? "" : "s"}`;
+
+async function bulk(command, what, extra = {}) {
+  const ids = [...selected];
+  const restart = await askRestart(what);
+  if (restart === null) return;
+  $("#dialog").close();
+  const msg = await run(() => invoke(command, { ids, restart, ...extra }));
+  if (msg !== undefined) clearSelection();
+}
+
+async function bulkRemove() {
+  const games = picked();
+  const choice = await ask(`Remove ${nGames(games.length)} from Steam?`,
+    [h("p", {}, "Only the Steam shortcuts and their artwork are removed. The games' files stay exactly where they are."), nameList(games)],
+    [{ label: "Cancel", value: null }, { label: "Remove from Steam", value: "yes", kind: "danger" }]);
+  if (choice) await bulk("remove_games", "the change");
+}
+
+/** Deleting several games: lists them, then needs DELETE typed (and the PIN, if one is set). */
+function bulkDelete() {
+  const games = picked();
+  const dlg = $("#dialog");
+  const word = h("input", { type: "text", autocomplete: "off", spellcheck: "false", "aria-label": "Type DELETE to confirm", placeholder: "DELETE" });
+  const pin = S.couch_pin_set ? h("input", { type: "password", inputmode: "numeric", maxlength: "4", autocomplete: "off", "aria-label": "PIN", placeholder: "PIN" }) : null;
+  const go = h("button", { class: "btn danger", disabled: true, onclick: () => bulk("delete_games", "the change", { pin: pin ? pin.value : "" }) }, `Delete ${nGames(games.length)}`);
+  const check = () => { go.disabled = word.value.trim().toUpperCase() !== "DELETE" || (pin && pin.value.length !== 4); };
+  word.addEventListener("input", check);
+  pin?.addEventListener("input", check);
+  dlg.replaceChildren(h("div", { class: "inner" },
+    h("h2", {}, `Delete ${nGames(games.length)}?`),
+    h("p", {}, "These game folders go to the Recycle Bin (you can restore them from there) and the games are removed from Steam. Folders on drives without a Recycle Bin, like USB sticks or network drives, are not deleted."),
+    nameList(games),
+    h("label", { class: "small" }, h("strong", {}, "Type DELETE to confirm")), word,
+    pin ? [h("label", { class: "small" }, h("strong", {}, "Couch mode PIN")), pin] : null,
+    h("div", { class: "actions" }, h("button", { class: "btn", onclick: () => dlg.close() }, "Cancel"), go)));
+  dlg.oncancel = null;
+  dlg.showModal();
+  word.focus();
+}
+
+function selectionBar() {
+  const n = selected.size;
+  return h("div", { class: "selbar", role: "toolbar", "aria-label": "Selected games" },
+    h("strong", { class: "count" }, `${n} selected`),
+    btn("Re-fetch art", () => bulk("refetch_art", "the new artwork"), "small"),
+    btn("Re-check game file", () => bulk("recheck_games", "the change"), "small"),
+    btn("Remove from Steam", bulkRemove, "small danger"),
+    btn(n === 1 ? "Delete game" : "Delete games", bulkDelete, "small danger"),
+    btn("Clear", clearSelection, "small", { always: true }));
+}
+
 function gameCard(g) {
-  const cover = h("button", { class: "cover", onclick: () => showDetails(g), "aria-label": `Details for ${g.name}` },
+  const cover = h("button", { class: "cover", "aria-label": `Details for ${g.name}`,
+    onclick: (e) => { if (e.ctrlKey || e.shiftKey) pick(e, g.id); else showDetails(g); } },
     SD.art(g, "portrait"));
-  return h("div", { class: "card" }, cover,
+  const tick = h("label", { class: "pick", title: "Select (Ctrl+click or Shift+click a cover too)" },
+    h("input", { type: "checkbox", checked: selected.has(g.id), "aria-label": `Select ${g.name}`, onclick: (e) => { e.preventDefault(); pick(e, g.id); } }));
+  return h("div", { class: `card ${selected.has(g.id) ? "selected" : ""}`, "data-id": g.id }, tick, cover,
     h("div", { class: "body" },
       h("div", { class: "name" }, g.name),
       g.folder_missing ? h("div", {}, h("span", { class: "badge warn" }, "Game file missing")) :
@@ -387,9 +463,12 @@ function gamesView() {
   out.push(h("div", { class: "spread" },
     h("div", {}, h("h1", {}, "Your games"),
       h("p", { class: "muted" }, S.games.length ? `${S.games.length} game${S.games.length === 1 ? "" : "s"} added by SteamDrop` : "Games you add show up here.")),
-    btn("+ Add a game", addGameFolder, "primary")));
+    h("div", { class: "row" },
+      gridGames().length > 1 ? btn(selected.size === gridGames().length ? "Clear" : "Select all", selected.size === gridGames().length ? clearSelection : selectAll, "", { always: true }) : null,
+      btn("+ Add a game", addGameFolder, "primary"))));
+  if (selected.size) out.push(selectionBar());
   const missing = S.games.filter((g) => g.folder_missing);
-  if (missing.length) out.splice(out.length - 1, 0, missingPanel(missing));
+  if (missing.length) out.splice(out.length - (selected.size ? 2 : 1), 0, missingPanel(missing));
   if (S.games.length) {
     out.push(h("div", { class: "grid" }, S.games.filter((g) => !g.folder_missing).map(gameCard)));
   } else {
@@ -781,7 +860,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "F11") { e.preventDe
 
 /* ---------- controller (same code as Couch mode, in shared.js) ----------
    D-pad / stick move focus, A selects, B closes a dialog (or goes back to Games), LB/RB switch tabs,
-   Y = Scan now, View = back to Couch mode, LT/RT = interface size. */
+   Y = Scan now, View = back to Couch mode, LT/RT = interface size, X = tick a game (hold: all). */
 const TABS = ["games", "settings", "about"];
 function focusables() {
   const dlg = $("#dialog");
@@ -806,8 +885,21 @@ function padPress(action) {
   else if (action === "view") switchView();
   else if (action === "lt") Z.step(-1);
   else if (action === "rt") Z.step(1);
+  else if (action === "x" && !dlg.open) xHold = setTimeout(() => { xHold = null; selectAll(); }, 1000);
 }
-SD.startPad(padPress, () => {});
+/* X ticks the focused game; holding X for a second selects all. */
+let xHold = null;
+function padRelease(action) {
+  if (action !== "x" || !xHold) return;
+  clearTimeout(xHold);
+  xHold = null;
+  const id = Number(document.activeElement?.closest(".card")?.dataset.id);
+  if (id) {
+    pick({}, id);
+    document.querySelector(`.card[data-id="${id}"] .cover`)?.focus();
+  }
+}
+SD.startPad(padPress, padRelease);
 // The big focus ring is for controller use; a mouse click turns it back to normal.
 document.addEventListener("mousedown", () => document.body.classList.remove("pad"));
 
