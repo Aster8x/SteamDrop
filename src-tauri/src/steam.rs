@@ -2,7 +2,7 @@
 
 use crate::vdf::{self, Map, Value};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
@@ -249,20 +249,39 @@ pub fn remove(config: &Path, data_dir: &Path, user: &str, ids: &[u32]) -> Result
     save(config, data_dir, user, root)
 }
 
+/// Running processes as (process id, lower-case .exe name), from Windows' process
+/// snapshot. Much faster than starting `tasklist`, so Steam can be checked often.
 #[cfg(windows)]
-fn hidden(cmd: &mut std::process::Command) -> &mut std::process::Command {
-    use std::os::windows::process::CommandExt;
-    cmd.creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+pub fn processes() -> Vec<(u32, String)> {
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS};
+    let mut list = Vec::new();
+    // SAFETY: the snapshot handle is checked and closed; the entry has its size set as the API requires.
+    unsafe {
+        let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snap == INVALID_HANDLE_VALUE {
+            return list;
+        }
+        let mut e: PROCESSENTRY32W = std::mem::zeroed();
+        e.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        let mut ok = Process32FirstW(snap, &mut e) != 0;
+        while ok {
+            let len = e.szExeFile.iter().position(|&c| c == 0).unwrap_or(e.szExeFile.len());
+            list.push((e.th32ProcessID, String::from_utf16_lossy(&e.szExeFile[..len]).to_lowercase()));
+            ok = Process32NextW(snap, &mut e) != 0;
+        }
+        CloseHandle(snap);
+    }
+    list
+}
+
+#[cfg(not(windows))]
+pub fn processes() -> Vec<(u32, String)> {
+    Vec::new()
 }
 
 pub fn is_running() -> bool {
-    #[cfg(windows)]
-    {
-        let out = hidden(std::process::Command::new("tasklist").args(["/FI", "IMAGENAME eq steam.exe", "/NH"])).output();
-        out.map(|o| String::from_utf8_lossy(&o.stdout).to_lowercase().contains("steam.exe")).unwrap_or(false)
-    }
-    #[cfg(not(windows))]
-    false
+    processes().iter().any(|(_, n)| n == "steam.exe")
 }
 
 /// True while a game started from Steam is running: a Steam game (Steam's RunningAppID)
@@ -278,25 +297,22 @@ pub fn game_running(games: &[crate::state::Game]) -> bool {
         if steam_game != 0 {
             return true;
         }
-        let Ok(out) = hidden(std::process::Command::new("tasklist").args(["/FO", "CSV", "/NH"])).output() else { return false };
-        let running: Vec<String> = String::from_utf8_lossy(&out.stdout)
-            .lines()
-            .filter_map(|l| l.split("\",\"").next().map(|n| n.trim_matches('"').to_lowercase()))
-            .collect();
-        games.iter().any(|g| {
-            let name = Path::new(&g.exe).file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
-            running.contains(&name)
-        })
     }
-    #[cfg(not(windows))]
-    {
-        let _ = games;
-        false
-    }
+    let running = processes();
+    games.iter().any(|g| {
+        let name = Path::new(&g.exe).file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+        running.iter().any(|(_, n)| *n == name)
+    })
 }
 
-/// Asks Steam to close and waits (up to a minute) until it has.
+/// How often Steam is checked while closing, and how long it gets before it is force-closed.
+const POLL: Duration = Duration::from_millis(250);
+const CLOSE_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Asks Steam to close and waits until it has, checking every 250 ms.
 /// Steam must be closed while shortcuts.vdf changes, or it overwrites them on exit.
+/// Once steam.exe has exited its files are closed, so no extra wait is needed.
+/// Only if Steam is still running after a minute is it force-closed (and that is logged).
 pub fn shutdown(steam: &Path) -> Result<(), String> {
     if !is_running() {
         return Ok(());
@@ -305,15 +321,62 @@ pub fn shutdown(steam: &Path) -> Result<(), String> {
         .arg("-shutdown")
         .spawn()
         .map_err(|e| format!("Could not ask Steam to close: {e}"))?;
-    for _ in 0..120 {
-        std::thread::sleep(Duration::from_millis(500));
+    let t = Instant::now();
+    while t.elapsed() < CLOSE_TIMEOUT {
+        std::thread::sleep(POLL);
         if !is_running() {
-            // Give Steam a moment to finish writing its own files.
-            std::thread::sleep(Duration::from_secs(2));
             return Ok(());
         }
     }
-    Err("Steam did not close within a minute. Close Steam yourself, then try again.".into())
+    crate::log::problem(format!("Steam did not close within {} seconds, so SteamDrop force-closed it.", CLOSE_TIMEOUT.as_secs()));
+    force_close();
+    for _ in 0..20 {
+        if !is_running() {
+            return Ok(());
+        }
+        std::thread::sleep(POLL);
+    }
+    Err("Steam did not close. Close Steam yourself, then try again.".into())
+}
+
+fn force_close() {
+    #[cfg(windows)]
+    for (pid, name) in processes() {
+        if name == "steam.exe" {
+            use windows_sys::Win32::Foundation::CloseHandle;
+            use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+            // SAFETY: the handle is checked before use and closed after.
+            unsafe {
+                let h = OpenProcess(PROCESS_TERMINATE, 0, pid);
+                if !h.is_null() {
+                    TerminateProcess(h, 1);
+                    CloseHandle(h);
+                }
+            }
+        }
+    }
+}
+
+/// The one way SteamDrop restarts Steam: decide the mode, close Steam, run `write`
+/// (the shortcuts.vdf changes), then start Steam again right away, even if `write`
+/// failed, so Steam is never left closed. Logs how long each phase took.
+pub fn restart_with(steam: &Path, mode: &str, write: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
+    let big_picture = reopen_in_big_picture(mode);
+    let t = Instant::now();
+    shutdown(steam)?;
+    let closed = t.elapsed();
+    let written = write();
+    let wrote = t.elapsed() - closed;
+    let started = start(steam, big_picture);
+    let total = t.elapsed();
+    crate::log::info(format!(
+        "Steam restart: closing Steam took {:.1} s, writing changes {:.1} s, starting it {:.1} s (total {:.1} s). Steam then loads in its own time.",
+        closed.as_secs_f32(),
+        wrote.as_secs_f32(),
+        (total - closed - wrote).as_secs_f32(),
+        total.as_secs_f32()
+    ));
+    written.and(started)
 }
 
 /// True while Steam's Big Picture window is open.
@@ -386,6 +449,21 @@ mod tests {
         assert!(restart_mode("bigpicture", false).0);
         assert!(!restart_mode("desktop", true).0);
         assert!(!restart_mode("", false).0, "older settings files default to keeping the mode");
+    }
+
+    #[test]
+    fn a_restart_always_writes_and_reports_the_write_error_first() {
+        // No Steam here: closing is a no-op and starting fails, but the write still runs.
+        let missing = Path::new("/no/steam/here");
+        let mut wrote = false;
+        let r = restart_with(missing, "desktop", || {
+            wrote = true;
+            Ok(())
+        });
+        assert!(wrote);
+        assert!(r.unwrap_err().starts_with("Could not start Steam"));
+        let r = restart_with(missing, "desktop", || Err("disk full".into()));
+        assert_eq!(r.unwrap_err(), "disk full");
     }
 
     #[test]

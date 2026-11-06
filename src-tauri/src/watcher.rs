@@ -12,6 +12,11 @@ use tauri::{AppHandle, Manager};
 
 /// How long a folder must stay quiet before we look at it.
 const QUIET: Duration = Duration::from_secs(12);
+/// Folders that are ready (or deleted) within this time of each other are handled together:
+/// one prompt and at most one Steam restart.
+const BATCH: Duration = Duration::from_secs(4);
+/// A batch waits for folders that are still copying, but never longer than this.
+const BATCH_MAX: Duration = Duration::from_secs(90);
 
 /// (Re)starts watching the folders in settings. Dropping the old watcher stops its thread.
 pub fn restart(app: &AppHandle) {
@@ -59,6 +64,9 @@ fn run(app: AppHandle, roots: Vec<PathBuf>, excluded: Vec<PathBuf>, rx: mpsc::Re
     let state = app.state::<App>();
     let unknown = |p: &Path| p.is_dir() && !state.data.lock().unwrap().is_known(&p.to_string_lossy());
     let mut due: HashMap<PathBuf, Instant> = HashMap::new();
+    let is_game = |f: &Path| state.data.lock().unwrap().games.iter().any(|g| crate::state::same_path(&g.folder, &f.to_string_lossy()));
+    // The current batch: new folders that finished copying, and game folders that were deleted.
+    let mut batch = Batch::default();
     // Folders that arrived while SteamDrop wasn't running.
     for root in &roots {
         for folder in subfolders(root, &roots, &excluded) {
@@ -68,7 +76,7 @@ fn run(app: AppHandle, roots: Vec<PathBuf>, excluded: Vec<PathBuf>, rx: mpsc::Re
         }
     }
     loop {
-        let next = due.values().min().copied();
+        let next = due.values().copied().chain(batch.flush_at(&due)).min();
         let msg = match next {
             Some(t) => rx.recv_timeout(t.saturating_duration_since(Instant::now())),
             None => rx.recv().map_err(|_| mpsc::RecvTimeoutError::Disconnected),
@@ -80,6 +88,9 @@ fn run(app: AppHandle, roots: Vec<PathBuf>, excluded: Vec<PathBuf>, rx: mpsc::Re
                     if let Some(folder) = game_folder(&roots, &excluded, &p) {
                         if unknown(&folder) {
                             due.insert(folder, Instant::now() + QUIET);
+                        } else if !folder.exists() && !batch.gone.contains(&folder) && is_game(&folder) {
+                            batch.gone.push(folder);
+                            batch.touch();
                         }
                     }
                 }
@@ -90,7 +101,6 @@ fn run(app: AppHandle, roots: Vec<PathBuf>, excluded: Vec<PathBuf>, rx: mpsc::Re
         }
         let now = Instant::now();
         let ready: Vec<PathBuf> = due.iter().filter(|(_, t)| **t <= now).map(|(p, _)| p.clone()).collect();
-        let mut batch = vec![];
         for folder in ready {
             due.remove(&folder);
             if !unknown(&folder) {
@@ -98,13 +108,46 @@ fn run(app: AppHandle, roots: Vec<PathBuf>, excluded: Vec<PathBuf>, rx: mpsc::Re
             }
             if still_copying(&folder) {
                 due.insert(folder, now + QUIET);
-            } else {
-                batch.push(folder);
+            } else if !batch.new.contains(&folder) {
+                batch.new.push(folder);
+                batch.touch();
             }
         }
-        if !batch.is_empty() {
-            crate::library::found(&app, batch);
+        if batch.flush_at(&due).is_some_and(|t| t <= now) {
+            let Batch { new, gone, .. } = std::mem::take(&mut batch);
+            if !new.is_empty() {
+                crate::library::found(&app, new.clone());
+            }
+            if !gone.is_empty() {
+                crate::library::gone(&app, gone, &new);
+            }
         }
+    }
+}
+
+/// Folder changes waiting to be handled together.
+#[derive(Default)]
+struct Batch {
+    new: Vec<PathBuf>,
+    gone: Vec<PathBuf>,
+    first: Option<Instant>,
+    last: Option<Instant>,
+}
+
+impl Batch {
+    fn touch(&mut self) {
+        let now = Instant::now();
+        self.first.get_or_insert(now);
+        self.last = Some(now);
+    }
+
+    /// When to hand the batch over: a few seconds after its last folder, once no other folder is
+    /// still on its way (a moved game's new folder may still be waiting), or after BATCH_MAX at most.
+    fn flush_at(&self, due: &HashMap<PathBuf, Instant>) -> Option<Instant> {
+        let (first, last) = (self.first?, self.last?);
+        let cap = first + BATCH_MAX;
+        let waiting = due.values().max().map_or(last, |t| (*t).max(last));
+        Some((waiting + BATCH).min(cap))
     }
 }
 
@@ -202,6 +245,21 @@ mod tests {
         assert_eq!(gf("/g/Torrent/Celeste/c.exe"), Some(p("/g/Torrent/Celeste")), "the most specific watched folder wins");
         assert_eq!(gf("/g/Torrent/X"), None);
         assert_eq!(gf("/g/Torrent/X/Downloads/Game/game.exe"), None, "everything inside an excluded folder is ignored");
+    }
+
+    #[test]
+    fn a_batch_waits_for_its_last_folder_and_for_folders_still_copying() {
+        let mut b = Batch::default();
+        assert_eq!(b.flush_at(&HashMap::new()), None, "nothing to hand over");
+        b.touch();
+        let first = b.first.unwrap();
+        assert_eq!(b.flush_at(&HashMap::new()), Some(b.last.unwrap() + BATCH));
+        // Another folder is still on its way: wait for it, but never past BATCH_MAX.
+        let mut due = HashMap::new();
+        due.insert(PathBuf::from("/g/Big"), first + Duration::from_secs(30));
+        assert_eq!(b.flush_at(&due), Some(first + Duration::from_secs(30) + BATCH));
+        due.insert(PathBuf::from("/g/Huge"), first + Duration::from_secs(600));
+        assert_eq!(b.flush_at(&due), Some(first + BATCH_MAX));
     }
 
     #[test]

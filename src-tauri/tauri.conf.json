@@ -15,8 +15,8 @@
         "title": "SteamDrop",
         "width": 1040,
         "height": 760,
-        "minWidth": 720,
-        "minHeight": 540,
+        "minWidth": 480,
+        "minHeight": 360,
         "center": true,
         "create": false,
         "backgroundColor": "#0d111a"

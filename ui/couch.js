@@ -167,7 +167,27 @@ function activityScreen() {
   return [h("h1", {}, "Activity"), list];
 }
 
-const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, pin: pinScreen, leave: leaveScreen };
+/** B on the Library: leave for Steam (the default), quit, or stay. */
+function exitScreen() {
+  return [h("div", { class: "pin" }, h("h1", {}, "Leave SteamDrop?"),
+    h("p", { class: "muted" }, "Back to Steam keeps SteamDrop running, so it still adds new games."),
+    h("div", { class: "actions" },
+      button("exit-steam", "Back to Steam", () => { stack.pop(); render(); backToSteam(); }),
+      button("exit-quit", "Quit SteamDrop", () => { stack.pop(); quitScreen(); }, { kind: "danger" }),
+      button("exit-cancel", "Cancel", back)))];
+}
+
+/** One question about several games, each with its own tick: A ticks or unticks. */
+function checklistScreen(sc) {
+  const picked = sc.items.filter((i) => i.on).map((i) => i.key);
+  return [h("div", { class: "pin wide" }, h("h1", {}, sc.title), h("p", { class: "muted" }, sc.text),
+    h("div", { class: "actions" },
+      sc.items.map((i, n) => button(`item-${n}`, i.label, () => { i.on = !i.on; render(); }, { value: i.on ? "✓ Selected" : "Not selected", on: i.on, note: i.note })),
+      button("list-yes", `${sc.yes} (${picked.length})`, () => { if (!picked.length) return toast("Select at least one game.", true); stack.pop(); sc.action(picked); }),
+      button("list-no", sc.no, () => { stack.pop(); sc.cancel?.(); render(); })))];
+}
+
+const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, pin: pinScreen, leave: leaveScreen, exit: exitScreen, checklist: checklistScreen };
 const current = () => stack.length ? SCREENS[stack.at(-1).name](stack.at(-1)) : SCREENS[tab]();
 
 /* ---------- control bar ---------- */
@@ -186,8 +206,6 @@ function controlBar() {
     c("c-scan", "Y", "y", "Scan now", scanNow),
     c("c-view", "View", "", "Window view", switchView),
     c("c-hide", "Menu", "", "Back to Steam", backToSteam),
-    c("c-close", "A", "a", "Close", leave),
-    c("c-quit", "A", "a", "Quit SteamDrop", quitScreen, "danger"),
   ];
 }
 
@@ -197,7 +215,7 @@ function render() {
   for (const t of document.querySelectorAll(".tab")) t.classList.toggle("active", t.dataset.tab === tab);
   $("#screen").replaceChildren(...current());
   $("#controls").replaceChildren(...controlBar());
-  const hints = [h("span", {}, h("b", { class: "a" }, "A"), "Select"), h("span", {}, h("b", { class: "b" }, "B"), stack.length ? "Back" : "Leave")];
+  const hints = [h("span", {}, h("b", { class: "a" }, "A"), "Select"), h("span", {}, h("b", { class: "b" }, "B"), stack.length ? "Back" : tab === "library" ? "Leave" : "Library")];
   if (!stack.length) hints.push(h("span", {}, h("b", {}, "LB"), h("b", {}, "RB"), "Switch"));
   $("#hints").replaceChildren(...hints);
   const again = keep && document.querySelector(`.f[data-key="${CSS.escape(keep)}"]`);
@@ -210,9 +228,11 @@ function focusFirst() {
 }
 
 function push(sc) { stack.push(sc); render(); }
+/** B: close the screen on top, go back to the Library, or (on the Library) ask how to leave. */
 function back() {
   if (stack.length) { stack.pop(); render(); }
-  else leave();
+  else if (tab !== "library") { tab = "library"; render(); }
+  else push({ name: "exit" });
 }
 
 /** Leaving: if changes are waiting for a Steam restart, offer to restart Steam once Couch mode has closed. */
@@ -301,6 +321,38 @@ document.addEventListener("click", (e) => { if (e.target.closest?.("[data-hold]"
 async function refresh() {
   S = await invoke("get_state");
   render();
+  maybeAsk();
+}
+
+/* New games and deleted game folders that arrive together are asked about together. */
+const askedFound = new Set();
+const askedGone = new Set();
+function maybeAsk() {
+  if (stack.some((sc) => sc.name === "checklist")) return;
+  const gone = S.gone.map(game).filter((g) => g && !askedGone.has(g.id));
+  if (gone.length) {
+    gone.forEach((g) => askedGone.add(g.id));
+    const n = gone.length;
+    push({ name: "checklist", title: n === 1 ? `The folder of "${gone[0].name}" was deleted. Remove it from Steam?` : `${n} game folders were deleted. Remove them from Steam?`,
+      text: "They were deleted or moved out of your watched folders. Only the Steam shortcuts and artwork are removed.",
+      items: gone.map((g) => ({ key: g.id, label: g.name, on: true })), yes: "Remove selected", no: "Keep in Steam",
+      action: (ids) => {
+        const kept = gone.map((g) => g.id).filter((id) => !ids.includes(id));
+        if (kept.length) invoke("keep_gone", { ids: kept });
+        run(() => invoke("remove_games", { ids, restart: false }), backToTab);
+      },
+      cancel: () => invoke("keep_gone", { ids: gone.map((g) => g.id) }) });
+    return;
+  }
+  const found = S.found.filter((f) => !f.installer_only && f.candidates.length && !askedFound.has(f.folder));
+  if (!found.length) return;
+  found.forEach((f) => askedFound.add(f.folder));
+  const n = found.length;
+  push({ name: "checklist", title: n === 1 ? `New game found: "${found[0].title}". Add it to Steam?` : `${n} new games found. Add them to Steam?`,
+    text: "SteamDrop picked the file that starts each game. You can change it later in the game's details.",
+    items: found.map((f) => ({ key: f.folder, label: f.title, on: true })), yes: "Add selected", no: "Not now",
+    action: (folders) => run(() => invoke("add_games", { restart: false,
+      games: found.filter((f) => folders.includes(f.folder)).map((f) => ({ folder: f.folder, exe: f.candidates[0].path, name: f.title })) }), backToTab) });
 }
 // "Delete game" fires "held" on the button; route it to that button's action.
 document.addEventListener("held", (e) => {

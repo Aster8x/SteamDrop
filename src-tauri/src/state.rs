@@ -115,6 +115,8 @@ pub struct App {
     pub dir: PathBuf,
     pub data: Mutex<Data>,
     pub found: Mutex<Vec<Found>>,
+    /// Games whose folder was deleted, waiting for "Remove selected" or "Keep in Steam".
+    pub gone: Mutex<Vec<u32>>,
     pub status: Mutex<String>,
     /// Only one Steam change at a time.
     pub busy: tauri::async_runtime::Mutex<()>,
@@ -130,6 +132,10 @@ pub struct App {
     seen: Mutex<Option<std::time::SystemTime>>,
     /// "Restart now" was chosen when leaving Couch mode.
     pub restart_after_couch: std::sync::atomic::AtomicBool,
+    /// A Steam restart is waiting to run (see library::request_restart).
+    pub restart_queued: std::sync::atomic::AtomicBool,
+    /// A view was opened from Steam and is still open (Steam shows SteamDrop as running).
+    pub steam_session: std::sync::atomic::AtomicBool,
 }
 
 /// %APPDATA%\SteamDrop, from Windows' own Roaming AppData location, so every SteamDrop process
@@ -270,6 +276,7 @@ impl App {
             seen: Mutex::new(modified(&dir)),
             dir,
             found: Mutex::new(vec![]),
+            gone: Mutex::new(vec![]),
             status: Mutex::new(String::new()),
             busy: tauri::async_runtime::Mutex::new(()),
             http: reqwest::Client::builder()
@@ -282,6 +289,8 @@ impl App {
             whats_new: Mutex::new(None),
             couch_lock: Mutex::new(None),
             restart_after_couch: Default::default(),
+            restart_queued: Default::default(),
+            steam_session: Default::default(),
         }
     }
 

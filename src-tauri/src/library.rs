@@ -40,7 +40,7 @@ pub fn found(app: &AppHandle, folders: Vec<PathBuf>) {
     let settings = state.settings();
     let auto = settings.auto_add;
     let mut to_add = vec![];
-    let mut ask = false;
+    let mut asked = vec![];
     for folder in folders {
         // A folder created a moment ago and still empty: wait for its files.
         if std::fs::read_dir(&folder).map(|mut d| d.next().is_none()).unwrap_or(true) {
@@ -79,15 +79,19 @@ pub fn found(app: &AppHandle, folders: Vec<PathBuf>) {
             continue;
         }
         if !auto && !f.installer_only && !f.candidates.is_empty() {
-            notify(app, "New game found", &format!("Open SteamDrop to add \"{}\" to Steam.", f.title));
+            asked.push(f.title.clone());
         }
         let mut list = state.found.lock().unwrap();
         list.retain(|x| !same_path(&x.folder, &f.folder));
         list.push(f);
-        ask = true;
     }
-    if ask && !auto {
-        crate::show_window(app);
+    match asked.as_slice() {
+        [] => {}
+        [one] => notify(app, "New game found", &format!("Open SteamDrop to add \"{one}\" to Steam.")),
+        many => notify(app, &format!("{} new games found", many.len()), "Open SteamDrop to add them to Steam."),
+    }
+    if !auto && !state.found.lock().unwrap().is_empty() {
+        crate::couch::bring_up(app);
     }
     emit_state(app);
     if !to_add.is_empty() {
@@ -100,6 +104,39 @@ pub fn found(app: &AppHandle, folders: Vec<PathBuf>) {
             }
         });
     }
+}
+
+/// Game folders that disappeared (deleted, or moved out of the watched folders), batched by the
+/// watcher. Nothing is removed from Steam by itself: the games wait for "Remove selected" or
+/// "Keep in Steam". A game whose folder reappeared under the same name in `new` was moved, not deleted.
+pub fn gone(app: &AppHandle, folders: Vec<PathBuf>, new: &[PathBuf]) {
+    let state = app.state::<App>();
+    let name = |p: &Path| p.file_name().map(|n| n.to_string_lossy().to_lowercase());
+    let games: Vec<Game> = state
+        .data
+        .lock()
+        .unwrap()
+        .games
+        .iter()
+        .filter(|g| folders.iter().any(|f| same_path(&g.folder, &f.to_string_lossy())))
+        .filter(|g| !Path::new(&g.exe).is_file() && !new.iter().any(|n| name(n) == name(Path::new(&g.folder))))
+        .cloned()
+        .collect();
+    if games.is_empty() {
+        return;
+    }
+    for g in &games {
+        log::info(format!("The folder of \"{}\" is gone: {}. Asking whether to remove it from Steam.", g.name, g.folder));
+    }
+    {
+        let mut list = state.gone.lock().unwrap();
+        list.retain(|id| !games.iter().any(|g| g.id == *id));
+        list.extend(games.iter().map(|g| g.id));
+    }
+    let title = if games.len() == 1 { "A game folder was deleted".to_string() } else { format!("{} game folders were deleted", games.len()) };
+    notify(app, &title, "Open SteamDrop to choose whether to remove them from Steam.");
+    crate::couch::bring_up(app);
+    emit_state(app);
 }
 
 pub struct Add {
@@ -209,22 +246,16 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
         ids.extend(items.iter().filter_map(|i| i.replaces).filter(|old| !games.iter().any(|g| g.id == *old)));
         (ids, d.clone())
     };
+    // With Steam open the shortcuts are written now and kept as pending changes, because Steam
+    // writes its own list back when it closes; the (shared) restart writes them again.
     let was_running = steam::is_running();
-    let restarting = was_running && restart;
     let dir = state.dir.clone();
     let games2 = games.clone();
     let app2 = app.clone();
     let users2 = users.clone();
     let replaced2 = replaced.clone();
-    let mode = settings.steam_restart_mode.clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
-        let big_picture = restarting && steam::reopen_in_big_picture(&mode);
-        if restarting {
-            set_status(&app2, "Closing Steam for a moment...");
-            log::info("Closing Steam so it picks up the new shortcuts.");
-            steam::shutdown(&steam_dir)?;
-        }
-        if !was_running || restarting {
+        if !was_running {
             apply_pending(&steam_dir, &dir, &snapshot, &steam::users(&steam_dir), &users2)?;
         }
         set_status(&app2, "Adding to Steam...");
@@ -249,10 +280,6 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
                 result = Err(e);
             }
         }
-        if restarting {
-            set_status(&app2, "Starting Steam...");
-            steam::start(&steam_dir, big_picture)?;
-        }
         result
     })
     .await
@@ -264,13 +291,14 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
             d.games.push(g.clone());
             d.mark_known(&g.folder);
         }
-        if !was_running || restarting {
+        if !was_running {
             d.clear_pending();
         } else {
             d.pending_adds.extend(games.iter().map(|g| g.id));
             d.pending_removals.extend(&replaced);
         }
     })?;
+    drop(_guard);
     state.found.lock().unwrap().retain(|f| !games.iter().any(|g| same_path(&g.folder, &f.folder)));
     for g in &games {
         log::info(format!("Added \"{}\" to Steam. Game file: {}", g.name, g.exe));
@@ -290,6 +318,9 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
     }
     set_status(app, &msg);
     emit_state(app);
+    if was_running && restart {
+        request_restart(app);
+    }
     Ok(msg)
 }
 
@@ -299,7 +330,10 @@ pub async fn remove(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<Str
         let d = app.state::<App>().data.lock().unwrap().clone();
         d.games.iter().filter(|g| ids.contains(&g.id)).map(|g| format!("\"{}\"", g.name)).collect()
     };
-    let result = remove_inner(app, ids, restart).await;
+    let result = remove_inner(app, ids.clone(), restart).await;
+    if result.is_ok() {
+        app.state::<App>().gone.lock().unwrap().retain(|id| !ids.contains(id));
+    }
     match &result {
         Ok(_) => log::info(format!("Removed {} from Steam. Game files were not touched.", names.join(", "))),
         Err(e) => log::problem(format!("Could not remove {}: {e}", names.join(", "))),
@@ -312,25 +346,14 @@ async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<S
     let _guard = state.busy.lock().await;
     let (steam_dir, users) = steam_and_users(&state)?;
     let was_running = steam::is_running();
-    let restarting = was_running && restart;
     let dir = state.dir.clone();
     let ids2 = ids.clone();
-    let app2 = app.clone();
     let mut snapshot = state.data.lock().unwrap().clone();
     snapshot.pending_adds.retain(|id| !ids.contains(id));
     tauri::async_runtime::spawn_blocking(move || {
-        let big_picture = restarting && steam::reopen_in_big_picture(&snapshot.settings.steam_restart_mode);
-        if restarting {
-            set_status(&app2, "Closing Steam for a moment...");
-            steam::shutdown(&steam_dir)?;
-        }
         let r = remove_blocking(&steam_dir, &dir, &ids2, None);
-        if !was_running || restarting {
+        if !was_running {
             apply_pending(&steam_dir, &dir, &snapshot, &steam::users(&steam_dir), &users)?;
-        }
-        if restarting {
-            set_status(&app2, "Starting Steam...");
-            steam::start(&steam_dir, big_picture)?;
         }
         r
     })
@@ -339,24 +362,28 @@ async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<S
     state.update(|d| {
         d.games.retain(|g| !ids.contains(&g.id));
         d.pending_adds.retain(|id| !ids.contains(id));
-        if was_running && !restart {
+        if was_running {
+            // Steam writes its old list back when it closes; the next restart removes them again.
             d.pending_removals.extend(&ids);
         } else {
             d.clear_pending();
         }
     })?;
+    drop(_guard);
     let msg = if was_running && !restart { "Removed. Restart Steam to see the change." } else { "Removed from Steam." };
     set_status(app, msg);
     emit_state(app);
+    if was_running && restart {
+        request_restart(app);
+    }
     Ok(msg.into())
 }
 
 /// The shared removal steps, also used by the uninstaller (which has no window).
 /// With `restart` (the "When SteamDrop restarts Steam" setting), Steam is closed first and reopened after.
 fn remove_blocking(steam_dir: &Path, data_dir: &Path, ids: &[u32], restart: Option<&str>) -> Result<(), String> {
-    let big_picture = restart.is_some_and(steam::reopen_in_big_picture);
-    if restart.is_some() {
-        steam::shutdown(steam_dir)?;
+    if let Some(mode) = restart {
+        return steam::restart_with(steam_dir, mode, || remove_blocking(steam_dir, data_dir, ids, None));
     }
     let mut result = Ok(());
     for (user, config) in steam::users(steam_dir) {
@@ -369,9 +396,6 @@ fn remove_blocking(steam_dir: &Path, data_dir: &Path, ids: &[u32], restart: Opti
     }
     for id in ids {
         let _ = std::fs::remove_dir_all(art::cache_dir(data_dir, *id));
-    }
-    if restart.is_some() {
-        steam::start(steam_dir, big_picture)?;
     }
     result
 }
@@ -484,19 +508,51 @@ pub fn apply_pending(steam_dir: &Path, data_dir: &Path, data: &Data, all: &[(Str
     Ok(())
 }
 
+/// Asks for a Steam restart that applies every pending change. Requests made while one is
+/// already waiting share it; changes made during a restart get one follow-up restart.
+pub fn request_restart(app: &AppHandle) {
+    let state = app.state::<App>();
+    if state.restart_queued.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<App>();
+        let _guard = state.busy.lock().await;
+        state.restart_queued.store(false, std::sync::atomic::Ordering::SeqCst);
+        let app2 = app.clone();
+        let result = tauri::async_runtime::spawn_blocking(move || restart_steam_applying(&app2)).await.map_err(|e| e.to_string()).and_then(|r| r);
+        if let Err(e) = result {
+            log::problem(format!("Could not restart Steam: {e}"));
+            notify(&app, "Could not restart Steam", &e);
+            set_status(&app, &e);
+        }
+    });
+}
+
 /// Closes Steam, applies pending changes, and starts it again in the mode the setting asks for.
+/// Hold `busy` while calling it. With Steam closed, it only applies the changes.
 pub fn restart_steam_applying(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<App>();
     let steam_dir = state.steam_path().ok_or("Steam was not found. Set its folder in Settings.")?;
-    let big_picture = steam::reopen_in_big_picture(&state.settings().steam_restart_mode);
-    set_status(app, "Restarting Steam...");
-    steam::shutdown(&steam_dir)?;
     let snapshot = state.data.lock().unwrap().clone();
-    apply_pending(&steam_dir, &state.dir, &snapshot, &steam::users(&steam_dir), &state.target_users(&steam_dir))?;
-    state.update(|d| d.clear_pending())?;
-    steam::start(&steam_dir, big_picture)?;
-    log::info(if big_picture { "Restarted Steam in Big Picture." } else { "Restarted Steam in desktop mode." });
-    set_status(app, "Steam restarted.");
+    let write = || apply_pending(&steam_dir, &state.dir, &snapshot, &steam::users(&steam_dir), &state.target_users(&steam_dir));
+    let running = steam::is_running();
+    if running {
+        set_status(app, "Restarting Steam...");
+        steam::restart_with(&steam_dir, &snapshot.settings.steam_restart_mode, write)?;
+    } else {
+        write()?;
+    }
+    // Clear only what was written: anything queued meanwhile stays for the next restart.
+    state.update(|d| {
+        d.pending_adds.retain(|id| !snapshot.pending_adds.contains(id));
+        d.pending_removals.retain(|id| !snapshot.pending_removals.contains(id));
+        if d.settings.steam_shortcut == snapshot.settings.steam_shortcut {
+            d.pending_self &= !snapshot.pending_self;
+        }
+    })?;
+    set_status(app, if running { "Steam restarted." } else { "Changes written to Steam." });
     emit_state(app);
     Ok(())
 }

@@ -102,6 +102,57 @@ function maybeShowDialogs() {
   if (dialogFor || $("#dialog").open) return;
   if (S.whats_new) showWhatsNew(S.whats_new);
   else if (S.update) showUpdate(S.update);
+  else if (S.gone.some((id) => !askedGone.has(id))) showGone();
+  else if (addable().length > 1 && addable().some((f) => !askedFound.has(f.folder))) showFoundBatch();
+}
+
+/* ---------- batches: new games and deleted game folders that arrive together ---------- */
+const askedFound = new Set();  // folders already shown in a "new games found" question
+const askedGone = new Set();   // games already shown in a "folders were deleted" question
+const addable = () => S.found.filter((f) => !f.installer_only && f.candidates.length);
+
+/** A list of ticked checkboxes; `selected()` gives the keys still ticked. */
+function checklist(items, label) {
+  const el = h("div", { class: "exe-list", role: "group", "aria-label": label },
+    items.map((i) => h("label", { class: "exe-option" },
+      h("input", { type: "checkbox", checked: true, value: String(i.key) }),
+      h("span", {}, h("strong", {}, i.name), h("br", {}), h("span", { class: "path muted small" }, i.note)))));
+  return { el, selected: () => [...el.querySelectorAll("input:checked")].map((c) => c.value) };
+}
+
+async function showGone() {
+  dialogFor = "gone";
+  const games = S.gone.map((id) => S.games.find((g) => g.id === id)).filter(Boolean);
+  games.forEach((g) => askedGone.add(g.id));
+  const n = games.length;
+  const list = checklist(games.map((g) => ({ key: g.id, name: g.name, note: g.folder })), "Games whose folder was deleted");
+  const choice = await ask(n === 1 ? `The folder of "${games[0].name}" was deleted. Remove it from Steam?` : `${n} game folders were deleted. Remove them from Steam?`,
+    [h("p", {}, "They were deleted or moved out of your watched folders. Only the Steam shortcuts and artwork are removed. Games you keep stay under \"Missing games\"."), list.el],
+    [{ label: "Keep in Steam", value: "keep" }, { label: "Remove selected", value: "remove", kind: "primary" }]);
+  dialogFor = null;
+  const ids = choice === "remove" ? list.selected().map(Number) : [];
+  const kept = games.map((g) => g.id).filter((id) => !ids.includes(id));
+  if (choice !== null && kept.length) await invoke("keep_gone", { ids: kept });
+  if (!ids.length) return refresh();
+  const restart = await askRestart("the change");
+  if (restart === null) return;
+  await run(() => invoke("remove_games", { ids, restart }));
+}
+
+async function showFoundBatch() {
+  dialogFor = "found";
+  const items = addable();
+  items.forEach((f) => askedFound.add(f.folder));
+  const list = checklist(items.map((f) => ({ key: f.folder, name: f.title, note: relative(f.folder, f.candidates[0].path) })), "New games");
+  const choice = await ask(`${items.length} new games found. Add them to Steam?`,
+    [h("p", {}, "Untick any you don't want yet. SteamDrop picked the file that starts each game; to change one, press \"Not now\" and use that game's card on the Games page."), list.el],
+    [{ label: "Not now", value: null }, { label: "Add selected", value: "add", kind: "primary" }]);
+  dialogFor = null;
+  const picked = choice === "add" ? items.filter((f) => list.selected().includes(f.folder)) : [];
+  if (!picked.length) return refresh();
+  const restart = await askRestart(picked.length === 1 ? "the new game" : "the new games");
+  if (restart === null) return;
+  await run(() => invoke("add_games", { restart, games: picked.map((f) => ({ folder: f.folder, exe: f.candidates[0].path, name: f.title })) }));
 }
 
 async function checkNow() {

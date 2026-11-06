@@ -20,6 +20,12 @@ First release.
 - After adding a game from desktop Steam, Steam no longer reopens in Big Picture.
 - "Window view" in Couch mode opened a blank white window; switching views now really switches, and windows have a dark background while loading.
 - Both views always list every game SteamDrop added, even games added while the view was closed or by another SteamDrop process.
+- Steam's "Resume" for SteamDrop did nothing, because the process Steam tracks had no window. It now has a tiny invisible one that brings SteamDrop to the front (Couch mode while Big Picture is open, switching the window instead of opening a second view). SteamDrop opened from Steam also switches to Couch mode by itself when Steam goes into Big Picture.
+- Couch mode's control bar no longer has "Close" and "Quit SteamDrop" (both showed A). B on the Library asks "Back to Steam", "Quit SteamDrop" or "Cancel"; on other screens B goes back to the Library.
+- Settings fit small and scaled windows (800x600, 125% and 150%): a control moves under its description when there isn't room, and the window never opens bigger than the screen. Couch mode fits small screens too.
+- Faster Steam restarts: no fixed waits, Steam is checked every quarter second with a fast process list, the changes are written and Steam is started again right away (even if writing failed), it's force-closed only after a minute, and the time of each step is logged.
+- New games and deleted game folders that arrive close together are handled together: one question with a tick per game ("3 new games found. Add them to Steam?", "2 game folders were deleted. Remove them from Steam?") and one Steam restart. Changes made during a restart wait for one follow-up restart.
+- A game that shows up in Steam as its store version (with a "Purchase" button) is explained in the README: the game itself tells Steam its App ID; SteamDrop never does.
 
 ### Added
 

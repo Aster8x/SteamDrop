@@ -29,7 +29,7 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 3. **Finds the right .exe.** It skips uninstallers, crash reporters, setup files and other helpers, and picks the file whose name best matches the game. You can always change the pick.
 4. **Adds it to Steam** for every Steam account on the PC, at the top of your "Recent" games.
 5. **Fills in all the artwork:** official Steam art when the game is on Steam, otherwise art from SteamGridDB, otherwise a clean title card.
-6. **Restarts Steam** (into Big Picture) so the game shows up right away, if you allow it.
+6. **Restarts Steam** (into Big Picture) so the game shows up right away, if you allow it. Games that arrive together are handled together: one question ("3 new games found. Add them to Steam?") and one Steam restart.
 
 ## Who it's for
 
@@ -57,6 +57,7 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 - **Excluded folders** (Settings → Watched folders → "Exclude a subfolder...") are ignored, with everything inside them.
 - **Already in Steam?** SteamDrop never adds a game whose .exe already has a Steam shortcut, whoever made it.
 - **Moving counts:** a game folder moved or renamed into a watched folder is added just like one copied there. A game folder moved *out* is never removed from Steam by itself; it shows under **Missing games**, where you can **Find it** in its new place or **Remove from Steam**.
+- **Deleted folders:** when game folders are deleted (or moved out), SteamDrop asks once for all of them, for example "2 game folders were deleted. Remove them from Steam?", with a tick per game: **Remove selected** or **Keep in Steam**.
 
 **Example:** you watch `D:\Games` and `D:\Games\Torrent`, and exclude `D:\Games\Torrent\X`. You try games out in `D:\Games\Torrent\X\Downloads`, and SteamDrop ignores them there. When one is good, move it to `D:\Games\Torrent\Celeste`: SteamDrop notices the move and adds Celeste. `D:\Games\Torrent` itself is never treated as a game of `D:\Games`.
 
@@ -77,8 +78,11 @@ Play from the sofa? SteamDrop can add **itself** to your Steam library, with its
 | Y (Triangle) | Scan now: look for new games right away |
 | View (Share) | Switch to the desktop window |
 | Menu (Options) | Back to Steam (SteamDrop keeps running) |
+| B on the Library | Leave: **Back to Steam** (selected), **Quit SteamDrop** or **Cancel** |
 
-Both views have the same control bar: **Scan now**, **Hide** ("Back to Steam" in Couch mode), **Close** (closes the window, SteamDrop keeps watching from the tray) and **Quit SteamDrop** (stops watching completely, after asking).
+The desktop window's control bar has **Scan now**, **Couch mode**, **Hide**, **Close** (closes the window, SteamDrop keeps watching from the tray) and **Quit SteamDrop** (stops watching completely, after asking). Couch mode's bar has **Scan now**, **Window view** and **Back to Steam**.
+
+Steam's **Resume** button brings SteamDrop back to the front, as Couch mode while Big Picture is open.
 
 **Deleting a game** needs you to hold A for 2 seconds. The game folder goes to the **Recycle Bin**, never deleted for good (on drives without a Recycle Bin, SteamDrop refuses). You can also set a 4-digit PIN in Couch mode's Settings so nobody deletes games by accident.
 
@@ -117,6 +121,9 @@ Steam only reads its list of non-Steam games when it starts. SteamDrop closes St
 
 **The artwork is a plain title card. Can I get real art?**
 Real art comes from Steam (when the game is on Steam) or from SteamGridDB. For SteamGridDB you need a free key: in SteamDrop go to **Settings → Artwork** and press **Get a free key**. Sign in on that page with your Steam account, press *Generate API Key*, copy the key, paste it into SteamDrop, and press **Test key**, then **Save key**. The key is stored in Windows Credential Manager, not in a settings file. Then open the game's details and press **Find artwork again**. If SteamDrop picked the wrong game, enter its Steam App ID in the details window.
+
+**A game shows up in Steam as the store version, with a "Purchase" button.**
+That comes from the game, not from SteamDrop. Some games include Steam's own `steam_api` files and a `steam_appid.txt`. When such a game runs while Steam is open, it tells Steam "I am Steam game number N", so Steam lists that store game under Recent, even though you started it from SteamDrop's shortcut. SteamDrop never gives Steam that number (it only uses it to find artwork and store details) and doesn't change game files. If it bothers you, you can rename `steam_appid.txt` in the game's folder yourself (for example to `steam_appid.txt.off`). Some games then refuse to start; if so, rename it back. Your SteamDrop shortcut keeps working either way.
 
 **It picked the wrong .exe.**
 With Automatic mode off, you confirm the pick before anything is added. Otherwise, remove the game in SteamDrop and add its folder again with **+ Add a game**, then choose the right file.

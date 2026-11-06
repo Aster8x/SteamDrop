@@ -6,6 +6,8 @@ mod changelog;
 mod chime;
 mod couch;
 mod exe;
+#[cfg(windows)]
+mod focus;
 mod library;
 mod log;
 mod recycle;
@@ -40,11 +42,24 @@ pub fn show_window(app: &AppHandle) {
     let _ = app.run_on_main_thread(move || {
         if let Some(cfg) = app2.config().app.windows.first() {
             if let Ok(w) = WebviewWindowBuilder::from_config(&app2, cfg).and_then(|b| b.build()) {
+                fit_to_screen(&w);
                 let _ = w.set_focus();
                 couch::sync_lock(&app2, None);
             }
         }
     });
+}
+
+/// Keeps the window inside the screen on small or scaled displays (e.g. 1366x768 at 125%).
+fn fit_to_screen(w: &tauri::WebviewWindow) {
+    let (Ok(Some(monitor)), Ok(size)) = (w.current_monitor(), w.outer_size()) else { return };
+    let area = monitor.work_area();
+    let width = size.width.min(area.size.width * 95 / 100);
+    let height = size.height.min(area.size.height * 95 / 100);
+    if (width, height) != (size.width, size.height) {
+        let _ = w.set_size(tauri::PhysicalSize::new(width, height));
+        let _ = w.center();
+    }
 }
 
 #[derive(Serialize)]
@@ -71,6 +86,8 @@ struct StateView {
     settings: Settings,
     games: Vec<GameView>,
     found: Vec<Found>,
+    /// Games whose folder was deleted, waiting for "Remove selected" or "Keep in Steam".
+    gone: Vec<u32>,
     steam: SteamView,
     status: String,
     version: String,
@@ -100,10 +117,12 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
         })
         .collect();
     games.sort_by_key(|g| std::cmp::Reverse(g.game.added));
+    let gone = state.gone.lock().unwrap().iter().copied().filter(|id| games.iter().any(|g| g.game.id == *id && g.folder_missing)).collect();
     StateView {
         settings: data.settings,
         games,
         found: state.found.lock().unwrap().clone(),
+        gone,
         steam: SteamView {
             accounts: steam_path.as_deref().map(steam::accounts).unwrap_or_default(),
             path: steam_path,
@@ -257,6 +276,40 @@ async fn add_game(app: AppHandle, folder: String, exe: String, name: String, res
     }
     let item = library::Add { folder: folder.into(), exe: exe.into(), name, replaces: None };
     library::add(&app, vec![item], restart).await
+}
+
+#[derive(serde::Deserialize)]
+struct NewGame {
+    folder: String,
+    exe: String,
+    name: String,
+}
+
+/// "Add selected" for a batch of new games: one add, so at most one Steam restart.
+#[tauri::command]
+async fn add_games(app: AppHandle, games: Vec<NewGame>, restart: bool) -> Result<String, String> {
+    if games.is_empty() {
+        return Err("Choose at least one game.".into());
+    }
+    let items = games.into_iter().map(|g| library::Add { folder: g.folder.into(), exe: g.exe.into(), name: g.name.trim().to_string(), replaces: None }).collect();
+    library::add(&app, items, restart).await
+}
+
+/// "Remove selected" (deleted folders, or several selected games): one removal, one Steam restart.
+#[tauri::command]
+async fn remove_games(app: AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
+    if ids.is_empty() {
+        return Err("Choose at least one game.".into());
+    }
+    library::remove(&app, ids, restart).await
+}
+
+/// "Keep in Steam" for deleted folders: stop asking. They stay under "Missing games".
+#[tauri::command]
+fn keep_gone(app: AppHandle, state: State<App>, ids: Vec<u32>) {
+    state.gone.lock().unwrap().retain(|id| !ids.contains(id));
+    log::info(format!("You kept {} game(s) with a deleted folder in Steam.", ids.len()));
+    library::emit_state(&app);
 }
 
 /// "Not now": forget the card and don't ask about this folder again.
@@ -575,8 +628,16 @@ fn main() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            if args.iter().any(|a| a == "--resume") {
+                couch::resume(app);
+                return;
+            }
             match couch::parse_view(&args) {
-                Some(view) => couch::open(app, view),
+                Some(view) => {
+                    // Asked by the process Steam started: a Steam session until the last window closes.
+                    app.state::<App>().steam_session.store(true, std::sync::atomic::Ordering::SeqCst);
+                    couch::open(app, view)
+                }
                 None => show_window(app),
             }
         }))
@@ -603,8 +664,11 @@ fn main() {
             add_watch_folder,
             inspect_folder,
             add_game,
+            add_games,
             dismiss_found,
             remove_game,
+            remove_games,
+            keep_gone,
             refresh_game,
             get_info,
             get_sgdb_key,
@@ -668,7 +732,10 @@ fn main() {
             updates::schedule(app.handle());
             let handle = app.handle().clone();
             std::thread::spawn(move || library::startup_repair(&handle));
+            #[cfg(windows)]
+            focus::start(app.handle());
             if let Some(view) = open_view {
+                app.state::<App>().steam_session.store(true, std::sync::atomic::Ordering::SeqCst);
                 couch::open(app.handle(), view);
             } else if !start_hidden {
                 show_window(app.handle());
