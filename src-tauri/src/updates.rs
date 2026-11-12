@@ -76,7 +76,10 @@ pub async fn auto_check(app: &AppHandle) {
     }
     notify(app, &format!("SteamDrop {} is available", available.version), "Open SteamDrop to see what's new and update.");
     *state.update.lock().unwrap() = Some(available);
-    crate::show_window(app);
+    // Never a desktop window over Big Picture: the update window shows the next time SteamDrop is opened.
+    if !crate::steam::big_picture_open() {
+        crate::show_window(app);
+    }
     crate::library::emit_state(app);
 }
 
@@ -90,17 +93,26 @@ async fn install_quietly(app: &AppHandle, update: tauri_plugin_updater::Update) 
         }
     };
     let mut told = false;
-    while crate::steam::game_running(&app.state::<App>().data.lock().unwrap().games) {
+    let state = app.state::<App>();
+    // Not while a game runs, and not while SteamDrop is on screen (it would vanish mid-use).
+    while state.couch_lock.lock().unwrap().is_some() || crate::steam::game_running(&state.data.lock().unwrap().games.clone()) {
         if !told {
-            log::info(format!("Update {} is ready. It will install after you close your game.", update.version));
+            log::info(format!("Update {} is ready. It will install once no game is running and SteamDrop's window is closed.", update.version));
             told = true;
         }
         std::thread::sleep(GAME_CHECK);
     }
     log::info(format!("Installing update {} automatically. SteamDrop will restart by itself.", update.version));
+    let _ = std::fs::write(quiet_marker(), b"");
     if let Err(e) = update.install(bytes) {
+        let _ = std::fs::remove_file(quiet_marker());
         log::problem(format!("Couldn't install update {}: {e}", update.version));
     }
+}
+
+/// Exists while an automatic update installs, so SteamDrop starts in the tray afterwards.
+pub fn quiet_marker() -> std::path::PathBuf {
+    crate::state::data_dir().join("updating-quietly")
 }
 
 /// "Update now" in the update window.

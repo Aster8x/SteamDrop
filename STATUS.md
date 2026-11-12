@@ -159,7 +159,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Open Couch mode from Steam, then B → "Quit SteamDrop" → confirm: the tray icon is gone, Task Manager shows no SteamDrop.exe, and Steam shows Play. Big Picture never gets stuck on the loading logo.
     - End SteamDrop.exe in Task Manager while Couch mode is open from Steam: within a second Steam shows Play.
     - From desktop Steam, open SteamDrop (window), press Hide: Steam shows Play again.
-    - **Fast restarts:** open Couch mode from Steam, add a game so SteamDrop restarts Steam (or Settings → leave Couch mode → "Restart now"). Steam closes within about 1 to 2 seconds of "Restarting Steam...", and Activity has "Steam restart: closing Steam took ... s". Start a game from Steam, then add a game from the desktop window: SteamDrop says "A game is running. Steam restarts once you close it." and restarts Steam right after you close the game.
+    - **Fast restarts:** open Couch mode from Steam, add a game so SteamDrop restarts Steam (or change something and press "Back to Steam" → "Restart now"). Steam closes within about 1 to 2 seconds of "Restarting Steam...", and Activity has "Steam restart: closing Steam took ... s". Start a game from Steam, then add a game from the desktop window: SteamDrop says "A game is running. Steam restarts once you close it." and restarts Steam right after you close the game.
     - **No "null":** Couch mode's Library starts straight with the first game; a game's details in the desktop window never show "null".
     - **Wording:** the Couch hint says "Select game (hold: all)"; nothing says "tick".
     - **Logs:** `%APPDATA%\SteamDrop\logs` has one file per day named `steamdrop-YYYY-MM-DD.log` (old `steamdrop.log` files are gone). Settings → Help → Activity and "Copy bug report" include lines from earlier days.
@@ -168,6 +168,18 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - **Couch setup:** the first time this build opens (either view) it asks "Playing from the couch with a controller?" with the list of what it turns on. "Turn these on" changes those settings; Settings → Couch mode then has "Undo Couch setup", which puts them back exactly as they were. "No thanks" changes nothing and it doesn't ask again. The "Couch setup..." button in Settings does the same anytime.
     - **Popup on top of Big Picture:** with "Keep Big Picture in front" on and Big Picture open, make another app show a window on top without clicking it (a file transfer's progress window, or any always-on-top window). About two seconds later it is behind Big Picture, still open, and Activity says "a window of ... was on top of Big Picture, so SteamDrop sent it behind." Apps under "Except these apps", Task Manager and the on-screen keyboard stay on top.
     - **After a game:** start a game from Big Picture with the controller, then quit the game. Big Picture reacts to the controller right away, without touching the mouse. Activity says "A game started from Steam closed, so SteamDrop gave Big Picture the focus back." (or nothing, if Big Picture already had it).
+
+45. **Round 4 audit fixes:**
+    - Set launch options for a SteamDrop game in Steam (Properties), then "Find artwork again" in SteamDrop and restart Steam: the launch options are still there.
+    - While a game is running, add another game from the desktop window with "Restart Steam now": it says "A game is running. Steam restarts once you close it.", and you can still add or remove other games meanwhile (nothing hangs on "Working on it...").
+    - Select several games including one whose file is missing (Couch mode, hold X) and press "Re-fetch art": the others get new art and the message says which one was skipped.
+    - With Steam's folder set to a wrong place (Settings → Steam), "Remove" still takes a game off SteamDrop's list.
+    - "+ Add a game" with a folder that holds more than a game (for example a watched folder itself), then try to delete it in Couch mode: SteamDrop refuses and nothing is deleted.
+    - Unplug or switch off the drive of a watched folder, start SteamDrop, then connect the drive: within half a minute Activity says it is watching that folder, and new games there are found.
+    - With Big Picture open and the SteamDrop window closed, delete a game's folder: the question appears in Couch mode (full screen, controller), not in a desktop window.
+    - Quit SteamDrop from the tray icon while Couch mode is open from Steam: Steam shows Play.
+    - Hold A on "Delete game" in Couch mode and press Alt+Tab before the bar fills: nothing is deleted. With Couch mode behind another window, the controller does nothing in it.
+    - Couch mode's Settings end with "Back to Steam" (there is no separate "Leave Couch mode").
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 

@@ -99,8 +99,15 @@ struct StateView {
     restart_needed: bool,
 }
 
+// Async, like the other commands that read files: sync commands run on the main thread and would
+// make the windows stutter.
 #[tauri::command]
-fn get_state(app: AppHandle, state: State<App>) -> StateView {
+async fn get_state(app: AppHandle) -> StateView {
+    state_view(&app)
+}
+
+fn state_view(app: &AppHandle) -> StateView {
+    let state = app.state::<App>();
     state.reload_if_changed();
     let data = state.data.lock().unwrap().clone();
     let steam_path = state.steam_path();
@@ -119,7 +126,7 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
         .collect();
     games.sort_by_key(|g| std::cmp::Reverse(g.game.added));
     let gone = state.gone.lock().unwrap().iter().copied().filter(|id| games.iter().any(|g| g.game.id == *id && g.folder_missing)).collect();
-    StateView {
+    let view = StateView {
         settings: data.settings,
         games,
         found: state.found.lock().unwrap().clone(),
@@ -137,7 +144,8 @@ fn get_state(app: AppHandle, state: State<App>) -> StateView {
         couch_pin_set: !secrets::couch_pin().is_empty(),
         restart_needed: !data.pending_adds.is_empty() || !data.pending_removals.is_empty() || data.pending_self,
         version: app.package_info().version.to_string(),
-    }
+    };
+    view
 }
 
 #[tauri::command]
@@ -146,8 +154,13 @@ fn save_settings(app: AppHandle, state: State<App>, patch: serde_json::Value) ->
     let old = state.settings();
     // Windows send only what changed, so one holding an older copy can't put old values back.
     let settings = old.patched(&patch)?;
-    set_run_at_sign_in("SteamDrop", settings.run_on_startup.then_some("--tray"))?;
-    set_run_at_sign_in("SteamDrop Big Picture", settings.big_picture_at_sign_in.then_some("--start-big-picture"))?;
+    // Only when switched: every other change (the interface size, say) leaves the registry alone.
+    if old.run_on_startup != settings.run_on_startup {
+        set_run_at_sign_in("SteamDrop", settings.run_on_startup.then_some("--tray"))?;
+    }
+    if old.big_picture_at_sign_in != settings.big_picture_at_sign_in {
+        set_run_at_sign_in("SteamDrop Big Picture", settings.big_picture_at_sign_in.then_some("--start-big-picture"))?;
+    }
     let watch_changed = old.watched != settings.watched || old.excluded != settings.excluded;
     log_changes(&old, &settings);
     state.update(|d| d.settings = settings)?;
@@ -281,7 +294,7 @@ async fn add_game(app: AppHandle, folder: String, exe: String, name: String, res
     if name.is_empty() {
         return Err("Please type a name for the game.".into());
     }
-    let item = library::Add { folder: folder.into(), exe: exe.into(), name, replaces: None };
+    let item = library::Add { folder: folder.into(), exe: exe.into(), name, replaces: None, fresh_art: false };
     library::add(&app, vec![item], restart).await
 }
 
@@ -298,7 +311,7 @@ async fn add_games(app: AppHandle, games: Vec<NewGame>, restart: bool) -> Result
     if games.is_empty() {
         return Err("Choose at least one game.".into());
     }
-    let items = games.into_iter().map(|g| library::Add { folder: g.folder.into(), exe: g.exe.into(), name: g.name.trim().to_string(), replaces: None }).collect();
+    let items = games.into_iter().map(|g| library::Add { folder: g.folder.into(), exe: g.exe.into(), name: g.name.trim().to_string(), replaces: None, fresh_art: false }).collect();
     library::add(&app, items, restart).await
 }
 
@@ -345,9 +358,7 @@ async fn refresh_game(app: AppHandle, state: State<'_, App>, id: u32, steam_appi
         Some(g.clone())
     })?;
     let game = game.ok_or("That game is no longer in the list.")?;
-    let _ = std::fs::remove_dir_all(art::cache_dir(&state.dir, id));
-    let _ = std::fs::remove_dir_all(PathBuf::from(&game.folder).join(art::GAME_FOLDER_ART));
-    let item = library::Add { folder: game.folder.into(), exe: game.exe.into(), name: game.name, replaces: None };
+    let item = library::Add { folder: game.folder.into(), exe: game.exe.into(), name: game.name, replaces: None, fresh_art: true };
     library::add(&app, vec![item], restart).await
 }
 
@@ -395,13 +406,13 @@ async fn test_sgdb_key(state: State<'_, App>, key: String) -> Result<String, Str
 }
 
 #[tauri::command]
-fn get_activity() -> Vec<String> {
+async fn get_activity() -> Vec<String> {
     log::recent(300)
 }
 
 #[tauri::command]
-fn bug_report(app: AppHandle, state: State<App>) -> String {
-    report::build(&state, &app.package_info().version.to_string())
+async fn bug_report(app: AppHandle) -> String {
+    report::build(&app.state::<App>(), &app.package_info().version.to_string())
 }
 
 #[tauri::command]
@@ -413,6 +424,8 @@ fn open_logs() -> Result<(), String> {
 
 #[tauri::command]
 async fn restart_steam(app: AppHandle, state: State<'_, App>) -> Result<(), String> {
+    let app2 = app.clone();
+    let _ = tauri::async_runtime::spawn_blocking(move || library::wait_for_game(&app2)).await;
     let _guard = state.busy.lock().await;
     let app2 = app.clone();
     tauri::async_runtime::spawn_blocking(move || library::restart_steam_applying(&app2)).await.map_err(|e| e.to_string())?
@@ -528,6 +541,7 @@ fn set_couch_pin(app: AppHandle, old: String, new: String) -> Result<(), String>
 #[tauri::command]
 async fn set_steam_shortcut(app: AppHandle, state: State<'_, App>, on: bool) -> Result<String, String> {
     let steam_dir = state.steam_path().ok_or("Steam was not found. Set its folder in Settings.")?;
+    let _guard = state.busy.lock().await;
     let running = steam::is_running();
     state.update(|d| {
         d.settings.steam_shortcut = on;
@@ -612,6 +626,10 @@ fn scan_now(app: AppHandle) -> String {
 /// Async: exiting closes the windows, which must not happen inside a window's own callback.
 #[tauri::command]
 async fn quit(app: AppHandle) {
+    quit_app(&app);
+}
+
+fn quit_app(app: &AppHandle) {
     steam::end_helpers();
     app.exit(0);
 }
@@ -653,7 +671,10 @@ fn main() {
     let open_view = couch::parse_view(&args).or_else(|| {
         from_steam.then(|| couch::view_for(&state::load(&state::data_dir()).settings.steam_view, couch::started_in_big_picture()))
     });
-    let start_hidden = args.iter().any(|a| a == "--tray");
+    // An automatic update restarts SteamDrop with the arguments it had; it must come back as quietly as it left.
+    let after_quiet_update = std::fs::remove_file(updates::quiet_marker()).is_ok();
+    let open_view = open_view.filter(|_| !after_quiet_update);
+    let start_hidden = after_quiet_update || args.iter().any(|a| a == "--tray");
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
@@ -663,6 +684,8 @@ fn main() {
                     app.state::<App>().steam_session.store(true, std::sync::atomic::Ordering::SeqCst);
                     couch::open(app, view)
                 }
+                // The start-with-Windows entry, when SteamDrop is already running: stay in the tray.
+                None if args.iter().any(|a| a == "--tray") => {}
                 None => show_window(app),
             }
         }))
@@ -747,7 +770,7 @@ fn main() {
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "open" => show_window(app),
                     "couch" => couch::open(app, couch::View::Couch),
-                    "quit" => app.exit(0),
+                    "quit" => quit_app(app),
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, e| {
@@ -779,7 +802,7 @@ fn main() {
                 WindowEvent::CloseRequested { .. } => {
                     let other = if label == couch::COUCH { couch::MAIN } else { couch::COUCH };
                     if !window.state::<App>().settings().close_to_tray && app.get_webview_window(other).is_none() {
-                        app.exit(0);
+                        quit_app(app);
                     }
                 }
                 WindowEvent::Destroyed => couch::closed(app, label),

@@ -152,6 +152,10 @@ Why things are the way they are. Newest decisions go at the bottom of each secti
 - **Bringing a window to the front** tries three times: joining the front app's input; then with a press of a key that has no meaning (0xE8) so SteamDrop counts as the last app to get input; then with Alt, the usual way. Each refusal is logged as a problem.
 - **Couch setup** is only a settings change made by the windows; the old values of the settings it touches are saved in `couch_setup_undo` so Undo puts them back, even after a restart.
 
+- **Re-adding a shortcut edits it in place:** only AppName, Exe, StartDir and icon (and SteamDrop's own launch option) are set; every other field of an existing entry stays as Steam or the user left it.
+- **Deleting is guarded twice:** the Recycle Bin rules, and a refusal for any "game folder" that is a drive root or contains a watched folder, Steam, SteamDrop's data or program, or the user's profile.
+- **Quiet updates** leave a marker file (`updating-quietly`) so the restarted SteamDrop stays in the tray whatever arguments the old one had.
+
 ## Left out on purpose
 
 - Removing a shortcut automatically when its game folder is deleted. SteamDrop asks instead ("Remove selected" / "Keep in Steam"), because deleting things from Steam unasked felt wrong.

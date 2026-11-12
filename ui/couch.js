@@ -154,6 +154,7 @@ function deleteGame(g) {
 
 function exesScreen({ id }) {
   const g = game(id);
+  if (!g) { stack.pop(); return current(); }
   const list = h("div", { class: "actions" }, h("p", { class: "muted" }, "Looking for game files..."));
   invoke("exe_candidates", { folder: g.folder }).then((cands) => {
     const rel = (p) => p.toLowerCase().startsWith(g.folder.toLowerCase()) ? p.slice(g.folder.length).replace(/^[\\/]/, "") : p;
@@ -215,7 +216,7 @@ function settingsScreen() {
     st.couch_setup_undo ? button("couch-undo", "Undo Couch setup", async () => { await save(SD.couchSetupUndo(st)); toast("Couch setup was undone."); }) : null,
     button("theme", "Theme", () => { push({ name: "themes" }); document.querySelector(`[data-key="theme-${SD.themeId(st.theme)}"]`)?.focus(); }, { value: SD.themeName(st.theme), on: true }),
     button("zoom", "Interface size", () => Z.reset(), { value: `${st.zoom_couch}%`, on: st.zoom_couch !== 100, note: "(LT smaller, RT bigger, A resets)" }),
-    button("exit", "Leave Couch mode", leave)),
+    button("exit", "Back to Steam", backToSteam)),
     h("p", { class: "muted" }, `SteamDrop ${S.version}. More settings are in SteamDrop on your desktop.`)];
 }
 
@@ -320,12 +321,6 @@ function back() {
   else push({ name: "exit" });
 }
 
-/** Leaving: if changes are waiting for a Steam restart, offer to restart Steam once Couch mode has closed. */
-function leave() {
-  if (S.restart_needed) push({ name: "leave" });
-  else push({ name: "confirm", title: "Leave Couch mode?", text: "SteamDrop keeps running in the tray on your desktop.", yes: "Leave", action: () => invoke("close_couch", { restart: false }) });
-}
-
 function leaveScreen() {
   return [h("div", { class: "pin" }, h("h1", {}, "Restart Steam to apply changes?"),
     h("p", { class: "muted" }, "Steam shows the changes you made after it restarts. SteamDrop can restart it right after Couch mode closes, and bring you back to Big Picture."),
@@ -375,6 +370,8 @@ function holdEnd() {
 }
 
 function press(action) {
+  // Only while Couch mode is the window in use: a controller in a game must never press anything here.
+  if (!document.hasFocus()) return;
   if (action === "a") {
     if (!holdStart()) document.activeElement?.classList.contains("f") && document.activeElement.click();
   } else if (action === "b") back();
@@ -391,6 +388,8 @@ function press(action) {
   else if (action === "left") move(-1, 0);
   else if (action === "right") move(1, 0);
 }
+// Switching away while holding A must not finish a delete.
+window.addEventListener("blur", holdEnd);
 function release(action) { if (action === "a") holdEnd(); else if (action === "x") xUp(); }
 const move = (dx, dy) => SD.move(dx, dy, [...document.querySelectorAll("#screen .f, #controls .f")]);
 

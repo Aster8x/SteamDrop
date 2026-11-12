@@ -37,11 +37,15 @@ pub fn restart(app: &AppHandle) {
             crate::log::problem(format!("Can't watch {}: {e}", root.display()));
         }
     }
+    let missing: Vec<PathBuf> = settings.watched.iter().map(PathBuf::from).filter(|p| !p.is_dir()).collect();
+    for m in &missing {
+        crate::log::problem(format!("Watched folder {} isn't there right now (a drive that's off or unplugged?). SteamDrop starts watching it as soon as it appears.", m.display()));
+    }
     let list: Vec<String> = roots.iter().map(|r| r.display().to_string()).collect();
     crate::log::info(if list.is_empty() { "Not watching any folders yet.".into() } else { format!("Watching: {}", list.join(", ")) });
     *state.watcher.lock().unwrap() = Some(watcher);
     let app = app.clone();
-    std::thread::spawn(move || run(app, roots, excluded, rx));
+    std::thread::spawn(move || run(app, roots, excluded, missing, rx));
 }
 
 /// The game folder `path` belongs to: a direct subfolder of the most specific watched folder
@@ -60,7 +64,7 @@ pub fn subfolders(root: &Path, roots: &[PathBuf], excluded: &[PathBuf]) -> Vec<P
     entries.filter(|p| p.is_dir() && game_folder(roots, excluded, p).as_ref() == Some(p)).collect()
 }
 
-fn run(app: AppHandle, roots: Vec<PathBuf>, excluded: Vec<PathBuf>, rx: mpsc::Receiver<notify::Result<notify::Event>>) {
+fn run(app: AppHandle, roots: Vec<PathBuf>, excluded: Vec<PathBuf>, missing: Vec<PathBuf>, rx: mpsc::Receiver<notify::Result<notify::Event>>) {
     let state = app.state::<App>();
     let unknown = |p: &Path| p.is_dir() && !state.data.lock().unwrap().is_known(&p.to_string_lossy());
     let mut due: HashMap<PathBuf, Instant> = HashMap::new();
@@ -76,7 +80,12 @@ fn run(app: AppHandle, roots: Vec<PathBuf>, excluded: Vec<PathBuf>, rx: mpsc::Re
         }
     }
     loop {
-        let next = due.values().copied().chain(batch.flush_at(&due)).min();
+        // Only while a watched folder is missing: look for it twice a minute.
+        if missing.iter().any(|m| m.is_dir()) {
+            return restart(&app);
+        }
+        let look_again = (!missing.is_empty()).then(|| Instant::now() + Duration::from_secs(30));
+        let next = due.values().copied().chain(batch.flush_at(&due)).chain(look_again).min();
         let msg = match next {
             Some(t) => rx.recv_timeout(t.saturating_duration_since(Instant::now())),
             None => rx.recv().map_err(|_| mpsc::RecvTimeoutError::Disconnected),

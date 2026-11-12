@@ -53,7 +53,7 @@ pub fn found(app: &AppHandle, folders: Vec<PathBuf>) {
         let moved = state.data.lock().unwrap().games.iter().find(|g| !Path::new(&g.exe).is_file() && Path::new(&g.folder).file_name().map(|n| n.to_string_lossy().to_lowercase()) == name).cloned();
         if let Some((g, exe)) = moved.and_then(|g| relocated_exe(&g, &folder, &f).map(|e| (g, e))) {
             log::info(format!("Found \"{}\" in its new place: {}", g.name, f.folder));
-            to_add.push(Add { folder: folder.clone(), exe, name: g.name, replaces: Some(g.id) });
+            to_add.push(Add { folder: folder.clone(), exe, name: g.name, replaces: Some(g.id), fresh_art: false });
             continue;
         }
         if f.candidates.first().is_some_and(|c| in_steam_elsewhere(&state, &c.path)) {
@@ -75,7 +75,7 @@ pub fn found(app: &AppHandle, folders: Vec<PathBuf>) {
             notify(app, "Only an installer found", &format!("\"{}\" holds an installer, not a ready-to-play game. Install it first, then put the installed folder here.", f.title));
         }
         if auto && !f.installer_only && !f.candidates.is_empty() {
-            to_add.push(Add { folder: folder.clone(), exe: f.candidates[0].path.clone(), name: f.title.clone(), replaces: None });
+            to_add.push(Add { folder: folder.clone(), exe: f.candidates[0].path.clone(), name: f.title.clone(), replaces: None, fresh_art: false });
             continue;
         }
         if !auto && !f.installer_only && !f.candidates.is_empty() {
@@ -145,6 +145,8 @@ pub struct Add {
     pub name: String,
     /// The game this one replaces (the same game, found in a new place).
     pub replaces: Option<u32>,
+    /// "Find artwork again": forget the saved art and get it anew.
+    pub fresh_art: bool,
 }
 
 /// True if a Steam shortcut that isn't one of SteamDrop's games already starts this exe.
@@ -167,7 +169,7 @@ pub async fn find_game(app: &AppHandle, id: u32, folder: PathBuf, restart: bool)
     let game = game.ok_or("That game is no longer in the list.")?;
     let exe = relocated_exe(&game, &folder, &inspect(&folder)).ok_or("There's no game file (.exe) in that folder.")?;
     log::info(format!("You found \"{}\" in a new place: {}", game.name, folder.display()));
-    add(app, vec![Add { folder, exe, name: game.name, replaces: Some(id) }], restart).await
+    add(app, vec![Add { folder, exe, name: game.name, replaces: Some(id), fresh_art: false }], restart).await
 }
 
 fn steam_and_users(state: &App) -> Result<(PathBuf, Vec<(String, PathBuf)>), String> {
@@ -200,16 +202,28 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
     let sgdb_key = crate::secrets::sgdb_key();
     let mut games = vec![];
     let mut art_sets = vec![];
+    // One game that can't be added doesn't stop the others in the same batch.
+    let mut skipped = vec![];
+    let mut kept = vec![];
+    let mut all_known = true;
     for item in &items {
         if !item.exe.is_file() {
-            return Err(format!("The game file {} no longer exists.", item.exe.display()));
+            skipped.push(format!("\"{}\" was skipped: its game file {} no longer exists.", item.name, item.exe.display()));
+            continue;
         }
         if in_steam_elsewhere(&state, &item.exe) {
-            return Err(format!("\"{}\" is already in Steam (game file {}), so SteamDrop won't add it twice.", item.name, item.exe.display()));
+            skipped.push(format!("\"{}\" was skipped: it's already in Steam (game file {}), so SteamDrop won't add it twice.", item.name, item.exe.display()));
+            continue;
         }
+        kept.push(item);
         let id = steam::shortcut_id(&steam::quote(&item.exe), &item.name);
         let folder_str = item.folder.to_string_lossy().into_owned();
         let old = state.data.lock().unwrap().games.iter().find(|g| g.id == id).cloned();
+        all_known &= old.is_some() || item.replaces.is_some();
+        if item.fresh_art {
+            let _ = std::fs::remove_dir_all(art::cache_dir(&state.dir, id));
+            let _ = std::fs::remove_dir_all(item.folder.join(art::GAME_FOLDER_ART));
+        }
         set_status(app, &format!("Looking up \"{}\"...", item.name));
         let mut steam_appid = old.and_then(|g| g.steam_appid).or_else(|| exe::find_appid(&item.folder));
         if steam_appid.is_none() {
@@ -239,11 +253,15 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
         });
     }
 
+    skipped.iter().for_each(|s| log::problem(s));
+    if games.is_empty() {
+        return Err(skipped.join(" "));
+    }
     // Re-adding a folder under a new name or exe gives it a new id; drop the old shortcut.
     let (replaced, snapshot): (Vec<u32>, Data) = {
         let d = state.data.lock().unwrap();
         let mut ids: Vec<u32> = d.games.iter().filter(|o| games.iter().any(|g| g.id != o.id && same_path(&g.folder, &o.folder))).map(|o| o.id).collect();
-        ids.extend(items.iter().filter_map(|i| i.replaces).filter(|old| !games.iter().any(|g| g.id == *old)));
+        ids.extend(kept.iter().filter_map(|i| i.replaces).filter(|old| !games.iter().any(|g| g.id == *old)));
         (ids, d.clone())
     };
     // With Steam open the shortcuts are written now and kept as pending changes, because Steam
@@ -301,20 +319,25 @@ async fn add_inner(app: &AppHandle, items: Vec<Add>, restart: bool) -> Result<St
     drop(_guard);
     state.found.lock().unwrap().retain(|f| !games.iter().any(|g| same_path(&g.folder, &f.folder)));
     for g in &games {
-        log::info(format!("Added \"{}\" to Steam. Game file: {}", g.name, g.exe));
+        log::info(format!("{} \"{}\" {} Steam. Game file: {}", if all_known { "Updated" } else { "Added" }, g.name, if all_known { "in" } else { "to" }, g.exe));
     }
     if was_running && !restart {
         log::info("Steam is open and was not restarted, so the change shows after Steam restarts.");
     }
     let names = games.iter().map(|g| format!("\"{}\"", g.name)).collect::<Vec<_>>().join(", ");
-    let msg = if was_running && !restart {
-        format!("Added {names}. Restart Steam to see it.")
-    } else {
-        format!("Added {names} to Steam.")
+    // New artwork or a changed game file for games already added isn't "added" (and gets no sound).
+    let mut msg = match (all_known, was_running && !restart) {
+        (true, true) => format!("Updated {names}. Restart Steam to see it."),
+        (true, false) => format!("Updated {names} in Steam."),
+        (false, true) => format!("Added {names}. Restart Steam to see it."),
+        (false, false) => format!("Added {names} to Steam."),
     };
-    notify(app, "Added to Steam", &msg);
-    if settings.chime {
-        crate::chime::play(settings.chime_volume, &settings.chime_sound);
+    skipped.iter().for_each(|s| msg = format!("{msg} {s}"));
+    if !all_known {
+        notify(app, "Added to Steam", &msg);
+        if settings.chime {
+            crate::chime::play(settings.chime_volume, &settings.chime_sound);
+        }
     }
     set_status(app, &msg);
     emit_state(app);
@@ -344,13 +367,19 @@ pub async fn remove(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<Str
 async fn remove_inner(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
     let state = app.state::<App>();
     let _guard = state.busy.lock().await;
-    let (steam_dir, users) = steam_and_users(&state)?;
+    // Without Steam (uninstalled, or not found) a game can still leave SteamDrop's list.
+    let steam_dir = state.steam_path();
+    let users = steam_dir.as_deref().map(|s| state.target_users(s)).unwrap_or_default();
     let was_running = steam::is_running();
     let dir = state.dir.clone();
     let ids2 = ids.clone();
     let mut snapshot = state.data.lock().unwrap().clone();
     snapshot.pending_adds.retain(|id| !ids.contains(id));
     tauri::async_runtime::spawn_blocking(move || {
+        let Some(steam_dir) = steam_dir else {
+            ids2.iter().for_each(|id| drop(std::fs::remove_dir_all(art::cache_dir(&dir, *id))));
+            return Ok(());
+        };
         let r = remove_blocking(&steam_dir, &dir, &ids2, None);
         if !was_running {
             apply_pending(&steam_dir, &dir, &snapshot, &steam::users(&steam_dir), &users)?;
@@ -523,6 +552,8 @@ pub fn request_restart(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app.state::<App>();
+        let app3 = app.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || wait_for_game(&app3)).await;
         let _guard = state.busy.lock().await;
         state.restart_queued.store(false, std::sync::atomic::Ordering::SeqCst);
         let app2 = app.clone();
@@ -535,6 +566,22 @@ pub fn request_restart(app: &AppHandle) {
     });
 }
 
+/// Steam won't close while a game runs, so a restart waits for the game rather than force anything.
+/// Call it before taking `busy`: adding and removing games must keep working meanwhile.
+pub fn wait_for_game(app: &AppHandle) {
+    let games = || app.state::<App>().data.lock().unwrap().games.clone();
+    if !steam::is_running() || !steam::game_running(&games()) {
+        return;
+    }
+    set_status(app, "A game is running. Steam restarts once you close it.");
+    log::info("A game is running, so the Steam restart waits until it closes.");
+    let t = std::time::Instant::now();
+    while steam::game_running(&games()) {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+    log::info(format!("The game closed after {} s; restarting Steam now.", t.elapsed().as_secs()));
+}
+
 /// Closes Steam, applies pending changes, and starts it again in the mode the setting asks for.
 /// Hold `busy` while calling it. With Steam closed, it only applies the changes.
 pub fn restart_steam_applying(app: &AppHandle) -> Result<(), String> {
@@ -543,16 +590,6 @@ pub fn restart_steam_applying(app: &AppHandle) -> Result<(), String> {
     let snapshot = state.data.lock().unwrap().clone();
     let write = || apply_pending(&steam_dir, &state.dir, &snapshot, &steam::users(&steam_dir), &state.target_users(&steam_dir));
     let running = steam::is_running();
-    if running && steam::game_running(&snapshot.games) {
-        // Steam won't close while a game runs; wait for it rather than force anything.
-        set_status(app, "A game is running. Steam restarts once you close it.");
-        log::info("A game is running, so the Steam restart waits until it closes.");
-        let t = std::time::Instant::now();
-        while steam::game_running(&snapshot.games) {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        }
-        log::info(format!("The game closed after {} s; restarting Steam now.", t.elapsed().as_secs()));
-    }
     if running {
         set_status(app, "Restarting Steam...");
         steam::restart_with(&steam_dir, &snapshot.settings.steam_restart_mode, write)?;
@@ -591,8 +628,27 @@ pub async fn delete_games(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Resu
     result
 }
 
+/// Why a "game folder" must not be deleted: it's a whole drive, or it holds a watched folder, Steam,
+/// SteamDrop or the user's own folders (someone added, say, the Desktop as a game). None if it's fine.
+fn too_much_to_delete(folder: &str, keep: &[PathBuf]) -> Option<String> {
+    let norm = |p: &str| p.replace('/', "\\").trim_end_matches('\\').to_lowercase();
+    let f = norm(folder);
+    if f.len() <= 2 {
+        return Some("it is a whole drive".into());
+    }
+    keep.iter().map(|k| norm(&k.to_string_lossy())).find(|k| *k == f || k.starts_with(&format!("{f}\\"))).map(|k| format!("it holds {k}, which is more than this game"))
+}
+
 async fn delete_games_inner(app: &AppHandle, ids: &[u32], restart: bool) -> Result<String, String> {
-    let games = games_by_id(app, ids);
+    let state = app.state::<App>();
+    let mut keep: Vec<PathBuf> = state.settings().watched.iter().map(PathBuf::from).collect();
+    keep.extend([state.steam_path(), Some(state.dir.clone()), dirs::home_dir(), std::env::current_exe().ok()].into_iter().flatten());
+    let (games, refused): (Vec<Game>, Vec<Game>) = games_by_id(app, ids).into_iter().partition(|g| too_much_to_delete(&g.folder, &keep).is_none());
+    if let Some(g) = refused.first() {
+        let why = too_much_to_delete(&g.folder, &keep).unwrap_or_default();
+        log::problem(format!("Refused to delete the folder of \"{}\" ({}): {why}.", g.name, g.folder));
+        return Err(format!("SteamDrop won't delete the folder of \"{}\" because {why}. Nothing was deleted. You can remove the game from Steam instead.", g.name));
+    }
     if games.is_empty() {
         return Err("That game is no longer in the list.".into());
     }
@@ -629,14 +685,9 @@ async fn delete_games_inner(app: &AppHandle, ids: &[u32], restart: bool) -> Resu
 
 /// "Re-fetch art" for one or several games: forget the cached art and add them again, in one go.
 pub async fn refetch_art(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
-    let dir = app.state::<App>().dir.clone();
     let items: Vec<Add> = games_by_id(app, &ids)
         .into_iter()
-        .map(|g| {
-            let _ = std::fs::remove_dir_all(art::cache_dir(&dir, g.id));
-            let _ = std::fs::remove_dir_all(PathBuf::from(&g.folder).join(art::GAME_FOLDER_ART));
-            Add { folder: g.folder.into(), exe: g.exe.into(), name: g.name, replaces: None }
-        })
+        .map(|g| Add { folder: g.folder.into(), exe: g.exe.into(), name: g.name, replaces: None, fresh_art: true })
         .collect();
     if items.is_empty() {
         return Err("Those games are no longer in the list.".into());
@@ -668,7 +719,7 @@ pub async fn recheck(app: &AppHandle, ids: Vec<u32>, restart: bool) -> Result<St
             Some(exe) => {
                 log::info(format!("Re-check: \"{}\" now starts with {}", g.name, exe.display()));
                 notes.push(format!("\"{}\" now uses {}", g.name, exe.file_name().unwrap_or_default().to_string_lossy()));
-                changes.push(Add { folder: g.folder.clone().into(), exe, name: g.name, replaces: Some(g.id) });
+                changes.push(Add { folder: g.folder.clone().into(), exe, name: g.name, replaces: Some(g.id), fresh_art: false });
             }
             None => notes.push(format!("\"{}\" has no game file", g.name)),
         }
@@ -758,6 +809,18 @@ mod tests {
         let renamed = Game { exe: base.join("Game/Game-old.exe").to_string_lossy().into(), ..mine };
         assert_eq!(rechecked_exe(&renamed, &found), found.first().map(|c| c.path.clone()), "a missing file gets the best match");
         assert_eq!(rechecked_exe(&renamed, &[]), None);
+    }
+
+    #[test]
+    fn only_a_games_own_folder_can_be_deleted() {
+        let keep = vec![PathBuf::from(r"D:\Games"), PathBuf::from(r"C:\Users\Leon"), PathBuf::from(r"C:\Program Files (x86)\Steam")];
+        assert!(too_much_to_delete(r"D:\Games\Hades", &keep).is_none());
+        assert!(too_much_to_delete(r"E:\Stuff\Celeste\", &keep).is_none());
+        assert!(too_much_to_delete(r"D:\", &keep).is_some(), "a whole drive");
+        assert!(too_much_to_delete(r"d:\games", &keep).is_some(), "a watched folder itself");
+        assert!(too_much_to_delete(r"C:\Users", &keep).is_some(), "it holds the user's folders");
+        assert!(too_much_to_delete(r"C:/Program Files (x86)", &keep).is_some(), "it holds Steam");
+        assert!(too_much_to_delete(r"D:\Gam", &keep).is_none(), "only whole folder names count");
     }
 
     #[test]

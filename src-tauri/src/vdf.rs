@@ -60,7 +60,8 @@ fn read_str(b: &[u8], pos: &mut usize) -> Result<String, String> {
     let rest = &b[*pos..];
     let len = rest.iter().position(|&c| c == 0).ok_or("file ends inside a text field")?;
     *pos += len + 1;
-    Ok(String::from_utf8_lossy(&rest[..len]).into_owned())
+    // Refuse rather than guess: writing a guessed text back would damage that shortcut.
+    String::from_utf8(rest[..len].to_vec()).map_err(|_| "a text field isn't UTF-8".into())
 }
 
 pub fn write(map: &Map) -> Vec<u8> {
@@ -185,6 +186,13 @@ pub fn text_get<'a>(map: &'a [(String, Text)], key: &str) -> Option<&'a Text> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn refuses_text_it_would_damage() {
+        // "Exe" in Windows-1252 ("é" as one byte 0xE9): reading it loosely and writing it back would change it.
+        let bytes = [&[MAP][..], b"shortcuts\0", &[MAP], b"0\0", &[STR], b"Exe\0caf\xE9.exe\0", &[END, END, END]].concat();
+        assert!(parse(&bytes).is_err());
+    }
 
     #[test]
     fn parses_text_keyvalues() {

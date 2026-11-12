@@ -113,9 +113,13 @@ pub fn sync_lock(app: &AppHandle, closing: Option<&str>) {
         lock.take();
         state.steam_session.store(false, Ordering::SeqCst);
     } else if lock.is_none() {
+        // The process Steam started opens the file for an instant to test it; try again past that.
         #[cfg(windows)]
         {
-            *lock = open_lock().ok();
+            *lock = (0..5).find_map(|_| open_lock().ok().or_else(|| {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                None
+            }));
         }
     }
 }
@@ -123,7 +127,9 @@ pub fn sync_lock(app: &AppHandle, closing: Option<&str>) {
 /// Brings SteamDrop to the front for a question (new games, deleted folders): Couch mode if it's
 /// open, otherwise the desktop window.
 pub fn bring_up(app: &AppHandle) {
-    let view = if app.get_webview_window(COUCH).is_some() { View::Couch } else { View::Window };
+    // In Big Picture the player holds a controller: ask in Couch mode, never in a desktop window on top.
+    let couch = app.get_webview_window(COUCH).is_some() || (crate::steam::big_picture_open() && app.get_webview_window(MAIN).is_none_or(|w| !w.is_visible().unwrap_or(false)));
+    let view = if couch { View::Couch } else { View::Window };
     open(app, view);
 }
 

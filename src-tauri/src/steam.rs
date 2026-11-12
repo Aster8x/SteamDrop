@@ -207,9 +207,24 @@ pub fn add(config: &Path, data_dir: &Path, user: &str, items: &[NewShortcut]) ->
     let mut root = load(config)?;
     let list = list_mut(&mut root);
     for s in items {
-        list.retain(|(_, e)| entry_id(e) != Some(s.id));
         let start_dir = s.exe.parent().map(|p| quote(p)).unwrap_or_default();
         let str_ = |v: &str| Value::Str(v.to_string());
+        // Already there: change only what SteamDrop owns, so launch options, collections and other
+        // things the user set in Steam stay.
+        if let Some((_, Value::Map(m))) = list.iter_mut().find(|(_, e)| entry_id(e) == Some(s.id)) {
+            let mut set = |key: &str, v: Value| match m.iter_mut().find(|(k, _)| k.eq_ignore_ascii_case(key)) {
+                Some((_, old)) => *old = v,
+                None => m.push((key.into(), v)),
+            };
+            set("AppName", str_(s.name));
+            set("Exe", str_(&quote(s.exe)));
+            set("StartDir", str_(&start_dir));
+            set("icon", str_(&s.icon));
+            if !s.launch_options.is_empty() {
+                set("LaunchOptions", str_(s.launch_options));
+            }
+            continue;
+        }
         list.push((
             String::new(),
             Value::Map(vec![
@@ -559,6 +574,38 @@ mod tests {
         assert_eq!(helper_pids(&procs, 5), vec![3, 4]);
         // The tray app started by the helper (when it wasn't running yet) never ends itself.
         assert_eq!(helper_pids(&procs, 4), vec![3]);
+    }
+
+    #[test]
+    fn adding_again_keeps_what_the_user_set_in_steam() {
+        let base = std::env::temp_dir().join(format!("steamdrop-keep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let config = base.join("config");
+        std::fs::create_dir_all(&config).unwrap();
+        let exe = PathBuf::from("/games/A/a.exe");
+        add(&config, &base, "1", &[NewShortcut { id: 9, name: "A", exe: &exe, icon: String::new(), launch_options: "" }]).unwrap();
+        // The user sets launch options and hides the game in Steam.
+        let mut root = load(&config).unwrap();
+        let Some((_, Value::Map(m))) = list_mut(&mut root).first_mut() else { panic!() };
+        for (k, v) in m.iter_mut() {
+            match k.as_str() {
+                "LaunchOptions" => *v = Value::Str("-windowed".into()),
+                "IsHidden" => *v = Value::Int(1),
+                _ => {}
+            }
+        }
+        std::fs::write(shortcuts_file(&config), vdf::write(&root)).unwrap();
+        // "Find artwork again" or a changed game file adds it again.
+        let moved = PathBuf::from("/games/A/bin/a.exe");
+        add(&config, &base, "1", &[NewShortcut { id: 9, name: "A", exe: &moved, icon: "i.png".into(), launch_options: "" }]).unwrap();
+        let mut root = load(&config).unwrap();
+        let list = list_mut(&mut root);
+        assert_eq!(list.len(), 1);
+        let Value::Map(m) = &list[0].1 else { panic!() };
+        assert_eq!(vdf::get(m, "LaunchOptions"), Some(&Value::Str("-windowed".into())));
+        assert_eq!(vdf::get_int(m, "IsHidden"), Some(1));
+        assert_eq!(vdf::get(m, "exe"), Some(&Value::Str(quote(&moved))));
+        assert_eq!(vdf::get(m, "icon"), Some(&Value::Str("i.png".into())));
     }
 
     #[test]

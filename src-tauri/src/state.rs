@@ -199,6 +199,8 @@ fn read(dir: &Path) -> Result<Option<Data>, String> {
     match parse(&dir.join("data.json.bak")) {
         Ok(Some(d)) => {
             crate::log::problem(format!("SteamDrop's data file couldn't be read ({error}). Your settings and games were recovered from the backup; the unreadable file was kept as {}.", kept.display()));
+            // Put the good copy back, so the next read (by any SteamDrop process) doesn't recover all over again.
+            let _ = std::fs::copy(dir.join("data.json.bak"), &main);
             Ok(Some(d))
         }
         _ => {

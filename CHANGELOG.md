@@ -27,6 +27,21 @@ First release.
 - Settings fit small and scaled windows (800x600, 125% and 150%): a control moves under its description when there isn't room, and the window never opens bigger than the screen. Couch mode fits small screens too.
 - Faster Steam restarts: no fixed waits, Steam is checked every quarter second with a fast process list, the changes are written and Steam is started again right away (even if writing failed), it's force-closed only after a minute, and the time of each step is logged.
 - New games and deleted game folders that arrive close together are handled together: one question with a checkbox per game ("3 new games found. Add them to Steam?", "2 game folders were deleted. Remove them from Steam?") and one Steam restart. Changes made during a restart wait for one follow-up restart.
+- A full review of the app fixed these:
+  - Getting art again or changing a game's file no longer wipes what you set for that game in Steam (launch options, hidden, collections).
+  - A Steam restart that waits for a running game no longer blocks adding and removing games meanwhile.
+  - One game that can't be added (file gone, or already in Steam) no longer stops the rest of its batch; the message says what was skipped. Art is only thrown away once new art is really being fetched.
+  - A game can be removed from SteamDrop's list even when Steam isn't found.
+  - "Delete game" refuses folders that hold more than a game: a whole drive, a watched folder, Steam, SteamDrop or your user folder.
+  - A watched folder on a drive that wasn't connected when SteamDrop started is watched as soon as it appears.
+  - Steam's shortcuts file is left alone (with a clear message) if it has text that isn't UTF-8, instead of being rewritten with damaged text.
+  - After recovering settings from the backup, the good copy is put back, so it isn't recovered again on every start.
+  - Questions and update notices never open a desktop window on top of Big Picture: questions come in Couch mode, the update window waits until SteamDrop is opened.
+  - Automatic updates wait until SteamDrop isn't on screen, and SteamDrop comes back in the tray afterwards.
+  - Quitting from the tray icon ends SteamDrop's Steam session too. The start-with-Windows entry no longer opens the window if SteamDrop already runs.
+  - Couch mode only listens to the controller while it is the window in use, and a hold to delete stops if you switch away. "Leave Couch mode" in its Settings is now the same "Back to Steam".
+  - The windows no longer stutter while SteamDrop reads its files, and changing a setting no longer rewrites the Windows startup entries each time.
+  - "Find artwork again" and "Change game file" say "Updated", not "Added", and play no sound.
 - A game that shows up in Steam as its store version (with a "Purchase" button) is explained in the README as a known Steam limitation: the game itself tells Steam its App ID; SteamDrop never does.
 
 ### Added

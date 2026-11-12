@@ -43,7 +43,7 @@ pub async fn details(http: &Client, data_dir: &Path, appid: u32) -> Result<Info,
         .map_err(|_| "Could not reach the Steam store. Check your internet connection.")?
         .json()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|_| "The Steam store gave an answer SteamDrop couldn't read. Try again later.")?;
     let entry = &json[appid.to_string()];
     if entry["success"].as_bool() != Some(true) {
         return Err("The Steam store has no page for this game.".into());
