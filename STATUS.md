@@ -189,7 +189,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Leave SteamDrop open and idle and look at Task Manager: its CPU stays at 0%.
     - Windows Settings → Accessibility → Visual effects → turn Animation effects off, restart SteamDrop, add a game: the fruit simply appears, nothing animates.
     - Try each theme: the forest and tree change colors with it. Change the interface size: the art stays sharp.
-    - The app icon (taskbar, tray, Start menu, the .exe) is the tree with one fruit and is recognizable at the smallest size. SteamDrop's tile in Steam gets the new art the next time SteamDrop starts while Steam is closed (or after SteamDrop restarts Steam). The installer shows the forest on its first and last page and in the page header. New title cards (games without art) use the same colors and pixel font.
+    - The app icon (taskbar, tray, Start menu, the .exe) is the tree with one fruit and is recognizable at the smallest size. SteamDrop's tile in Steam gets the new art the next time SteamDrop starts while Steam is closed. The installer shows the forest on its first and last page and in the page header. New title cards (games without art) use the same colors and pixel font.
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 
