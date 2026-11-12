@@ -104,8 +104,24 @@ function maybeShowDialogs() {
   if (dialogFor || $("#dialog").open) return;
   if (S.whats_new) showWhatsNew(S.whats_new);
   else if (S.update) showUpdate(S.update);
+  else if (!S.settings.couch_setup_offered) couchSetup(true);
   else if (S.gone.some((id) => !askedGone.has(id))) showGone();
   else if (addable().length > 1 && addable().some((f) => !askedFound.has(f.folder))) showFoundBatch();
+}
+
+/** "Couch setup": shows what it turns on, then turns it all on. `first` is the one-time offer. */
+async function couchSetup(first = false) {
+  dialogFor = "couch-setup";
+  if (first) await invoke("save_settings", { patch: { couch_setup_offered: true } });
+  const yes = await ask(first ? "Playing from the couch with a controller?" : "Couch setup",
+    [h("p", {}, "Couch setup turns on everything you need to use SteamDrop with only a controller in Steam's Big Picture:"),
+      h("ul", {}, SD.COUCH_SETUP.map(([label]) => h("li", {}, label))),
+      h("p", { class: "muted" }, "You can undo it anytime in Settings → Couch mode.")],
+    [{ label: first ? "No thanks" : "Cancel", value: null }, { label: "Turn these on", value: true, kind: "primary" }]);
+  dialogFor = null;
+  if (!yes) return refresh();
+  await saveSettings(SD.couchSetup(S.settings));
+  showStatus("Couch setup is on. You can undo it in Settings → Couch mode.");
 }
 
 /* ---------- batches: new games and deleted game folders that arrive together ---------- */
@@ -843,6 +859,9 @@ function settingsView() {
         h("div", { class: "seg", role: "group", "aria-label": "When opened from Steam" },
           [["auto", "Auto"], ["couch", "Always Couch mode"], ["window", "Always window"]].map(([v, label]) =>
             h("button", { "aria-pressed": String((st.steam_view || "auto") === v), onclick: () => saveSettings({ steam_view: v }) }, label)))),
+      setting("Couch setup", "One button for playing with only a controller: Automatic mode, Keep Big Picture in front, Steam in Big Picture after restarts and when Windows starts, and SteamDrop starting with Windows. You see the list before anything changes.",
+        h("div", { class: "row" }, btn("Couch setup...", () => couchSetup(), "primary", { always: true }),
+          st.couch_setup_undo ? btn("Undo Couch setup", async () => { await saveSettings(SD.couchSetupUndo(st)); showStatus("Couch setup was undone: those settings are back to how they were."); }, "", { always: true }) : null)),
       h("div", { class: "row" }, btn("Open Couch mode", () => invoke("open_couch"), "", { always: true }))),
 
     h("div", { class: "panel" },

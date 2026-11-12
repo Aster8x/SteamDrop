@@ -314,10 +314,11 @@ pub fn game_running(games: &[crate::state::Game]) -> bool {
 }
 
 /// Apps "Keep Big Picture in front" never fights: Windows' sign-in, lock and permission screens, its
-/// Start menu, search and Task Manager, Steam itself, and SteamDrop.
-const ALWAYS_ALLOWED: [&str; 12] = [
+/// Start menu, search, Task Manager, on-screen keyboards and Game Bar, Steam itself, and SteamDrop.
+const ALWAYS_ALLOWED: [&str; 17] = [
     "lockapp.exe", "logonui.exe", "consent.exe", "credentialuibroker.exe", "taskmgr.exe", "startmenuexperiencehost.exe",
-    "searchhost.exe", "searchapp.exe", "shellexperiencehost.exe", "steam.exe", "steamwebhelper.exe", "gameoverlayui.exe",
+    "searchhost.exe", "searchapp.exe", "shellexperiencehost.exe", "textinputhost.exe", "tabtip.exe", "osk.exe", "dwm.exe",
+    "gamebar.exe", "steam.exe", "steamwebhelper.exe", "gameoverlayui.exe",
 ];
 
 /// Why the window of process `pid` may keep the focus over Big Picture, or None if Big Picture
@@ -335,15 +336,21 @@ pub fn may_keep_focus(pid: u32, procs: &[Proc], except: &[String], me: u32) -> O
     if except.iter().any(|x| x.eq_ignore_ascii_case(&name)) {
         return Some(format!("{name} is in your exceptions"));
     }
-    let mut at = find(pid);
+    from_steam(pid, procs).then(|| format!("{name} was started from Steam"))
+}
+
+/// True if Steam started this process, directly or through a launcher (and it isn't Steam's own).
+pub fn from_steam(pid: u32, procs: &[Proc]) -> bool {
+    let find = |id: u32| procs.iter().find(|p| p.pid == id);
+    let mut at = find(pid).filter(|p| !ALWAYS_ALLOWED.contains(&p.name.as_str()) && p.name != "steamdrop.exe");
     for _ in 0..10 {
         let Some(p) = at.and_then(|p| find(p.parent)).filter(|p| p.pid != 0) else { break };
         if p.name == "steam.exe" {
-            return Some(format!("{name} was started from Steam"));
+            return true;
         }
         at = Some(p);
     }
-    None
+    false
 }
 
 /// How often Steam is checked while closing, and how long it gets before it is force-closed.
@@ -540,6 +547,8 @@ mod tests {
         assert!(may_keep_focus(5, &procs, &except, 5).is_some(), "this process");
         assert!(may_keep_focus(8, &procs, &except, 99).is_some(), "an exception, whatever its case");
         assert!(may_keep_focus(42, &procs, &except, 99).is_some(), "a process that's already gone");
+        assert!(from_steam(4, &procs) && from_steam(3, &procs), "a game and its launcher");
+        assert!(!from_steam(2, &procs) && !from_steam(5, &procs) && !from_steam(7, &procs), "not Steam itself, other apps or SteamDrop");
     }
 
     #[test]

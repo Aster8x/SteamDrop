@@ -166,8 +166,17 @@ function exesScreen({ id }) {
 }
 
 function confirmScreen(sc) {
-  return [h("div", { class: "pin" }, h("h1", {}, sc.title), h("p", { class: "muted" }, sc.text),
-    h("div", { class: "actions" }, button("yes", sc.yes, () => { stack.pop(); sc.action(); }, { kind: "danger" }), button("no", "Cancel", back)))];
+  return [h("div", { class: `pin ${sc.list ? "wide" : ""}` }, h("h1", {}, sc.title), h("p", { class: "muted" }, sc.text),
+    sc.list ? h("ul", { class: "names" }, sc.list.map((x) => h("li", {}, x))) : null,
+    h("div", { class: "actions" }, button("yes", sc.yes, () => { stack.pop(); sc.action(); }, { kind: sc.safe ? "" : "danger" }), button("no", sc.no || "Cancel", back)))];
+}
+
+/** "Couch setup": shows what it turns on, then turns it all on. */
+function couchSetup(first = false) {
+  push({ name: "confirm", safe: true, title: first ? "Playing from the couch with a controller?" : "Couch setup",
+    text: "Couch setup turns on everything you need to use SteamDrop with only a controller. You can undo it in Settings.",
+    list: SD.COUCH_SETUP.map((s) => s[0]), yes: "Turn these on", no: first ? "No thanks" : "Cancel",
+    action: async () => { await save(SD.couchSetup(S.settings)); toast("Couch setup is on."); } });
 }
 
 /** Four-digit PIN pad: A types, B cancels. */
@@ -202,6 +211,8 @@ function settingsScreen() {
       ? push({ name: "pin", title: "Enter your current PIN to turn it off", done: (old) => run(() => invoke("set_couch_pin", { old, new: "" })) })
       : push({ name: "pin", title: "Choose a 4-digit PIN", done: (pin) => run(() => invoke("set_couch_pin", { old: "", new: pin })) }),
       { value: onoff(S.couch_pin_set), on: S.couch_pin_set }),
+    button("couch-setup", "Couch setup", () => couchSetup(), { note: "(everything for controller-only play)" }),
+    st.couch_setup_undo ? button("couch-undo", "Undo Couch setup", async () => { await save(SD.couchSetupUndo(st)); toast("Couch setup was undone."); }) : null,
     button("theme", "Theme", () => { push({ name: "themes" }); document.querySelector(`[data-key="theme-${SD.themeId(st.theme)}"]`)?.focus(); }, { value: SD.themeName(st.theme), on: true }),
     button("zoom", "Interface size", () => Z.reset(), { value: `${st.zoom_couch}%`, on: st.zoom_couch !== 100, note: "(LT smaller, RT bigger, A resets)" }),
     button("exit", "Leave Couch mode", leave)),
@@ -291,6 +302,8 @@ function render() {
   $("#hints").replaceChildren(...hints);
   const again = keep && document.querySelector(`.f[data-key="${CSS.escape(keep)}"]`);
   if (again) again.focus({ preventScroll: true }); else focusFirst();
+  // Questions wait until no other screen (a PIN pad, a confirmation) is open.
+  if (!stack.length) maybeAsk();
 }
 
 function focusFirst() {
@@ -399,14 +412,18 @@ async function refresh() {
   S = await invoke("get_state");
   Z.sync(S.settings.zoom_couch);
   render();
-  maybeAsk();
 }
 
 /* New games and deleted game folders that arrive together are asked about together. */
 const askedFound = new Set();
 const askedGone = new Set();
 function maybeAsk() {
-  if (stack.some((sc) => sc.name === "checklist")) return;
+  if (stack.length) return;
+  if (!S.settings.couch_setup_offered) {
+    invoke("save_settings", { patch: { couch_setup_offered: true } }).catch(() => {});
+    S.settings.couch_setup_offered = true;
+    return couchSetup(true);
+  }
   const gone = S.gone.map(game).filter((g) => g && !askedGone.has(g.id));
   if (gone.length) {
     gone.forEach((g) => askedGone.add(g.id));

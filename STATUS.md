@@ -164,6 +164,11 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - **Wording:** the Couch hint says "Select game (hold: all)"; nothing says "tick".
     - **Logs:** `%APPDATA%\SteamDrop\logs` has one file per day named `steamdrop-YYYY-MM-DD.log` (old `steamdrop.log` files are gone). Settings → Help → Activity and "Copy bug report" include lines from earlier days.
 
+44. **Round 4, controller-only play:**
+    - **Couch setup:** the first time this build opens (either view) it asks "Playing from the couch with a controller?" with the list of what it turns on. "Turn these on" changes those settings; Settings → Couch mode then has "Undo Couch setup", which puts them back exactly as they were. "No thanks" changes nothing and it doesn't ask again. The "Couch setup..." button in Settings does the same anytime.
+    - **Popup on top of Big Picture:** with "Keep Big Picture in front" on and Big Picture open, make another app show a window on top without clicking it (a file transfer's progress window, or any always-on-top window). About two seconds later it is behind Big Picture, still open, and Activity says "a window of ... was on top of Big Picture, so SteamDrop sent it behind." Apps under "Except these apps", Task Manager and the on-screen keyboard stay on top.
+    - **After a game:** start a game from Big Picture with the controller, then quit the game. Big Picture reacts to the controller right away, without touching the mouse. Activity says "A game started from Steam closed, so SteamDrop gave Big Picture the focus back." (or nothing, if Big Picture already had it).
+
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 
 ## How to publish a new version

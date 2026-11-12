@@ -30,7 +30,7 @@ dirs = "7"
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
 keyring = { version = "3", features = ["windows-native"] }
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_Storage_FileSystem", "Win32_Media_Audio", "Win32_UI_WindowsAndMessaging", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_UI_Accessibility", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_Storage_FileSystem", "Win32_Media_Audio", "Win32_UI_WindowsAndMessaging", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_UI_Accessibility", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_UI_Input_KeyboardAndMouse"] }
 
 [profile.release]
 codegen-units = 1

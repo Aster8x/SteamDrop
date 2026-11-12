@@ -147,6 +147,11 @@ Why things are the way they are. Newest decisions go at the bottom of each secti
 
 - **Keep Big Picture in front** uses the same foreground hook. Two seconds after another window takes the focus (and still has it), Big Picture is brought back by briefly joining the front app's input (`AttachThreadInput`) and calling `SetForegroundWindow`, which Windows can still refuse. It leaves alone SteamDrop, Windows' sign-in, lock, permission and shell windows, Steam's own windows, the user's exceptions, anything whose parent chain leads to `steam.exe` (games and their launchers), and everything while a game runs.
 
+- **Windows on top of Big Picture.** A second hook (`EVENT_OBJECT_SHOW`, top-level windows only) and Big Picture getting the focus both schedule one check two seconds later. If Big Picture has the focus and no game runs, every visible window above it in the stacking order that overlaps it, isn't click-through, isn't one of Windows' own shell windows and isn't excepted is placed right behind Big Picture with `SetWindowPos` (which also ends its always-on-top state). Nothing is closed, hidden or minimized.
+- **Focus back after a game.** When a window of a process started from Steam (its parent chain leads to `steam.exe`) comes to the front while Big Picture exists, SteamDrop waits on that process handle (no polling). When it exits and, a moment later, the front window isn't Big Picture or something that may keep the focus, Big Picture is brought to the front. This doesn't depend on the "Keep Big Picture in front" setting.
+- **Bringing a window to the front** tries three times: joining the front app's input; then with a press of a key that has no meaning (0xE8) so SteamDrop counts as the last app to get input; then with Alt, the usual way. Each refusal is logged as a problem.
+- **Couch setup** is only a settings change made by the windows; the old values of the settings it touches are saved in `couch_setup_undo` so Undo puts them back, even after a restart.
+
 ## Left out on purpose
 
 - Removing a shortcut automatically when its game folder is deleted. SteamDrop asks instead ("Remove selected" / "Keep in Steam"), because deleting things from Steam unasked felt wrong.

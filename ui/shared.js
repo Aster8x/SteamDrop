@@ -110,8 +110,24 @@ window.SD = (() => {
   const themeName = (id) => THEMES.find((t) => t[0] === themeId(id))[1];
   const applyTheme = (id) => { document.documentElement.dataset.theme = themeId(id); };
 
+  /* "Couch setup": everything a controller-only player needs, turned on in one go. */
+  const COUCH_SETUP = [
+    ["Automatic mode: new games are added, Steam restarts and you're told, all by itself", { auto_add: true, auto_restart: true, notify: true }],
+    ["Keep Big Picture in front of other apps", { keep_big_picture: true }],
+    ["Steam always comes back in Big Picture after SteamDrop restarts it", { steam_restart_mode: "bigpicture" }],
+    ["Steam opens in Big Picture when Windows starts", { big_picture_at_sign_in: true }],
+    ["SteamDrop starts with Windows", { run_on_startup: true }],
+  ];
+  /** The settings change for Couch setup, remembering the old values so it can be undone. */
+  function couchSetup(settings) {
+    const patch = Object.assign({}, ...COUCH_SETUP.map((s) => s[1]));
+    const before = Object.fromEntries(Object.keys(patch).map((k) => [k, settings[k]]));
+    return { ...patch, couch_setup_undo: settings.couch_setup_undo || before };
+  }
+  const couchSetupUndo = (settings) => ({ ...settings.couch_setup_undo, couch_setup_undo: null });
+
   /** Replaces an element's content; leaves out null and false (replaceChildren would show them as text). */
   const fill = (el, ...kids) => el.replaceChildren(...kids.flat().filter((k) => k != null && k !== false));
 
-  return { startPad, move, art, zoom, THEMES, themeId, themeName, applyTheme, fill };
+  return { startPad, move, art, zoom, THEMES, themeId, themeName, applyTheme, fill, COUCH_SETUP, couchSetup, couchSetupUndo };
 })();

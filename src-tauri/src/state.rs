@@ -50,6 +50,9 @@ pub struct Settings {
     /// "Keep Big Picture in front" (off by default) and the apps it leaves alone (lower-case .exe names).
     pub keep_big_picture: bool,
     pub keep_big_picture_except: Vec<String>,
+    /// "Couch setup" was offered once, and the settings it changed as they were before (for Undo).
+    pub couch_setup_offered: bool,
+    pub couch_setup_undo: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
 impl Default for Settings {
@@ -83,6 +86,8 @@ impl Default for Settings {
             zoom_couch: 100,
             keep_big_picture: false,
             keep_big_picture_except: vec![],
+            couch_setup_offered: false,
+            couch_setup_undo: None,
         }
     }
 }
