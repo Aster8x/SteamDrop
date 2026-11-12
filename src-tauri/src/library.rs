@@ -430,7 +430,7 @@ fn remove_blocking(steam_dir: &Path, data_dir: &Path, ids: &[u32], restart: Opti
 }
 
 const SELF_NAME: &str = "SteamDrop";
-/// SteamDrop's own artwork (sources in assets/steam-art/*.svg).
+/// SteamDrop's own artwork (drawn by scripts/render-art.mjs).
 const SELF_ART: [(art::Slot, &[u8]); 5] = [
     (art::Slot::Portrait, include_bytes!("../steam-art/portrait.png")),
     (art::Slot::Wide, include_bytes!("../steam-art/wide.png")),
@@ -494,7 +494,9 @@ pub fn startup_repair(app: &AppHandle) {
     }
     if state.settings().steam_shortcut {
         let missing = self_shortcut().is_ok_and(|(id, _)| state.target_users(&steam_dir).iter().any(|(_, c)| !steam::present_ids(c).contains(&id)));
-        if missing {
+        // A newer SteamDrop can bring new art for its own tile.
+        let old_art = self_shortcut().is_ok_and(|(id, _)| std::fs::read(art::cache_dir(&state.dir, id).join("portrait.png")).is_ok_and(|b| b != SELF_ART[0].1));
+        if missing || old_art {
             if let Err(e) = set_self_shortcut(&steam_dir, &state.dir, true) {
                 log::problem(format!("Could not add SteamDrop to Steam: {e}"));
             }

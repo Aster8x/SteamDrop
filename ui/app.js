@@ -30,7 +30,11 @@ function h(tag, props, ...kids) {
 const $ = (sel) => document.querySelector(sel);
 const btn = (label, onclick, kind = "", extra = {}) =>
   h("button", { class: `btn ${kind}`, onclick, disabled: busy && !extra.always, ...extra }, label);
-const logo = () => $(".brand svg").cloneNode(true);
+const logo = SD.logo;
+// The tree in the sidebar: one fruit per game.
+const tree = Grove.tree($("#tree"), { w: 90, h: 150, cx: 45, size: 62, ground: 18 });
+const growTree = () => tree.set(S ? S.games.map((g) => g.id) : []);
+document.addEventListener("theme", growTree);
 
 /* ---------- state and status ---------- */
 async function refresh() {
@@ -38,6 +42,7 @@ async function refresh() {
   for (const id of [...selected]) if (!S.games.some((g) => g.id === id && !g.folder_missing)) selected.delete(id);
   Z.sync(S.settings.zoom_window);
   SD.applyTheme(S.settings.theme);
+  growTree();
   render();
   maybeShowDialogs();
 }
@@ -498,9 +503,9 @@ function gamesView() {
   if (S.games.length) {
     out.push(h("div", { class: "grid" }, S.games.filter((g) => !g.folder_missing).map(gameCard)));
   } else {
-    out.push(h("div", { class: "panel empty" }, logo(),
-      h("h2", {}, "No games yet"),
-      h("p", { class: "muted" }, "Copy a game folder into a watched folder, or add one yourself."),
+    out.push(h("div", { class: "panel empty" }, Grove.young(),
+      h("h2", {}, "Nothing planted yet"),
+      h("p", { class: "muted" }, "Copy a game folder into a watched folder and SteamDrop adds it by itself, or add one yourself. Your tree grows a fruit for every game."),
       h("div", { class: "row" }, btn("+ Add a game", addGameFolder, "primary"))));
   }
   return out;
@@ -893,7 +898,7 @@ function aboutView() {
       h("p", { class: "legal" }, LEGAL)),
     h("div", { class: "panel" },
       h("h2", {}, "Thanks"),
-      h("p", {}, "Built with Tauri. Fonts: Chakra Petch and Atkinson Hyperlegible, under the SIL Open Font License. Artwork comes from Steam and SteamGridDB and is fetched only when needed."),
+      h("p", {}, "Built with Tauri. Fonts: Pixelify Sans and Atkinson Hyperlegible, under the SIL Open Font License. Artwork comes from Steam and SteamGridDB and is fetched only when needed."),
       link("Third-party credits", `${REPO}/blob/main/THIRD_PARTY.md`)),
   ];
 }
@@ -972,3 +977,6 @@ window.addEventListener("focus", refresh);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 listen("status", (e) => showStatus(e.payload));
 refresh().then(() => { if (S.status) showStatus(S.status); });
+
+// Pointing at a game (or moving onto it) nudges its fruit on the tree.
+for (const type of ["mouseover", "focusin"]) $("#view-games").addEventListener(type, (e) => { const id = Number(e.target.closest?.(".card")?.dataset.id); if (id) tree.bob(id); });

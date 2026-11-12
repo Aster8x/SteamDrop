@@ -139,7 +139,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 
 39. **Interface size:** in the desktop window, Ctrl and plus makes everything bigger in steps of 10%, Ctrl and minus smaller, Ctrl and 0 back to 100%; Ctrl and the mouse wheel does the same. It stops at 50% and 200%. Settings → Appearance → "Interface size" shows the size, with −, + and Reset. In Couch mode, LT and RT change the size and Settings → "Interface size" resets it. Each view keeps its own size after closing and reopening.
 
-40. **Themes:** in Settings → Appearance, pointing at a theme (or moving to it with Tab or the D-pad) shows it on the whole window right away; moving away goes back; clicking keeps it. Try all eight and check text is easy to read everywhere, including dialogs (Remove a game), the Missing games box and error messages. Open Couch mode: it uses the same theme. In Couch mode, Settings → Theme previews each theme as you move over it, A keeps it, B goes back to the old one. The sun/moon button at the top still switches between SteamDrop Dark and Light.
+40. **Themes:** in Settings → Appearance, pointing at a theme (or moving to it with Tab or the D-pad) shows it on the whole window right away; moving away goes back; clicking keeps it. Try all eight and check text is easy to read everywhere, including dialogs (Remove a game), the Missing games box and error messages. Open Couch mode: it uses the same theme. In Couch mode, Settings → Theme previews each theme as you move over it, A keeps it, B goes back to the old one. The sun/moon button in the sidebar switches between Night Grove and Day Grove.
 
 41. **Several games at once** (use test games you don't need for deleting):
     - Desktop: select two games with their checkboxes; a bar says "2 selected". Ctrl+click a cover adds or removes it; click one game's box, then Shift+click another cover: everything between is selected. "Select all" and "Clear" work.
@@ -181,6 +181,15 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Couch mode's Settings end with "Back to Steam" (there is no separate "Leave Couch mode").
 
 46. **No PIN, and updates in Couch setup:** Couch mode's Settings have no PIN entry and deleting never asks for one (hold A for 2 seconds still does). If you had set a PIN, Windows Credential Manager (Windows Credentials → Generic) no longer lists "Couch mode PIN" after this build starts. "Couch setup" lists "Updates install by themselves" and turns on Settings → Updates → "Install updates automatically"; Undo puts it back.
+
+47. **Night Grove:**
+    - Both views show the forest look: solid cards and panels (no thin outlines), pixel headings, readable body text. Check every screen and dialog you can reach: Games, Settings, About, a game's details, Remove and Delete dialogs, the update window, What's new, Couch mode's Library, details, Settings, Activity and questions.
+    - **The tree** (sidebar in the window, left of the Library in Couch mode) has one fruit per game. Add a game: a blossom opens where the new fruit will be, a few fireflies rise, and it ripens in about two seconds. Move over games (mouse, Tab or D-pad): that game's fruit bobs once. Remove a game: its fruit is gone.
+    - With no games, a young tree shows with "Nothing planted yet" and a short hint.
+    - Leave SteamDrop open and idle and look at Task Manager: its CPU stays at 0%.
+    - Windows Settings → Accessibility → Visual effects → turn Animation effects off, restart SteamDrop, add a game: the fruit simply appears, nothing animates.
+    - Try each theme: the forest and tree change colors with it. Change the interface size: the art stays sharp.
+    - The app icon (taskbar, tray, Start menu, the .exe) is the tree with one fruit and is recognizable at the smallest size. SteamDrop's tile in Steam gets the new art the next time SteamDrop starts while Steam is closed (or after SteamDrop restarts Steam). The installer shows the forest on its first and last page and in the page header. New title cards (games without art) use the same colors and pixel font.
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 

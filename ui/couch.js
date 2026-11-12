@@ -66,10 +66,12 @@ async function run(fn, after) {
 /* ---------- screens ---------- */
 function libraryScreen() {
   if (!S.games.length) {
-    return [h("div", { class: "empty" }, h("h1", {}, "No games yet"),
-      h("p", { class: "muted" }, "Copy a game folder into one of SteamDrop's watched folders and it shows up here. You can choose watched folders in SteamDrop on your desktop."))];
+    return [h("div", { class: "empty" }, h("h1", {}, "Nothing planted yet"),
+      h("p", {}, "Copy a game folder into your games folder and SteamDrop plants it here by itself."),
+      h("p", { class: "muted" }, "Each game grows a fruit on your tree. You choose the games folder in SteamDrop on your desktop."))];
   }
-  return [selected.size ? selectionBar() : null, h("div", { class: "grid" }, S.games.map((g) =>
+  return [h("div", { class: "note" }, h("h1", {}, nGames(S.games.length)), h("p", {}, "Your tree has a fruit for every game.")),
+    selected.size ? selectionBar() : null, h("div", { class: "grid" }, S.games.map((g) =>
     h("button", { class: `tile f ${selected.has(g.id) ? "selected" : ""}`, "data-key": `game-${g.id}`, "aria-label": g.name, "aria-pressed": String(selected.has(g.id)), onclick: () => push({ name: "detail", id: g.id }) },
       SD.art(g, "portrait"),
       selected.has(g.id) ? h("span", { class: "check", "aria-hidden": "true" }, "✓") : null,
@@ -263,8 +265,24 @@ function controlBar() {
 }
 
 /* ---------- navigation ---------- */
+/* ---------- the grove: forest backdrop, and the tree beside the Library ---------- */
+const tree = Grove.tree($("#tree"), { w: 170, h: 190, cx: 84, size: 104 });
+function grove() {
+  // One forest pixel is a whole number of screen pixels, so the art stays crisp at any size.
+  const px = Math.max(2, Math.round(innerHeight / 270));
+  document.documentElement.style.setProperty("--px", `${px}px`);
+  Grove.backdrop($("#backdrop"), px);
+  tree.set(S ? S.games.map((g) => g.id) : []);
+}
+document.addEventListener("theme", grove);
+let resized = 0;
+window.addEventListener("resize", () => { cancelAnimationFrame(resized); resized = requestAnimationFrame(grove); });
+// Moving onto a game nudges its fruit.
+$("#screen").addEventListener("focusin", (e) => { const key = e.target.dataset?.key || ""; if (key.startsWith("game-")) tree.bob(Number(key.slice(5))); });
+
 function render() {
   const keep = document.activeElement?.dataset?.key;
+  document.body.classList.toggle("lib", tab === "library" && !stack.length);
   // The saved theme, except while trying themes on the Theme screen.
   if (stack.at(-1)?.name !== "themes") SD.applyTheme(S.settings.theme);
   for (const t of document.querySelectorAll(".tab")) t.classList.toggle("active", t.dataset.tab === tab);
@@ -384,6 +402,8 @@ document.addEventListener("click", (e) => { if (e.target.closest?.("[data-hold]"
 async function refresh() {
   S = await invoke("get_state");
   Z.sync(S.settings.zoom_couch);
+  SD.applyTheme(S.settings.theme);
+  tree.set(S.games.map((g) => g.id));
   render();
 }
 

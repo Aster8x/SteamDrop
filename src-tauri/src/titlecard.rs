@@ -2,7 +2,7 @@
 
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 
-static FONT: &[u8] = include_bytes!("../../ui/fonts/ChakraPetch-Bold.ttf");
+static FONT: &[u8] = include_bytes!("../../ui/fonts/PixelifySans.ttf");
 
 pub enum Kind {
     /// Background with the title on it (portrait and wide covers).
@@ -13,9 +13,11 @@ pub enum Kind {
     Logo,
 }
 
-const TOP: [f32; 3] = [27.0, 35.0, 54.0];
-const BOTTOM: [f32; 3] = [11.0, 14.0, 22.0];
-const ACCENT: [f32; 3] = [92.0, 200.0, 255.0];
+// Night Grove's colors: forest panel to night sky, a leaf-green stripe, cream text.
+const TOP: [f32; 3] = [32.0, 57.0, 58.0];
+const BOTTOM: [f32; 3] = [12.0, 20.0, 24.0];
+const ACCENT: [f32; 3] = [143.0, 208.0, 106.0];
+const TEXT: [f32; 3] = [241.0, 234.0, 210.0];
 
 pub fn render(title: &str, w: u32, h: u32, kind: Kind) -> Vec<u8> {
     let mut px = vec![0f32; (w * h * 4) as usize];
@@ -39,9 +41,9 @@ pub fn render(title: &str, w: u32, h: u32, kind: Kind) -> Vec<u8> {
         // A soft shadow keeps the logo readable over bright backgrounds.
         Kind::Logo => {
             draw_title(&mut px, w, h, title, (h as f32 * 0.008).max(2.0), [0.0; 3], 0.55);
-            draw_title(&mut px, w, h, title, 0.0, [245.0; 3], 1.0);
+            draw_title(&mut px, w, h, title, 0.0, TEXT, 1.0);
         }
-        Kind::Cover => draw_title(&mut px, w, h, title, 0.0, [245.0; 3], 1.0),
+        Kind::Cover => draw_title(&mut px, w, h, title, 0.0, TEXT, 1.0),
     }
     encode(&px, w, h)
 }

@@ -48,7 +48,9 @@
         "installMode": "currentUser",
         "languages": ["English"],
         "displayLanguageSelector": false,
-        "installerIcon": "icons/icon.ico"
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "windows/header.bmp",
+        "sidebarImage": "windows/sidebar.bmp"
       }
     }
   },

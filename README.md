@@ -47,7 +47,8 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 - **Safe.** SteamDrop backs up Steam's shortcuts file before every change. "Remove from Steam" removes only the shortcut, never your game files.
 - **Light on your PC.** The window is fully closed while SteamDrop sits in the tray. The installer is only a few megabytes.
 - **A sound** when a game has been added, loud enough to hear over Big Picture: **Soft chime** (the default), **Retro coin** or **Pop**, each with a Preview button, or Off, plus a volume slider (Settings → App). The sounds are made by SteamDrop itself.
-- **Themes** (Settings → Appearance): SteamDrop Dark, SteamDrop Light, Dracula, Nord, Catppuccin Mocha, Gruvbox Dark, Tokyo Night and Terminal (green on black). Point at one to try it, click to keep it; Couch mode uses the same theme. Large readable text (Atkinson Hyperlegible) in every theme.
+- **A calm pixel-art forest.** SteamDrop looks like a small grove at night, and a tree grows with your library: every game SteamDrop adds is a fruit on it. A new game opens as a blossom and ripens with a few fireflies; moving over a game nudges its fruit. Nothing moves when nothing happens (and nothing animates at all if Windows' "reduce motion" is on).
+- **Themes** (Settings → Appearance): Night Grove (the default), Day Grove, Dracula, Nord, Catppuccin Mocha, Gruvbox Dark, Tokyo Night and Terminal (green on black). Point at one to try it, click to keep it; Couch mode uses the same theme. Large readable text (Atkinson Hyperlegible) in every theme.
 - **Interface size:** Ctrl and plus, Ctrl and minus, Ctrl and 0, or Ctrl and the mouse wheel make everything bigger or smaller (50% to 200%), with LT and RT on a controller. The desktop window and Couch mode each remember their own size (Settings → Appearance → "Interface size", with Reset).
 - **Stays up to date:** checks for new versions on startup and once a day, shows what changed, and can install updates by itself (never while you're playing).
 
@@ -170,7 +171,7 @@ Run the tests with `cargo test --manifest-path src-tauri/Cargo.toml`. For releas
 
 - Built with [Tauri](https://tauri.app/).
 - Color themes based on [Dracula](https://draculatheme.com/), [Nord](https://www.nordtheme.com/), [Catppuccin](https://catppuccin.com/), [Gruvbox](https://github.com/morhetz/gruvbox) and [Tokyo Night](https://github.com/enkia/tokyo-night-vscode-theme) (all MIT).
-- Fonts: [Chakra Petch](https://github.com/m4rc1e/Chakra-Petch) and [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), under the SIL Open Font License.
+- Fonts: [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) (headings) and [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), under the SIL Open Font License.
 - Artwork from the Steam store and [SteamGridDB](https://www.steamgriddb.com/), fetched when needed.
 
 See [THIRD_PARTY.md](THIRD_PARTY.md) for details.

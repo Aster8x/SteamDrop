@@ -1,17 +1,17 @@
 /* Color themes for both views, as CSS variables only. An element with data-theme="<id>" gets that
    theme's colors (the page root, and the small previews in Settings). Palettes and licenses: THIRD_PARTY.md. */
 :root, [data-theme="dark"] {
-  --bg: #0d111a; --panel: #161c2a; --panel-2: #1e2638; --border: #2c3650;
-  --text: #eef2f8; --muted: #aab4c8; --accent: #5cc8ff; --accent-ink: #052131;
-  --danger: #ff7b7b; --ok: #6fdc9b; --warn: #ffc95c; --logo-bg: #151b2a;
-  --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  --bg: #0c1418; --panel: #17292a; --panel-2: #20393a; --border: #2f5d44;
+  --text: #f1ead2; --muted: #a9b89f; --accent: #8fd06a; --accent-ink: #0c1418;
+  --danger: #ff8f7a; --ok: #8fd06a; --warn: #ffd96a; --logo-bg: #14272b;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .4);
   color-scheme: dark;
 }
 [data-theme="light"] {
-  --bg: #f1f4f9; --panel: #ffffff; --panel-2: #e9eef6; --border: #ccd5e3;
-  --text: #121826; --muted: #485470; --accent: #0b74b0; --accent-ink: #ffffff;
-  --danger: #c22f2f; --ok: #1a7f45; --warn: #8a5a00; --logo-bg: #151b2a;
-  --shadow: 0 10px 30px rgba(20, 30, 50, .12);
+  --bg: #e9f0dc; --panel: #f8faf0; --panel-2: #dbe6c8; --border: #9db88a;
+  --text: #17261c; --muted: #4a5c48; --accent: #2f7a3c; --accent-ink: #ffffff;
+  --danger: #b3402c; --ok: #2f7a3c; --warn: #8a5a00; --logo-bg: #14272b;
+  --shadow: 0 10px 30px rgba(20, 40, 20, .15);
   color-scheme: light;
 }
 /* Dracula (draculatheme.com) */
@@ -62,9 +62,36 @@
   --shadow: 0 0 0 1px #1d5a2a;
   color-scheme: dark;
 }
-/* Shared by every theme. */
+/* Shared by every theme. The grove (sky, woods, tree) is drawn from these, so it follows the theme. */
 :root, [data-theme] {
   --accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
   --danger-soft: color-mix(in srgb, var(--danger) 14%, transparent);
   --warn-soft: color-mix(in srgb, var(--warn) 14%, transparent);
+  /* The hard drop shadow under cards and buttons. */
+  --ink: color-mix(in srgb, var(--bg) 55%, #000);
+  --sky-0: var(--bg);
+  --sky-1: color-mix(in srgb, var(--bg) 75%, var(--panel));
+  --sky-2: color-mix(in srgb, var(--bg) 45%, var(--panel));
+  --sky-3: color-mix(in srgb, var(--bg) 15%, var(--panel));
+  --far: color-mix(in srgb, var(--panel-2) 45%, var(--bg));
+  --mid: color-mix(in srgb, var(--panel-2) 75%, var(--bg));
+  --ground: color-mix(in srgb, var(--ok) 22%, var(--panel));
+  --soil: color-mix(in srgb, var(--ok) 8%, var(--bg));
+  --moss: color-mix(in srgb, var(--ok) 45%, var(--panel));
+  --bark: #6b4a33; --bark-d: #3f2c22;
+  --leaf-d: color-mix(in srgb, var(--ok) 40%, var(--bg));
+  --leaf: color-mix(in srgb, var(--ok) 70%, var(--bg));
+  --leaf-l: var(--ok);
+  --leaf-hi: color-mix(in srgb, var(--ok) 55%, #fff);
+  --fruit: var(--danger); --fruit-hi: color-mix(in srgb, var(--danger) 35%, #fff);
+  --blossom: #f4e9c9; --glow: var(--warn);
+  --star: color-mix(in srgb, var(--muted) 45%, var(--bg));
 }
+/* Night Grove's own forest colors (the page always names its theme, so other themes don't get these). */
+[data-theme="dark"] {
+  --sky-0: #0c1418; --sky-1: #101d22; --sky-2: #14272b; --sky-3: #1a3334;
+  --far: #14282a; --mid: #183230; --ground: #1d3a2c; --soil: #16261f; --moss: #2f5d44;
+  --leaf-d: #234a38; --leaf: #3f7d4b; --leaf-l: #6fb05a; --leaf-hi: #b9dc7c;
+  --fruit: #e8623c; --fruit-hi: #ffd9a0; --star: #4d6b63;
+}
+[data-theme="light"] { --leaf-d: #2f6b3a; --leaf: #4f9a4a; --leaf-l: #86c46a; --leaf-hi: #d7f0a8; --fruit: #d2452b; --glow: #f2c14e; --star: #f8faf0; }

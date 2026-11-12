@@ -1,5 +1,4 @@
-@font-face { font-family: "Chakra Petch"; src: url(fonts/ChakraPetch-SemiBold.ttf); font-weight: 600; }
-@font-face { font-family: "Chakra Petch"; src: url(fonts/ChakraPetch-Bold.ttf); font-weight: 700; }
+@font-face { font-family: "Pixelify Sans"; src: url(fonts/PixelifySans.ttf); font-weight: 400 700; }
 @font-face { font-family: "Atkinson Hyperlegible"; src: url(fonts/AtkinsonHyperlegible-Regular.ttf); font-weight: 400; }
 @font-face { font-family: "Atkinson Hyperlegible"; src: url(fonts/AtkinsonHyperlegible-Bold.ttf); font-weight: 700; }
 
@@ -8,7 +7,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
 body {
-  background: radial-gradient(ellipse at 75% 0%, color-mix(in srgb, var(--accent) 14%, var(--bg)) 0%, var(--bg) 60%);
+  background: var(--sky-0);
   color: var(--text);
   font-family: "Atkinson Hyperlegible", "Segoe UI", sans-serif;
   line-height: 1.4;
@@ -17,7 +16,7 @@ body {
   cursor: none;
   user-select: none;
 }
-h1, h2, h3, .brand, .tab, .bumper { font-family: "Chakra Petch", sans-serif; font-weight: 700; }
+h1, h2, h3, .brand, .tab, .bumper { font-family: "Pixelify Sans", sans-serif; font-weight: 700; }
 h1 { font-size: 2rem; margin: 0 0 .3rem; }
 h2 { font-size: 1.5rem; margin: 0 0 .6rem; }
 p { margin: .3rem 0 .8rem; }
@@ -26,73 +25,74 @@ p { margin: .3rem 0 .8rem; }
 
 .top { display: flex; align-items: center; gap: 2rem; padding: 1.2rem 2.5rem; }
 .brand { display: flex; align-items: center; gap: .7rem; font-size: 1.5rem; }
-.brand svg { width: 2.4rem; height: 2.4rem; }
+.brand canvas { width: 2.4rem; height: 2.4rem; image-rendering: pixelated; }
 .tabs { display: flex; align-items: center; gap: .6rem; margin-left: auto; }
-.tab { padding: .45rem 1.3rem; border-radius: 99px; color: var(--muted); font-size: 1.15rem; }
+.tab { padding: .45rem 1.3rem; border-radius: 6px; color: var(--muted); background: var(--panel); font-size: 1.15rem; }
 .tab.active { background: var(--accent); color: var(--accent-ink); }
-.bumper { font-size: .8rem; padding: .2rem .55rem; border: 2px solid var(--border); border-radius: 8px; color: var(--muted); }
+.bumper { font-size: .8rem; padding: .25rem .6rem; border-radius: 99px; background: var(--panel-2); color: var(--text); }
 
 #screen { overflow-y: auto; padding: .5rem 2.5rem 2rem; scroll-behavior: smooth; scrollbar-width: none; }
 #screen::-webkit-scrollbar { display: none; }
 
-.hints { display: flex; gap: 2.2rem; justify-content: flex-end; padding: .9rem 2.5rem; background: var(--panel); border-top: .1rem solid var(--border); color: var(--muted); font-size: .95rem; }
+.hints { display: flex; gap: 2.2rem; justify-content: flex-end; padding: .9rem 2.5rem; color: var(--text); font-size: .95rem; }
 .hints b { display: inline-grid; place-items: center; min-width: 1.7rem; height: 1.7rem; padding: 0 .35rem; margin-right: .45rem; border-radius: 99px; background: var(--panel-2); color: var(--text); font-size: .85rem; }
 .hints b.a { background: #3ec46d; color: #062611; }
 .hints b.b { background: #e5534b; color: #2b0605; }
 
 /* Focus: anything with class "f" can be reached with the D-pad. */
 .f { outline: none; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
-.f:focus { transform: scale(1.045); box-shadow: 0 0 0 .22rem var(--accent), 0 .8rem 2rem rgba(0, 0, 0, .5); z-index: 1; }
+.f:focus { transform: translateY(-.3rem); outline: .3rem solid var(--glow); outline-offset: .2rem; z-index: 1; }
 
 /* Library */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 1.6rem; padding: .6rem; }
-.tile { position: relative; aspect-ratio: 2 / 3; border-radius: 1rem; overflow: hidden; border: 0; padding: 0; background: var(--panel-2); color: var(--text); font: inherit; }
-.tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.tile .label { position: absolute; inset: auto 0 0 0; padding: 2.5rem .8rem .8rem; background: linear-gradient(transparent, rgba(0, 0, 0, .85)); font-weight: 700; text-align: left; color: #fff; opacity: 0; transition: opacity .12s; }
-.tile:focus .label { opacity: 1; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.8rem, 8.3rem)); gap: 1.4rem 3rem; padding: .6rem; }
+.tile { position: relative; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; border: 0; padding: 0; background: var(--panel); color: var(--text); font: inherit; box-shadow: 0 .45rem 0 var(--ink); }
+.tile img, .tile .titlecard { width: 100%; aspect-ratio: 2 / 3; height: auto; object-fit: cover; display: block; }
+.tile .label { padding: .55rem .8rem .65rem; font-family: "Pixelify Sans", sans-serif; font-weight: 600; font-size: 1.05rem; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile:focus { background: var(--panel-2); }
 /* Shown instead of art that's missing or won't load. */
-.titlecard { display: grid; place-items: center; width: 100%; height: 100%; padding: 1rem; text-align: center; font-family: "Chakra Petch", sans-serif; font-weight: 700; font-size: 1.3rem; background: linear-gradient(var(--panel-2), var(--bg)); color: var(--text); border-bottom: .4rem solid var(--accent); }
+.titlecard { display: grid; place-items: center; width: 100%; height: 100%; padding: 1rem; text-align: center; font-family: "Pixelify Sans", sans-serif; font-weight: 700; font-size: 1.3rem; background: linear-gradient(var(--panel-2), var(--bg)); color: var(--text); }
 .hero img, .hero .titlecard { width: 100%; height: 100%; object-fit: cover; }
 .hero .titlecard { display: none; }
-.empty { max-width: 46rem; margin: 4rem auto; text-align: center; }
+.empty { max-width: 40rem; margin: 6rem 0 0; }
+.empty h1 { font-size: 2.6rem; }
+.empty p { font-size: 1.25rem; }
 
 /* Detail */
 .detail { display: grid; grid-template-columns: 11rem 1fr; gap: 2rem; align-items: start; }
 .hero { height: 8rem; margin: -.5rem -2.5rem 1rem; background: center / cover no-repeat var(--panel); position: relative; }
 .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 30%, var(--bg)); }
-.cover { width: 100%; height: auto; aspect-ratio: 2 / 3; border-radius: 1rem; object-fit: cover; background: var(--panel-2); margin-top: -4.5rem; position: relative; z-index: 1; box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, .6); }
+.cover { width: 100%; height: auto; aspect-ratio: 2 / 3; border-radius: 8px; object-fit: cover; background: var(--panel-2); margin-top: -4.5rem; position: relative; z-index: 1; box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, .6); }
 .actions { display: grid; gap: .7rem; max-width: 34rem; margin-top: .8rem; }
 
 .btn {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
   width: 100%; min-height: 3rem; padding: .55rem 1.3rem;
-  border-radius: .9rem; border: .15rem solid var(--border); background: var(--panel);
+  border-radius: 8px; border: 0; background: var(--panel); box-shadow: 0 .3rem 0 var(--ink);
   color: var(--text); font: inherit; font-weight: 700; font-size: 1.1rem; text-align: left;
   position: relative; overflow: hidden;
 }
-.btn:focus { border-color: var(--accent); background: var(--panel-2); }
+.btn:focus { background: var(--panel-2); }
 .btn.danger { color: var(--danger); }
-.btn .value { font-family: "Chakra Petch", sans-serif; color: var(--muted); }
+.btn .value { font-family: "Pixelify Sans", sans-serif; color: var(--muted); }
 .btn .value.on { color: var(--accent); }
 .btn small { font-weight: 400; color: var(--muted); font-size: .85rem; }
 .btn .fill { position: absolute; inset: 0; width: 0; background: var(--danger-soft); pointer-events: none; }
 .btn .text { position: relative; }
 
 .list { display: grid; gap: .6rem; max-width: 60rem; }
-.row { display: grid; grid-template-columns: 11rem 1fr; gap: 1rem; padding: .7rem 1.1rem; border-radius: .7rem; background: var(--panel); border: .15rem solid transparent; font-size: .95rem; }
-.row:focus { border-color: var(--accent); transform: none; }
+.row { display: grid; grid-template-columns: 11rem 1fr; gap: 1rem; padding: .7rem 1.1rem; border-radius: 8px; background: var(--panel); font-size: .95rem; }
+.row:focus { transform: none; background: var(--panel-2); }
 .row time { color: var(--muted); }
 .row.problem span { color: var(--danger); font-weight: 700; }
 
 /* Centered question screens */
 .pin { max-width: 26rem; margin: 1rem auto; text-align: center; }
 .pin.wide { max-width: 42rem; }
-#toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); max-width: 80vw; padding: 1rem 1.8rem; border-radius: 1rem; background: var(--panel-2); border: .15rem solid var(--accent); font-weight: 700; box-shadow: 0 1rem 2rem rgba(0, 0, 0, .5); }
-#toast.error { border-color: var(--danger); color: var(--danger); }
+#toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); max-width: 80vw; padding: 1rem 1.8rem; border-radius: 8px; background: var(--panel-2); border-left: .6rem solid var(--accent); font-weight: 700; box-shadow: 0 .45rem 0 var(--ink); z-index: 3; }
+#toast.error { border-left-color: var(--danger); color: var(--danger); }
 
 .controls { display: flex; gap: .8rem; justify-content: flex-end; padding: 0 2.5rem .6rem; }
-.cbtn { display: inline-flex; align-items: center; gap: .55rem; min-height: 2.6rem; padding: .35rem 1rem; border-radius: .8rem; border: .15rem solid var(--border); background: var(--panel); color: var(--text); font: inherit; font-weight: 700; font-size: .95rem; }
-.cbtn:focus { border-color: var(--accent); }
+.cbtn { display: inline-flex; align-items: center; gap: .55rem; min-height: 2.6rem; padding: .35rem 1rem; border-radius: 8px; border: 0; background: var(--panel); box-shadow: 0 .3rem 0 var(--ink); color: var(--text); font: inherit; font-weight: 700; font-size: .95rem; }
 .cbtn.danger { color: var(--danger); }
 .cbtn b { display: inline-grid; place-items: center; min-width: 1.6rem; height: 1.6rem; padding: 0 .35rem; border-radius: 99px; background: var(--panel-2); color: var(--text); font-size: .75rem; }
 .cbtn b.y { background: #e7b416; color: #2a1f00; }
@@ -112,9 +112,29 @@ p { margin: .3rem 0 .8rem; }
 }
 
 /* Several games selected */
-.tile.selected { box-shadow: 0 0 0 .3rem var(--accent); }
+.tile.selected { background: var(--moss); }
 .tile .check { position: absolute; top: .6rem; right: .6rem; display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700; }
-.selbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .7rem; align-items: center; margin: 0 .6rem 1rem; padding: 1rem; border-radius: 1rem; background: var(--panel); border: .15rem solid var(--accent); }
+.selbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .7rem; align-items: center; margin: 0 .6rem 1rem; padding: 1rem; border-radius: 8px; background: var(--panel); border-top: .4rem solid var(--accent); box-shadow: 0 .45rem 0 var(--ink); }
 .selbar h2 { margin: 0; }
 .names { text-align: left; max-height: 30vh; overflow-y: auto; margin: 0 0 1rem; }
 .hints b.x { background: #3a7bd5; color: #fff; }
+
+/* ---------- Night Grove: the forest behind everything, the tree beside the Library ---------- */
+#backdrop { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; image-rendering: pixelated; }
+/* --px is one forest pixel on screen (set from the window size, always a whole number). */
+#tree { position: fixed; left: 0; bottom: calc(46 * var(--px)); width: calc(170 * var(--px)); pointer-events: none; display: none; }
+.grove-tree { display: block; width: 100%; image-rendering: pixelated; }
+body.lib #tree { display: block; }
+body.lib #screen { padding-left: calc(170 * var(--px) + 2rem); }
+.note { position: fixed; left: 2.5rem; top: 6.2rem; width: calc(170 * var(--px) - 2rem); }
+.note h1 { margin: 0; }
+.note p { color: var(--muted); margin: .2rem 0 0; }
+/* Text screens get a solid card so they read well over the forest. */
+.pin, .detail > div, .list, #screen > h1, #screen > p { position: relative; }
+.pin { background: var(--panel); padding: 1.6rem 1.8rem; border-radius: 8px; box-shadow: 0 .45rem 0 var(--ink); }
+@media (max-width: 1000px) {
+  body.lib #tree, .note { display: none; }
+  body.lib #screen { padding-left: 2.5rem; }
+}
+/* Windows "reduce motion": nothing slides or fades. */
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }

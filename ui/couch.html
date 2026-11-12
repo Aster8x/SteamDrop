@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,9 +8,11 @@
   <link rel="stylesheet" href="couch.css">
 </head>
 <body>
+  <canvas id="backdrop" aria-hidden="true"></canvas>
+  <div id="tree" aria-hidden="true"></div>
   <header class="top">
     <div class="brand">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--logo-bg)"/><path d="M32 8 L48.5 33 A18 18 0 1 1 15.5 33 Z" fill="var(--accent)"/><path d="M28.5 26h7v14h7L32 52 21.5 40h7z" fill="var(--logo-bg)"/></svg>
+      <canvas class="logo" width="32" height="32" aria-hidden="true"></canvas>
       <span>SteamDrop</span>
     </div>
     <nav class="tabs" aria-label="Sections">
@@ -25,6 +27,7 @@
   <main id="screen"></main>
   <footer class="hints" id="hints"></footer>
   <div id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="grove.js"></script>
   <script src="shared.js"></script>
   <script src="couch.js"></script>
 </body>

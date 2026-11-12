@@ -19,7 +19,7 @@ The full list of Rust crates and their licenses is in `src-tauri/Cargo.lock`.
 
 ## Fonts (bundled)
 
-- **Chakra Petch**, Copyright 2018 The Chakra Petch Project Authors. SIL Open Font License 1.1, see `ui/fonts/OFL-ChakraPetch.txt`.
+- **Pixelify Sans** (headings and title cards), Copyright 2021 The Pixelify Sans Project Authors. SIL Open Font License 1.1, see `ui/fonts/OFL-PixelifySans.txt`.
 - **Atkinson Hyperlegible**, Copyright 2020 Braille Institute of America, Inc. SIL Open Font License 1.1, see `ui/fonts/OFL-AtkinsonHyperlegible.txt`.
 
 ## Color themes
@@ -32,7 +32,7 @@ The themes in Settings → Appearance use colors from these palettes (only the c
 - **[Gruvbox](https://github.com/morhetz/gruvbox)** by Pavel Pertsev (morhetz), MIT/X11 License.
 - **[Tokyo Night](https://github.com/enkia/tokyo-night-vscode-theme)** by Enkia, MIT License.
 
-SteamDrop Dark, SteamDrop Light and Terminal are SteamDrop's own.
+Night Grove, Day Grove and Terminal are SteamDrop's own. All pixel art (the forest, the tree, the icon, SteamDrop's Steam artwork and the installer pictures) is original and drawn by SteamDrop's own code in `ui/grove.js`.
 
 ## Online services (used at runtime, nothing is bundled)
 

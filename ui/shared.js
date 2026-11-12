@@ -104,11 +104,20 @@ window.SD = (() => {
   }
 
   /* Color themes (the colors themselves are in themes.css). */
-  const THEMES = [["dark", "SteamDrop Dark"], ["light", "SteamDrop Light"], ["dracula", "Dracula"], ["nord", "Nord"],
+  const THEMES = [["dark", "Night Grove"], ["light", "Day Grove"], ["dracula", "Dracula"], ["nord", "Nord"],
     ["catppuccin", "Catppuccin Mocha"], ["gruvbox", "Gruvbox Dark"], ["tokyonight", "Tokyo Night"], ["terminal", "Terminal"]];
   const themeId = (id) => THEMES.some((t) => t[0] === id) ? id : "dark";
   const themeName = (id) => THEMES.find((t) => t[0] === themeId(id))[1];
-  const applyTheme = (id) => { document.documentElement.dataset.theme = themeId(id); };
+  // The "theme" event lets each view redraw its pixel art in the new colors.
+  const applyTheme = (id) => {
+    if (document.documentElement.dataset.theme === themeId(id) && applyTheme.done) return;
+    applyTheme.done = true;
+    document.documentElement.dataset.theme = themeId(id);
+    document.dispatchEvent(new Event("theme"));
+  };
+  /** The app icon as a small canvas, in the theme's colors. */
+  const logo = () => { const c = Grove.icon(32, Grove.palette()); c.className = "logo"; c.setAttribute("aria-hidden", "true"); return c; };
+  document.addEventListener("theme", () => document.querySelector(".brand .logo")?.replaceWith(logo()));
 
   /* "Couch setup": everything a controller-only player needs, turned on in one go. */
   const COUCH_SETUP = [
@@ -130,5 +139,5 @@ window.SD = (() => {
   /** Replaces an element's content; leaves out null and false (replaceChildren would show them as text). */
   const fill = (el, ...kids) => el.replaceChildren(...kids.flat().filter((k) => k != null && k !== false));
 
-  return { startPad, move, art, zoom, THEMES, themeId, themeName, applyTheme, fill, COUCH_SETUP, couchSetup, couchSetupUndo };
+  return { startPad, move, art, zoom, THEMES, themeId, themeName, applyTheme, logo, fill, COUCH_SETUP, couchSetup, couchSetupUndo };
 })();
