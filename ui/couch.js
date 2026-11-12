@@ -94,21 +94,18 @@ function selectionBar() {
 }
 const names = (ids) => ids.map((id) => game(id)?.name).filter(Boolean).join(", ");
 
-/** Deleting several games: lists them, then hold A for 2 seconds (and the PIN, if one is set). */
+/** Deleting several games: lists them, then hold A for 2 seconds. */
 function bulkDeleteScreen(sc) {
-  const note = S.couch_pin_set ? "(hold A, then PIN)" : "(hold A for 2 seconds)";
   return [h("div", { class: "pin wide" }, h("h1", {}, `Delete ${nGames(sc.ids.length)}?`),
     h("p", { class: "muted" }, "These folders go to the Recycle Bin and the games are removed from Steam. Folders on drives without a Recycle Bin are not deleted."),
     h("ul", { class: "names" }, sc.ids.map((id) => game(id)).filter(Boolean).map((g) => h("li", {}, g.name))),
     h("div", { class: "actions" },
-      button("bulk-delete", `Delete ${nGames(sc.ids.length)}`, null, { kind: "danger", hold: true, note }),
+      button("bulk-delete", `Delete ${nGames(sc.ids.length)}`, null, { kind: "danger", hold: true, note: "(hold A for 2 seconds)" }),
       button("bulk-cancel", "Cancel", back)))];
 }
 function bulkDelete(ids) {
-  const go = (pin) => run(() => invoke("delete_games", { ids, pin, restart: false }), clearSelection);
   stack.pop();
-  if (S.couch_pin_set) push({ name: "pin", title: `Enter your PIN to delete ${nGames(ids.length)}`, done: go });
-  else go("");
+  run(() => invoke("delete_games", { ids, restart: false }), clearSelection);
 }
 let xHold = null;
 function xDown() {
@@ -132,7 +129,6 @@ function detailScreen({ id }) {
   const hero = h("div", { class: "hero" }, g.hero ? SD.art(g, "hero") : null);
   const info = h("p", { class: "muted" }, g.folder_missing ? "The game file is missing." : g.in_steam ? "" : "Not in Steam right now.");
   invoke("get_info", { id }).then((i) => { if (i && i.description) info.textContent = i.description; }).catch(() => {});
-  const deleteNote = S.couch_pin_set ? "(hold A, then PIN)" : "(hold A for 2 seconds)";
   return [hero, h("div", { class: "detail" },
     SD.art(g, "portrait", "cover"),
     h("div", {}, h("h1", {}, g.name), info,
@@ -142,14 +138,12 @@ function detailScreen({ id }) {
         button("remove", "Remove from Steam", () => push({ name: "confirm", title: `Remove "${g.name}" from Steam?`,
           text: "Only the Steam shortcut and its artwork are removed. The game's files stay where they are.",
           yes: "Remove from Steam", action: () => run(() => invoke("remove_game", { id, restart: false }), backToTab) })),
-        button("delete", "Delete game", () => deleteGame(g), { kind: "danger", hold: true, note: deleteNote })),
+        button("delete", "Delete game", () => deleteGame(g), { kind: "danger", hold: true, note: "(hold A for 2 seconds)" })),
       h("p", { class: "muted" }, "Changes to Steam's library show after Steam restarts.")))];
 }
 
 function deleteGame(g) {
-  const go = (pin) => run(() => invoke("delete_games", { ids: [g.id], pin, restart: false }), backToTab);
-  if (S.couch_pin_set) push({ name: "pin", title: `Enter your PIN to delete "${g.name}"`, done: go });
-  else go("");
+  run(() => invoke("delete_games", { ids: [g.id], restart: false }), backToTab);
 }
 
 function exesScreen({ id }) {
@@ -180,22 +174,6 @@ function couchSetup(first = false) {
     action: async () => { await save(SD.couchSetup(S.settings)); toast("Couch setup is on."); } });
 }
 
-/** Four-digit PIN pad: A types, B cancels. */
-function pinScreen(sc) {
-  sc.digits = sc.digits || "";
-  const dots = h("div", { class: "dots" }, [0, 1, 2, 3].map((i) => h("i", { class: i < sc.digits.length ? "on" : "" })));
-  const press = (d) => {
-    if (d === "del") sc.digits = sc.digits.slice(0, -1);
-    else if (sc.digits.length < 4) sc.digits += d;
-    if (sc.digits.length === 4) { const pin = sc.digits; stack.pop(); sc.done(pin); }
-    render();
-  };
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "del", "0", "back"];
-  return [h("div", { class: "pin" }, h("h2", {}, sc.title), dots,
-    h("div", { class: "pad" }, keys.map((k) => k === "back" ? button("k-back", "Cancel", back)
-      : button(`k-${k}`, k === "del" ? "Delete" : k, () => press(k)))))];
-}
-
 function settingsScreen() {
   const st = S.settings;
   const onoff = (v) => v ? "On" : "Off";
@@ -208,10 +186,6 @@ function settingsScreen() {
     toggle("keep_bp", "Keep Big Picture in front", "keep_big_picture"),
     button("shortcut", "Show SteamDrop in my Steam library", () => run(() => invoke("set_steam_shortcut", { on: !st.steam_shortcut })),
       { value: onoff(st.steam_shortcut), on: st.steam_shortcut }),
-    button("pin", "PIN needed to delete games", () => S.couch_pin_set
-      ? push({ name: "pin", title: "Enter your current PIN to turn it off", done: (old) => run(() => invoke("set_couch_pin", { old, new: "" })) })
-      : push({ name: "pin", title: "Choose a 4-digit PIN", done: (pin) => run(() => invoke("set_couch_pin", { old: "", new: pin })) }),
-      { value: onoff(S.couch_pin_set), on: S.couch_pin_set }),
     button("couch-setup", "Couch setup", () => couchSetup(), { note: "(everything for controller-only play)" }),
     st.couch_setup_undo ? button("couch-undo", "Undo Couch setup", async () => { await save(SD.couchSetupUndo(st)); toast("Couch setup was undone."); }) : null,
     button("theme", "Theme", () => { push({ name: "themes" }); document.querySelector(`[data-key="theme-${SD.themeId(st.theme)}"]`)?.focus(); }, { value: SD.themeName(st.theme), on: true }),
@@ -264,7 +238,7 @@ function checklistScreen(sc) {
       button("list-no", sc.no, () => { stack.pop(); sc.cancel?.(); render(); })))];
 }
 
-const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, pin: pinScreen, leave: leaveScreen, exit: exitScreen, checklist: checklistScreen, themes: themesScreen, bulkdelete: bulkDeleteScreen };
+const SCREENS = { library: libraryScreen, settings: settingsScreen, activity: activityScreen, detail: detailScreen, exes: exesScreen, confirm: confirmScreen, leave: leaveScreen, exit: exitScreen, checklist: checklistScreen, themes: themesScreen, bulkdelete: bulkDeleteScreen };
 const current = () => stack.length ? SCREENS[stack.at(-1).name](stack.at(-1)) : SCREENS[tab]();
 
 /* ---------- control bar ---------- */
@@ -303,7 +277,7 @@ function render() {
   $("#hints").replaceChildren(...hints);
   const again = keep && document.querySelector(`.f[data-key="${CSS.escape(keep)}"]`);
   if (again) again.focus({ preventScroll: true }); else focusFirst();
-  // Questions wait until no other screen (a PIN pad, a confirmation) is open.
+  // Questions wait until no other screen (a confirmation, a game's details) is open.
   if (!stack.length) maybeAsk();
 }
 

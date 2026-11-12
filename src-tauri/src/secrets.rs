@@ -1,9 +1,8 @@
 //! Secrets live in Windows Credential Manager, never in data.json or the logs:
-//! the SteamGridDB key and the optional Couch mode PIN.
+//! the SteamGridDB key.
 
 const SERVICE: &str = "SteamDrop";
 const SGDB: &str = "SteamGridDB API key";
-const PIN: &str = "Couch mode PIN";
 
 /// The saved value, or "" when there is none.
 fn get(account: &str) -> String {
@@ -28,10 +27,7 @@ pub fn set_sgdb_key(key: &str) -> Result<(), String> {
     set(SGDB, key)
 }
 
-pub fn couch_pin() -> String {
-    get(PIN)
-}
-
-pub fn set_couch_pin(pin: &str) -> Result<(), String> {
-    set(PIN, pin)
+/// Removes the PIN older builds could save (deleting games no longer asks for one).
+pub fn forget_old_pin() {
+    let _ = set("Couch mode PIN", "");
 }

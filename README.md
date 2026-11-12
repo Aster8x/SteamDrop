@@ -42,7 +42,7 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 - **Automatic mode** (off by default). Turn it on and SteamDrop adds games, restarts Steam and tells you, all by itself. Or keep it off and confirm each game with one click.
 - **Complete folders only.** If a folder contains only an installer, SteamDrop skips it and tells you to install the game first.
 - **Full artwork** in every slot Steam uses: portrait cover, wide banner, hero background, logo and icon. Only real artwork from Steam or SteamGridDB, or a clean text title card.
-- **Several games at once:** select games on the Games page with their checkboxes (or Ctrl+click and Shift+click their covers, or press X on a controller; hold X to select all), then **Re-fetch art**, **Re-check game file**, **Remove from Steam** or **Delete games** for all of them together, with one Steam restart. Deleting lists the games first and needs DELETE typed (in Couch mode: hold A for 2 seconds), plus the PIN if one is set.
+- **Several games at once:** select games on the Games page with their checkboxes (or Ctrl+click and Shift+click their covers, or press X on a controller; hold X to select all), then **Re-fetch art**, **Re-check game file**, **Remove from Steam** or **Delete games** for all of them together, with one Steam restart. Deleting lists the games first and needs DELETE typed (in Couch mode: hold A for 2 seconds).
 - **Game details** (description, developer, genres) from the Steam store, with a link to the store page.
 - **Safe.** SteamDrop backs up Steam's shortcuts file before every change. "Remove from Steam" removes only the shortcut, never your game files.
 - **Light on your PC.** The window is fully closed while SteamDrop sits in the tray. The installer is only a few megabytes.
@@ -88,11 +88,11 @@ The desktop window's control bar has **Scan now**, **Couch mode**, **Hide**, **C
 
 When you go **Back to Steam**, quit, or hide the desktop window, Steam shows SteamDrop's **Play** button again (never a "Resume" that can't do anything); press Play to open it again. SteamDrop keeps watching your folders from the tray.
 
-**Deleting a game** needs you to hold A for 2 seconds. The game folder goes to the **Recycle Bin**, never deleted for good (on drives without a Recycle Bin, SteamDrop refuses). You can also set a 4-digit PIN in Couch mode's Settings so nobody deletes games by accident.
+**Deleting a game** needs you to hold A for 2 seconds. The game folder goes to the **Recycle Bin**, never deleted for good (on drives without a Recycle Bin, SteamDrop refuses).
 
 For a gaming PC on the TV, turn on **Settings → App → "Open Steam in Big Picture when Windows starts"**: after you sign in, Steam opens straight into Big Picture (unless it's already there).
 
-**Couch setup** (Settings → Couch mode, and offered once the first time SteamDrop opens): one button that turns on everything for playing with only a controller. It shows the list first (Automatic mode, Keep Big Picture in front, Steam in Big Picture after restarts and when Windows starts, SteamDrop starting with Windows), and **Undo Couch setup** puts those settings back.
+**Couch setup** (Settings → Couch mode, and offered once the first time SteamDrop opens): one button that turns on everything for playing with only a controller. It shows the list first (Automatic mode, Keep Big Picture in front, Steam in Big Picture after restarts and when Windows starts, SteamDrop starting with Windows, updates installing by themselves), and **Undo Couch setup** puts those settings back.
 
 **Keep Big Picture in front** (Settings → App, off by default): while Big Picture is open and no game is running, SteamDrop brings Big Picture back a moment after another app takes over the screen, like an update window or a chat app popping up. A window that sits on top of Big Picture without taking over (a progress popup, for example) is sent behind it; other apps' windows are never closed or minimized. And whenever a game you started from Steam closes, Big Picture gets the controller back, with or without this setting. It never pushes away games started from Steam, SteamDrop itself, Windows' permission prompts or the lock screen, and you can list apps it should leave alone under **Except these apps**. Windows sometimes doesn't allow an app to change what's in front, so it may not catch everything. Each time it acts, it says so in the Activity list.
 

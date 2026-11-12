@@ -94,7 +94,6 @@ struct StateView {
     version: String,
     update: Option<updates::Available>,
     whats_new: Option<changelog::Section>,
-    couch_pin_set: bool,
     /// Changes were written while Steam was running and show after a Steam restart.
     restart_needed: bool,
 }
@@ -141,7 +140,6 @@ fn state_view(app: &AppHandle) -> StateView {
         status: state.status.lock().unwrap().clone(),
         update: state.update.lock().unwrap().clone(),
         whats_new: state.whats_new.lock().unwrap().clone(),
-        couch_pin_set: !secrets::couch_pin().is_empty(),
         restart_needed: !data.pending_adds.is_empty() || !data.pending_removals.is_empty() || data.pending_self,
         version: app.package_info().version.to_string(),
     };
@@ -497,14 +495,8 @@ fn exe_candidates(folder: String) -> Vec<exe::Candidate> {
 }
 
 /// "Delete game" for one or several games (after holding A, or typing DELETE on the desktop).
-/// Checks the PIN when one is set.
 #[tauri::command]
-async fn delete_games(app: AppHandle, ids: Vec<u32>, pin: String, restart: bool) -> Result<String, String> {
-    let saved = secrets::couch_pin();
-    if !saved.is_empty() && pin != saved {
-        log::info("Someone tried to delete a game with a wrong PIN.");
-        return Err("That PIN isn't right.".into());
-    }
+async fn delete_games(app: AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
     library::delete_games(&app, ids, restart).await
 }
 
@@ -518,22 +510,6 @@ async fn refetch_art(app: AppHandle, ids: Vec<u32>, restart: bool) -> Result<Str
 #[tauri::command]
 async fn recheck_games(app: AppHandle, ids: Vec<u32>, restart: bool) -> Result<String, String> {
     library::recheck(&app, ids, restart).await
-}
-
-/// Sets, changes or removes (empty `new`) the Couch mode PIN. Changing it needs the old one.
-#[tauri::command]
-fn set_couch_pin(app: AppHandle, old: String, new: String) -> Result<(), String> {
-    let saved = secrets::couch_pin();
-    if !saved.is_empty() && old != saved {
-        return Err("The current PIN isn't right.".into());
-    }
-    if !new.is_empty() && (new.len() != 4 || !new.chars().all(|c| c.is_ascii_digit())) {
-        return Err("The PIN must be 4 digits.".into());
-    }
-    secrets::set_couch_pin(&new)?;
-    log::info(if new.is_empty() { "Couch mode PIN turned off." } else { "Couch mode PIN set." });
-    library::emit_state(&app);
-    Ok(())
 }
 
 /// "Show SteamDrop in my Steam library". Written right away when Steam is closed; otherwise it's a
@@ -642,7 +618,7 @@ fn main() {
     // Used by the uninstaller's "Delete SteamDrop settings and cache".
     if std::env::args().any(|a| a == "--forget-secrets") {
         let _ = secrets::set_sgdb_key("");
-        let _ = secrets::set_couch_pin("");
+        secrets::forget_old_pin();
         return;
     }
     // Used by the installer's "Show SteamDrop in my Steam library" and by the uninstaller.
@@ -656,6 +632,7 @@ fn main() {
         return;
     }
     if std::env::args().any(|a| a == "--remove-from-steam") {
+        secrets::forget_old_pin();
         library::remove_self_from_installer();
         return;
     }
@@ -736,7 +713,6 @@ fn main() {
             delete_games,
             refetch_art,
             recheck_games,
-            set_couch_pin,
             set_steam_shortcut,
             open_couch,
             close_couch,
@@ -783,7 +759,10 @@ fn main() {
             updates::after_start(app.handle());
             updates::schedule(app.handle());
             let handle = app.handle().clone();
-            std::thread::spawn(move || library::startup_repair(&handle));
+            std::thread::spawn(move || {
+                secrets::forget_old_pin();
+                library::startup_repair(&handle)
+            });
             #[cfg(windows)]
             focus::start(app.handle());
             if let Some(view) = open_view {

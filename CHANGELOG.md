@@ -42,6 +42,7 @@ First release.
   - Couch mode only listens to the controller while it is the window in use, and a hold to delete stops if you switch away. "Leave Couch mode" in its Settings is now the same "Back to Steam".
   - The windows no longer stutter while SteamDrop reads its files, and changing a setting no longer rewrites the Windows startup entries each time.
   - "Find artwork again" and "Change game file" say "Updated", not "Added", and play no sound.
+- The Couch mode PIN is gone: holding A for 2 seconds is the one confirmation for deleting. A PIN saved by an earlier build is removed from Windows Credential Manager when SteamDrop starts, and by the uninstaller.
 - A game that shows up in Steam as its store version (with a "Purchase" button) is explained in the README as a known Steam limitation: the game itself tells Steam its App ID; SteamDrop never does.
 
 ### Added
@@ -66,7 +67,7 @@ First release.
 - Automatic updates install quietly, but never while a game started from Steam is running.
 - A one-time "What's new" screen after each update.
 - Couch mode: SteamDrop adds itself to Steam with its own artwork and, started from Steam, opens a full-screen view for gamepads (Xbox and PlayStation) with Library, game details, Settings and Activity.
-- Couch mode can find art again, change a game's file, remove a game from Steam, or delete it (hold A for 2 seconds; the folder goes to the Recycle Bin). An optional 4-digit PIN protects deleting.
+- Couch mode can find art again, change a game's file, remove a game from Steam, or delete it (hold A for 2 seconds; the folder goes to the Recycle Bin).
 - Installer option "Show SteamDrop in my Steam library" (on by default) and a matching setting. Turning it off removes only SteamDrop's own tile and its art, from every Steam account, while Steam is closed.
 - Opened from Steam, SteamDrop picks its view: Couch mode in Big Picture or on a Steam Deck, the desktop window in normal Steam. A setting ("Auto", "Always Couch mode", "Always window"), a switch button and F11 change it anytime. Steam shows SteamDrop as running while either view is shown.
 - A control bar in both views: Scan now (Y on a controller), Hide / Back to Steam, Close (keeps watching from the tray) and Quit SteamDrop (asks first), with controller button hints in Couch mode.
@@ -79,10 +80,10 @@ First release.
 - "When SteamDrop restarts Steam": "Keep current mode" (default; Big Picture only if it was open right before), "Always Big Picture" or "Always desktop mode". Every restart uses it and logs which mode it chose and why.
 - Full controller support in the desktop window too (same controls as Couch mode, with a clear focus ring; View goes back to Couch mode).
 - "Keep Big Picture in front" (off by default): while Big Picture is open and no game runs, Big Picture comes back two seconds after another app takes the focus. It never fights games started from Steam, SteamDrop, Windows' permission prompts or the lock screen, has an "Except these apps" list, and logs each time it acts.
-- "Couch setup" in Settings (both views), offered once on first run: one button that turns on Automatic mode, Keep Big Picture in front, Steam in Big Picture after restarts and at Windows sign-in, and starting with Windows. It lists what it changes first and can be undone.
+- "Couch setup" in Settings (both views), offered once on first run: one button that turns on Automatic mode, Keep Big Picture in front, Steam in Big Picture after restarts and at Windows sign-in, starting with Windows and automatic updates. It lists what it changes first and can be undone.
 - "Keep Big Picture in front" also sends other apps' windows that sit on top of Big Picture without taking the focus (a progress popup, say) behind it. Windows are never closed or minimized.
 - When a game started from Steam closes while Big Picture is open, Big Picture gets the focus back, so the controller keeps working. Bringing Big Picture to the front now tries harder, and says so in the log when Windows refuses.
-- Select several games in both views: a checkbox on each game, Ctrl+click and Shift+click, Select all and Clear; on a controller X selects a game and holding X selects all. A bar shows how many are selected with Re-fetch art, Re-check game file, Remove from Steam and Delete games, all done in one go with one Steam restart. Deleting several uses the same Recycle Bin rules and PIN, lists the games first, and needs a 2-second hold (or typing DELETE on the desktop).
+- Select several games in both views: a checkbox on each game, Ctrl+click and Shift+click, Select all and Clear; on a controller X selects a game and holding X selects all. A bar shows how many are selected with Re-fetch art, Re-check game file, Remove from Steam and Delete games, all done in one go with one Steam restart. Deleting several uses the same Recycle Bin rules, lists the games first, and needs a 2-second hold (or typing DELETE on the desktop).
 - Themes in Settings → Appearance, with a live preview: SteamDrop Dark (default), SteamDrop Light, Dracula, Nord, Catppuccin Mocha, Gruvbox Dark, Tokyo Night and Terminal (green on black). They apply to both views and every dialog; Couch mode picks a theme with the controller.
 - Interface size: Ctrl+plus, Ctrl+minus, Ctrl+0 and Ctrl+mouse wheel (LT/RT on a controller), 50% to 200% in steps of 10, saved separately for the desktop window and Couch mode, with an "Interface size" setting and Reset. Both views are slightly more compact by default.
 - Leaving Couch mode after changes asks "Restart Steam to apply changes?". SteamDrop then restarts Steam once Couch mode has closed (back into Big Picture) and writes the changes while Steam is closed, so Steam can't bring back a removed game.

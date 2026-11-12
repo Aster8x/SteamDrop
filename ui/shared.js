@@ -117,6 +117,7 @@ window.SD = (() => {
     ["Steam always comes back in Big Picture after SteamDrop restarts it", { steam_restart_mode: "bigpicture" }],
     ["Steam opens in Big Picture when Windows starts", { big_picture_at_sign_in: true }],
     ["SteamDrop starts with Windows", { run_on_startup: true }],
+    ["Updates install by themselves (never while you're playing)", { update_auto_install: true }],
   ];
   /** The settings change for Couch setup, remembering the old values so it can be undone. */
   function couchSetup(settings) {

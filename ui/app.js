@@ -424,22 +424,18 @@ async function bulkRemove() {
   if (choice) await bulk("remove_games", "the change");
 }
 
-/** Deleting several games: lists them, then needs DELETE typed (and the PIN, if one is set). */
+/** Deleting several games: lists them, then needs DELETE typed. */
 function bulkDelete() {
   const games = picked();
   const dlg = $("#dialog");
   const word = h("input", { type: "text", autocomplete: "off", spellcheck: "false", "aria-label": "Type DELETE to confirm", placeholder: "DELETE" });
-  const pin = S.couch_pin_set ? h("input", { type: "password", inputmode: "numeric", maxlength: "4", autocomplete: "off", "aria-label": "PIN", placeholder: "PIN" }) : null;
-  const go = h("button", { class: "btn danger", disabled: true, onclick: () => bulk("delete_games", "the change", { pin: pin ? pin.value : "" }) }, `Delete ${nGames(games.length)}`);
-  const check = () => { go.disabled = word.value.trim().toUpperCase() !== "DELETE" || (pin && pin.value.length !== 4); };
-  word.addEventListener("input", check);
-  pin?.addEventListener("input", check);
+  const go = h("button", { class: "btn danger", disabled: true, onclick: () => bulk("delete_games", "the change") }, `Delete ${nGames(games.length)}`);
+  word.addEventListener("input", () => { go.disabled = word.value.trim().toUpperCase() !== "DELETE"; });
   dlg.replaceChildren(h("div", { class: "inner" },
     h("h2", {}, `Delete ${nGames(games.length)}?`),
     h("p", {}, "These game folders go to the Recycle Bin (you can restore them from there) and the games are removed from Steam. Folders on drives without a Recycle Bin, like USB sticks or network drives, are not deleted."),
     nameList(games),
     h("label", { class: "small" }, h("strong", {}, "Type DELETE to confirm")), word,
-    pin ? [h("label", { class: "small" }, h("strong", {}, "Couch mode PIN")), pin] : null,
     h("div", { class: "actions" }, h("button", { class: "btn", onclick: () => dlg.close() }, "Cancel"), go)));
   dlg.oncancel = null;
   dlg.showModal();

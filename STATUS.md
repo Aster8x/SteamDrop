@@ -18,7 +18,7 @@ Version 0.1.0, first complete build. Everything in the spec is implemented. It h
   - sending a folder to the Recycle Bin, or refusing without touching it (Wine has no Recycle Bin, so it refused; GitHub's Windows runner exercises the real path).
 - **SteamDrop's own Steam shortcut:** `--add-to-steam` and `--remove-from-steam` were run as a Windows binary under Wine against a fake Steam folder. They added and removed the shortcut (launch options `--couch`) and all five artwork files.
 - **The process Steam starts** (`--couch`) exits by itself when Couch mode can't open; it doesn't hang.
-- **Couch mode** was driven in Chromium with a simulated gamepad and the keyboard: moving around, A, B, LB/RB, holding A (1 second does nothing, 2 seconds deletes), and the PIN pad.
+- **Couch mode** was driven in Chromium with a simulated gamepad and the keyboard: moving around, A, B, LB/RB, holding A (1 second does nothing, 2 seconds deletes).
 - **Windows installer builds:** a cross-compiled build produced a ~2 MB `SteamDrop_0.1.0_x64-setup.exe` with the custom uninstaller template, so the NSIS script compiles.
 - **`SteamDrop.exe --uninstall-cleanup`** was run as a Windows binary under Wine against a fake Steam folder. It removed SteamDrop's shortcut and its grid art, kept another tool's shortcut, made a backup, and cleared the art cache and the game list.
 - **The UI** was rendered in Chromium against a mocked backend (games list, new-game card, installer card, details window, settings, about, dark and light). The layout looks right.
@@ -114,9 +114,8 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 34. **Sound:** Settings → App → "Sound when a game is added" is on "Soft chime". Each Preview button plays its sound (Soft chime, Retro coin, Pop) at the slider's volume, even when the sound is Off. Choose one, add a game while Big Picture is open: you hear that sound. Choose Off: no sound, and the volume slider is hidden.
 35. **Delete game:**
     - Use a test game you don't need. Holding A for under 2 seconds does nothing; holding it for 2 seconds moves the folder to the Recycle Bin (check that you can restore it) and removes the game.
-    - Set a PIN in Couch mode's Settings: deleting now asks for it, and a wrong PIN refuses.
     - On a USB stick or network drive without a Recycle Bin, SteamDrop must refuse and leave the folder alone.
-36. **Uninstall** removes SteamDrop's own shortcut from Steam (always), and the PIN with "Delete SteamDrop settings and cache".
+36. **Uninstall** removes SteamDrop's own shortcut from Steam (always).
 
 37. **Fixes from the first laptop test** (install the new build over the old one; your games and settings stay):
     - **Settings survive restarts:** set up watched folders, an exclusion, Automatic mode and a few other settings, and add a game. Then quit and restart SteamDrop, restart Windows, open SteamDrop from Steam (both views), let SteamDrop restart Steam, and install the new build over the old one. After each, everything is still there. `%APPDATA%\SteamDrop` has `data.json` and `data.json.bak`.
@@ -145,8 +144,8 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 41. **Several games at once** (use test games you don't need for deleting):
     - Desktop: select two games with their checkboxes; a bar says "2 selected". Ctrl+click a cover adds or removes it; click one game's box, then Shift+click another cover: everything between is selected. "Select all" and "Clear" work.
     - "Re-fetch art" gets new art for all of them with one Steam restart. "Re-check game file": games whose file still exists keep it. To see a change, use a test folder you made yourself, not a real game: copy `C:\Windows\notepad.exe` into a new folder in a watched folder, let SteamDrop add it, rename that copy, then re-check: it now uses the renamed copy. "Remove from Steam" lists the games first.
-    - "Delete games" lists them; the Delete button only works after typing DELETE (and the PIN, if set). The folders go to the Recycle Bin and the games leave Steam, with one restart. On a USB stick, those folders are refused and stay.
-    - Controller (both views): X selects the focused game, holding X for a second selects all. In Couch mode the bar sits above the Library; "Delete games" needs A held for 2 seconds, then the PIN if set. B clears the selection.
+    - "Delete games" lists them; the Delete button only works after typing DELETE. The folders go to the Recycle Bin and the games leave Steam, with one restart. On a USB stick, those folders are refused and stay.
+    - Controller (both views): X selects the focused game, holding X for a second selects all. In Couch mode the bar sits above the Library; "Delete games" needs A held for 2 seconds. B clears the selection.
 
 42. **Keep Big Picture in front** (Settings → App, off by default):
     - Turn it on, open Big Picture, then open another app from the desktop (for example Notepad with Win+R → notepad). About two seconds later Big Picture is back in front, and Activity says "Keep Big Picture in front: notepad.exe took the focus, so SteamDrop brought Big Picture back."
@@ -180,6 +179,8 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Quit SteamDrop from the tray icon while Couch mode is open from Steam: Steam shows Play.
     - Hold A on "Delete game" in Couch mode and press Alt+Tab before the bar fills: nothing is deleted. With Couch mode behind another window, the controller does nothing in it.
     - Couch mode's Settings end with "Back to Steam" (there is no separate "Leave Couch mode").
+
+46. **No PIN, and updates in Couch setup:** Couch mode's Settings have no PIN entry and deleting never asks for one (hold A for 2 seconds still does). If you had set a PIN, Windows Credential Manager (Windows Credentials → Generic) no longer lists "Couch mode PIN" after this build starts. "Couch setup" lists "Updates install by themselves" and turns on Settings → Updates → "Install updates automatically"; Undo puts it back.
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 
