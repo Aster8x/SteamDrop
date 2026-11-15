@@ -176,24 +176,55 @@ function couchSetup(first = false) {
     action: async () => { await save(SD.couchSetup(S.settings)); toast("Couch setup is on."); } });
 }
 
+/* Settings sections: A opens or closes one; which are open is remembered on this PC. */
+const OPEN_KEY = "steamdrop-couch-open-sections";
+const openSections = (() => { try { return new Set(JSON.parse(localStorage.getItem(OPEN_KEY)) || []); } catch { return new Set(); } })();
+function group(id, title, summary, items) {
+  const open = openSections.has(id);
+  const flip = () => {
+    if (open) openSections.delete(id); else openSections.add(id);
+    try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openSections])); } catch { /* not remembered */ }
+    render();
+  };
+  return [button(`sec-${id}`, title, flip, { kind: "section-head", value: open ? "−" : "+", note: `· ${summary}` }),
+    open ? h("div", { class: "section-items" }, items) : null];
+}
+const SOUNDS = [["soft", "Soft chime"], ["coin", "Retro coin"], ["pop", "Pop"], ["off", "Off"]];
+
 function settingsScreen() {
   const st = S.settings;
   const onoff = (v) => v ? "On" : "Off";
   const toggle = (key, label, field) => button(key, label, () => save({ [field]: !st[field] }), { value: onoff(st[field]), on: st[field] });
+  const sound = st.chime ? st.chime_sound || "soft" : "off";
+  const nextSound = () => {
+    const [v] = SOUNDS[(SOUNDS.findIndex(([x]) => x === sound) + 1) % SOUNDS.length];
+    save(v === "off" ? { chime: false } : { chime: true, chime_sound: v });
+    if (v !== "off") invoke("test_chime", { volume: st.chime_volume, sound: v });
+  };
+  const auto = [st.auto_add, st.auto_restart, st.notify];
   return [h("h1", {}, "Settings"), h("div", { class: "actions" },
-    toggle("auto_add", "Add new games without asking", "auto_add"),
-    toggle("auto_restart", "Restart Steam automatically", "auto_restart"),
-    toggle("notify", "Show notifications", "notify"),
-    toggle("art_folder", "Also save art in the game folder", "art_in_game_folder"),
-    toggle("keep_bp", "Keep Big Picture in front", "keep_big_picture"),
-    button("shortcut", "Show SteamDrop in my Steam library", () => run(() => invoke("set_steam_shortcut", { on: !st.steam_shortcut })),
-      { value: onoff(st.steam_shortcut), on: st.steam_shortcut }),
-    button("couch-setup", "Couch setup", () => couchSetup(), { note: "(everything for controller-only play)" }),
-    st.couch_setup_undo ? button("couch-undo", "Undo Couch setup", async () => { await save(SD.couchSetupUndo(st)); toast("Couch setup was undone."); }) : null,
-    button("theme", "Theme", () => { push({ name: "themes" }); document.querySelector(`[data-key="theme-${SD.themeId(st.theme)}"]`)?.focus(); }, { value: SD.themeName(st.theme), on: true }),
-    button("zoom", "Interface size", () => Z.reset(), { value: `${st.zoom_couch}%`, on: st.zoom_couch !== 100, note: "(LT smaller, RT bigger, A resets)" }),
-    button("exit", "Back to Steam", backToSteam)),
-    h("p", { class: "muted" }, `SteamDrop ${S.version}. More settings are in SteamDrop on your desktop.`)];
+    group("auto", "Adding games", `Automatic mode: ${auto.every(Boolean) ? "On" : auto.some(Boolean) ? "Custom" : "Off"}`, [
+      toggle("auto_add", "Add new games without asking", "auto_add"),
+      toggle("auto_restart", "Restart Steam by itself", "auto_restart"),
+      toggle("notify", "Show notifications", "notify")]),
+    group("couch", "Big Picture & Couch setup", `Couch setup: ${st.couch_setup_undo ? "on" : "off"}`, [
+      button("couch-setup", "Couch setup", () => couchSetup(), { note: "(everything for controller-only play)" }),
+      st.couch_setup_undo ? button("couch-undo", "Undo Couch setup", async () => { await save(SD.couchSetupUndo(st)); toast("Couch setup was undone."); }) : null,
+      toggle("keep_bp", "Keep Big Picture in front", "keep_big_picture"),
+      button("shortcut", "Show SteamDrop in my Steam library", () => run(() => invoke("set_steam_shortcut", { on: !st.steam_shortcut })),
+        { value: onoff(st.steam_shortcut), on: st.steam_shortcut })]),
+    group("appearance", "Appearance", `${SD.themeName(st.theme)} · ${st.zoom_couch}% size`, [
+      button("theme", "Theme", () => { push({ name: "themes" }); document.querySelector(`[data-key="theme-${SD.themeId(st.theme)}"]`)?.focus(); }, { value: SD.themeName(st.theme), on: true }),
+      button("zoom", "Interface size", () => Z.reset(), { value: `${st.zoom_couch}%`, on: st.zoom_couch !== 100, note: "(LT smaller, RT bigger, A resets)" })]),
+    group("sound", "Sound", SOUNDS.find(([v]) => v === sound)[1], [
+      button("sound", "Sound when a game is added", nextSound, { value: SOUNDS.find(([v]) => v === sound)[1], on: st.chime, note: "(A plays the next one)" })]),
+    group("artwork", "Artwork", `Copy in game folder: ${onoff(st.art_in_game_folder).toLowerCase()}`, [
+      toggle("art_folder", "Also save art in the game folder", "art_in_game_folder")]),
+    group("updates", "Updates", `Version ${S.version}`, [
+      toggle("update_auto", "Install updates automatically", "update_auto_install")]),
+    group("help", "Help & About", "Version, where the other settings are", [
+      h("p", { class: "muted" }, `SteamDrop ${S.version}. Watched folders, Steam and the rest are in SteamDrop on your desktop. For a bug report, use Settings → Help & About there.`)]),
+    button("exit", "Back to Steam", backToSteam))];
 }
 
 function activityScreen() {
@@ -213,11 +244,11 @@ function activityScreen() {
 /** Themes: moving onto one previews it on the whole screen, A keeps it, B goes back to the saved one. */
 function themesScreen() {
   const saved = SD.themeId(S.settings.theme);
-  return [h("h1", {}, "Theme"), h("p", { class: "muted" }, "Move to a theme to try it. A keeps it, B goes back."),
+  return [h("h1", {}, "Theme"), h("p", { class: "muted" }, "A picks a theme, B goes back."),
     h("div", { class: "actions" }, SD.THEMES.map(([id, name]) =>
-      h("button", { class: "btn f", "data-key": `theme-${id}`, "data-theme": id, onfocus: () => SD.applyTheme(id),
-        onclick: () => { stack.pop(); save({ theme: id }); } },
-        h("span", { class: "text" }, name), h("span", { class: "value on" }, id === saved ? "In use" : ""))))];
+      h("button", { class: `btn f ${id === saved ? "in-use" : ""}`, "data-key": `theme-${id}`, "data-theme": id,
+        onclick: () => { S.settings.theme = id; SD.fadeToTheme(id); stack.pop(); save({ theme: id }); } },
+        h("span", { class: "text" }, name), h("span", { class: "value on" }, id === saved ? "✓ In use" : ""))))];
 }
 
 /** B on the Library: leave for Steam (the default), quit, or stay. */
@@ -283,8 +314,7 @@ $("#screen").addEventListener("focusin", (e) => { const key = e.target.dataset?.
 function render() {
   const keep = document.activeElement?.dataset?.key;
   document.body.classList.toggle("lib", tab === "library" && !stack.length);
-  // The saved theme, except while trying themes on the Theme screen.
-  if (stack.at(-1)?.name !== "themes") SD.applyTheme(S.settings.theme);
+  SD.applyTheme(S.settings.theme);
   for (const t of document.querySelectorAll(".tab")) t.classList.toggle("active", t.dataset.tab === tab);
   SD.fill($("#screen"), current());
   $("#controls").replaceChildren(...controlBar());

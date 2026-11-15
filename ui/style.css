@@ -40,10 +40,6 @@ nav { display: flex; gap: .4rem; flex: 1; }
 }
 .tab:hover { color: var(--text); background: var(--panel-2); }
 .tab[aria-current="page"] { color: var(--accent-ink); background: var(--accent); }
-.icon-btn {
-  width: 48px; height: 48px; border-radius: 8px; border: 0;
-  background: var(--panel-2); color: var(--text); cursor: pointer; font-size: 1.3rem;
-}
 
 .status {
   display: flex; align-items: center; gap: .7rem;
@@ -198,7 +194,7 @@ dialog .actions { display: flex; flex-wrap: wrap; gap: .7rem; justify-content: f
 
 .legal { white-space: pre-line; }
 .about-head { display: flex; gap: 1.2rem; align-items: center; }
-.about-head svg { width: 76px; height: 76px; }
+canvas.logo { image-rendering: pixelated; flex: none; }
 .error { color: var(--danger); font-weight: 700; }
 .spread > .text { flex: 1; min-width: 260px; }
 .info .row { margin-top: 1rem; }
@@ -273,7 +269,6 @@ body.pad :focus { outline: 4px solid var(--accent); outline-offset: 3px; box-sha
 .theme { font: inherit; font-weight: 700; display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; padding: .7rem .9rem; border-radius: 8px; border: 0; background: var(--panel); color: var(--text); cursor: pointer; text-align: left; }
 .theme:hover { filter: brightness(1.12); }
 .theme[aria-checked="true"] { outline: 4px solid var(--accent); }
-.theme[aria-checked="true"]::after { content: "In use"; font-size: .8rem; color: var(--accent); }
 .swatches { display: flex; gap: .3rem; }
 .swatches i { width: 1.4rem; height: 1.4rem; border-radius: 4px; }
 .swatches i:nth-child(1) { background: var(--bg); }
@@ -299,8 +294,7 @@ body { padding-left: 15rem; }
 .topbar { position: fixed; left: 0; top: 0; bottom: 0; width: 15rem; flex-direction: column; align-items: stretch; gap: .5rem; padding: 1.6rem 1.2rem 0; overflow: hidden; }
 .topbar nav { flex: none; flex-direction: column; margin-top: 1.2rem; }
 .tab { text-align: left; font-family: "Pixelify Sans", sans-serif; font-size: 1.25rem; border-radius: 6px; }
-.brand canvas { width: 40px; height: 40px; image-rendering: pixelated; }
-.icon-btn { align-self: flex-start; margin-top: .6rem; box-shadow: 0 4px 0 var(--ink); }
+.brand canvas { width: 64px; height: 64px; image-rendering: pixelated; }
 /* The tree stands at the bottom of the sidebar; it never takes clicks. */
 #tree { margin: auto -1.2rem 0; pointer-events: none; }
 .grove-tree { display: block; width: 100%; image-rendering: pixelated; }
@@ -312,8 +306,22 @@ body { padding-left: 15rem; }
   body { padding-left: 0; }
   .topbar { position: sticky; bottom: auto; width: auto; flex-direction: row; align-items: center; padding: .6rem 1rem; overflow: visible; }
   .topbar nav { flex: 1; flex-direction: row; margin-top: 0; }
-  .icon-btn { align-self: center; margin-top: 0; }
   #tree { display: none; }
 }
 /* Windows "reduce motion": nothing slides or fades. */
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+@media (prefers-reduced-motion: reduce) { *, ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+
+/* Settings sections: a header row with a one-line summary; the settings show when it's open. */
+details.section { padding: 0; overflow: hidden; }
+details.section > summary { list-style: none; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .1rem 1rem; padding: 1rem 1.4rem; cursor: pointer; }
+details.section > summary::-webkit-details-marker { display: none; }
+details.section > summary h2 { margin: 0; grid-column: 1; }
+details.section > summary .summary-line { grid-column: 1; color: var(--muted); font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+details.section > summary::after { content: "+"; grid-column: 2; grid-row: 1 / span 2; font: 700 1.6rem "Pixelify Sans", sans-serif; color: var(--accent); width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 6px; background: var(--panel-2); }
+details.section[open] > summary::after { content: "−"; }
+details.section > summary:hover { background: var(--panel-2); }
+details.section[open] > summary { border-bottom: 3px solid var(--bg); }
+.section-body { padding: .6rem 1.4rem 1.2rem; }
+.view > details.section + details.section { margin-top: .8rem; }
+/* The theme in use is ringed and says so. */
+.theme .in-use { font-size: .85rem; color: var(--accent); font-weight: 700; }

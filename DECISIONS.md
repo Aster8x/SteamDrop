@@ -67,7 +67,7 @@ Why things are the way they are. Newest decisions go at the bottom of each secti
 - **Single instance:** starting SteamDrop again just shows the existing window.
 - **Store details** (description, developer, publisher, genres, release date) come from `store.steampowered.com/api/appdetails`, fetched on first open and cached in `info/<appid>.json`.
 - **Wording** is aimed at non-technical users: "Game file" instead of "executable", "Not now" instead of "Ignore", and every Steam restart is explained before it happens.
-- **Look:** Night Grove (dark) by default, with Day Grove and other themes in Settings and a sun/moon button in the sidebar; see "Night Grove" below. Base text is 18 px and buttons are at least 44 to 52 px tall.
+- **Look:** Night Grove (dark) by default, with Day Grove and other themes in Settings → Appearance only; see "Night Grove" below. Base text is 18 px and buttons are at least 44 to 52 px tall.
 
 ## Installer, uninstaller, releases
 
@@ -162,6 +162,10 @@ Why things are the way they are. Newest decisions go at the bottom of each secti
 - **Sizes:** in Couch mode one forest pixel is a whole number of screen pixels (window height / 270, rounded), recomputed on resize, so the art stays crisp with any interface size. The desktop tree lives in the sidebar and hides in small windows, where the sidebar becomes a top bar again.
 - **No thin outlines:** cards, panels, buttons and inputs are filled shapes with a hard shadow; selection uses a thick ring.
 - **Pixelify Sans** (OFL 1.1) is for headings, names and tabs only; all body text stays Atkinson Hyperlegible.
+
+- **The logo** is three hand-drawn pixel grids in `ui/grove.js` (32, 24 and 16 px; the small ones simplified so "SD" stays readable) with its own nine colors in every theme. Everything that shows it enlarges it by a whole number of screen pixels: the window headers compute their size from Windows' scaling, and the icon, Steam art and installer pictures are drawn at whole-number scales by `scripts/render-art.mjs` (48 px is the 24 px grid doubled).
+- **Themes change only on a click or A.** No preview on hover or focus (it changed the theme by accident while scrolling). The change uses the browser's view transition for a short cross-fade of the whole window, skipped with "reduce motion".
+- **Settings sections** are `<details>` elements in the window (keyboard, mouse and controller work without extra code) and header buttons in Couch mode; which are open is a per-PC convenience in the window's local storage, so it can be lost without harm.
 
 ## Left out on purpose
 

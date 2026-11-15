@@ -82,7 +82,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - "Test key" says clearly whether the key works. Try a wrong key too.
     - After "Save key", the key is in Windows Credential Manager (Control Panel → Credential Manager → Windows Credentials, look for "SteamDrop") and not in `%APPDATA%\SteamDrop\data.json`.
 24. **Help and bug report:**
-    - Settings → Help shows recent activity in plain words (for example "Added "X" to Steam").
+    - Settings → Help & About shows recent activity in plain words (for example "Added "X" to Steam").
     - "Open log folder" opens `%APPDATA%\SteamDrop\logs`.
     - "Copy bug report" copies one block of text. Paste it into Notepad and check it shows `C:\Users\<user>` instead of your name and contains no key.
     - "Report a problem" opens GitHub's bug report form.
@@ -97,7 +97,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 27. **Couch mode setup:**
     - On the installer's last page, "Show SteamDrop in my Steam library" is selected.
     - After installing and restarting Steam, SteamDrop is in the library with its own cover, banner, background, logo and icon.
-    - Settings → Couch mode can turn this off and on again.
+    - Settings → Big Picture & Couch setup can turn this off and on again.
 28. **Couch mode with a controller** (try an Xbox and a PlayStation controller if you have both):
     - Start SteamDrop from Steam in Big Picture. It opens full screen, and Steam shows SteamDrop as running.
     - D-pad and left stick move between tiles, A opens a game, B goes back, and LB/RB switch Library, Settings and Activity.
@@ -110,8 +110,8 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Change "When opened from Steam" to "Always Couch mode" or "Always window" and check it's respected.
     - F11 or the switch button changes views; Steam keeps showing SteamDrop as running the whole time, and as stopped once no SteamDrop window is shown (closed or hidden).
 32. **Control bar:** Scan now finds a game you copied while SteamDrop was paused (Y on a controller). In the desktop window, Hide sends the window to the tray, Close closes it but the tray icon stays, and Quit SteamDrop asks "Stop adding new games?" and then exits. Couch mode's bar has only Scan now (Y), Window view (View) and Back to Steam (Menu); leaving and quitting are behind B (see test 38).
-33. **Big Picture at sign-in:** turn on Settings → App → "Open Steam in Big Picture when Windows starts", sign out and back in: Steam opens in Big Picture. With Steam already set to start in Big Picture, nothing extra happens. Turn it off and sign in again: Steam starts as usual. Uninstalling removes it.
-34. **Sound:** Settings → App → "Sound when a game is added" is on "Soft chime". Each Preview button plays its sound (Soft chime, Retro coin, Pop) at the slider's volume, even when the sound is Off. Choose one, add a game while Big Picture is open: you hear that sound. Choose Off: no sound, and the volume slider is hidden.
+33. **Big Picture at sign-in:** turn on Settings → Big Picture & Couch setup → "Open Steam in Big Picture when Windows starts", sign out and back in: Steam opens in Big Picture. With Steam already set to start in Big Picture, nothing extra happens. Turn it off and sign in again: Steam starts as usual. Uninstalling removes it.
+34. **Sound:** Settings → Sound → "Sound when a game is added" is on "Soft chime". Each Preview button plays its sound (Soft chime, Retro coin, Pop) at the slider's volume, even when the sound is Off. Choose one, add a game while Big Picture is open: you hear that sound. Choose Off: no sound, and the volume slider is hidden.
 35. **Delete game:**
     - Use a test game you don't need. Holding A for under 2 seconds does nothing; holding it for 2 seconds moves the folder to the Recycle Bin (check that you can restore it) and removes the game.
     - On a USB stick or network drive without a Recycle Bin, SteamDrop must refuse and leave the folder alone.
@@ -139,7 +139,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 
 39. **Interface size:** in the desktop window, Ctrl and plus makes everything bigger in steps of 10%, Ctrl and minus smaller, Ctrl and 0 back to 100%; Ctrl and the mouse wheel does the same. It stops at 50% and 200%. Settings → Appearance → "Interface size" shows the size, with −, + and Reset. In Couch mode, LT and RT change the size and Settings → "Interface size" resets it. Each view keeps its own size after closing and reopening.
 
-40. **Themes:** in Settings → Appearance, pointing at a theme (or moving to it with Tab or the D-pad) shows it on the whole window right away; moving away goes back; clicking keeps it. Try all eight and check text is easy to read everywhere, including dialogs (Remove a game), the Missing games box and error messages. Open Couch mode: it uses the same theme. In Couch mode, Settings → Theme previews each theme as you move over it, A keeps it, B goes back to the old one. The sun/moon button in the sidebar switches between Night Grove and Day Grove.
+40. **Themes:** in Settings → Appearance, pointing at a theme or scrolling over it changes nothing. Clicking one (or A on it in Couch mode, Settings → Appearance → Theme) changes the whole window with a short fade, and that theme is ringed and says "✓ In use". With Windows' animation effects off, it changes without a fade. Try all eight and check text is easy to read everywhere, including dialogs, the Missing games box and error messages. Couch mode uses the same theme.
 
 41. **Several games at once** (use test games you don't need for deleting):
     - Desktop: select two games with their checkboxes; a bar says "2 selected". Ctrl+click a cover adds or removes it; click one game's box, then Shift+click another cover: everything between is selected. "Select all" and "Clear" work.
@@ -147,7 +147,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - "Delete games" lists them; the Delete button only works after typing DELETE. The folders go to the Recycle Bin and the games leave Steam, with one restart. On a USB stick, those folders are refused and stay.
     - Controller (both views): X selects the focused game, holding X for a second selects all. In Couch mode the bar sits above the Library; "Delete games" needs A held for 2 seconds. B clears the selection.
 
-42. **Keep Big Picture in front** (Settings → App, off by default):
+42. **Keep Big Picture in front** (Settings → Big Picture & Couch setup, off by default):
     - Turn it on, open Big Picture, then open another app from the desktop (for example Notepad with Win+R → notepad). About two seconds later Big Picture is back in front, and Activity says "Keep Big Picture in front: notepad.exe took the focus, so SteamDrop brought Big Picture back."
     - Start a game from Big Picture, then Alt+Tab to another app: Big Picture does not jump over it while the game runs. Switch to SteamDrop's window or Couch mode, lock the PC (Win+L), or start something that asks for permission: none of these are pushed away.
     - Add notepad.exe under "Except these apps": Notepad now stays in front. Turn the setting off: nothing is brought back any more.
@@ -161,7 +161,7 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - **Fast restarts:** open Couch mode from Steam, add a game so SteamDrop restarts Steam (or change something and press "Back to Steam" → "Restart now"). Steam closes within about 1 to 2 seconds of "Restarting Steam...", and Activity has "Steam restart: closing Steam took ... s". Start a game from Steam, then add a game from the desktop window: SteamDrop says "A game is running. Steam restarts once you close it." and restarts Steam right after you close the game.
     - **No "null":** Couch mode's Library starts straight with the first game; a game's details in the desktop window never show "null".
     - **Wording:** the Couch hint says "Select game (hold: all)"; nothing says "tick".
-    - **Logs:** `%APPDATA%\SteamDrop\logs` has one file per day named `steamdrop-YYYY-MM-DD.log` (old `steamdrop.log` files are gone). Settings → Help → Activity and "Copy bug report" include lines from earlier days.
+    - **Logs:** `%APPDATA%\SteamDrop\logs` has one file per day named `steamdrop-YYYY-MM-DD.log` (old `steamdrop.log` files are gone). Settings → Help & About → Activity and "Copy bug report" include lines from earlier days.
 
 44. **Round 4, controller-only play:**
     - **Couch setup:** the first time this build opens (either view) it asks "Playing from the couch with a controller?" with the list of what it turns on. "Turn these on" changes those settings; Settings → Couch mode then has "Undo Couch setup", which puts them back exactly as they were. "No thanks" changes nothing and it doesn't ask again. The "Couch setup..." button in Settings does the same anytime.
@@ -189,9 +189,14 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
     - Leave SteamDrop open and idle and look at Task Manager: its CPU stays at 0%.
     - Windows Settings → Accessibility → Visual effects → turn Animation effects off, restart SteamDrop, add a game: the fruit simply appears, nothing animates.
     - Try each theme: the forest and tree change colors with it. Change the interface size: the art stays sharp.
-    - The app icon (taskbar, tray, Start menu, the .exe) is the tree with one fruit and is recognizable at the smallest size. SteamDrop's tile in Steam gets the new art the next time SteamDrop starts while Steam is closed. The installer shows the forest on its first and last page and in the page header. New title cards (games without art) use the same colors and pixel font.
+    - The tree in the sidebar and in Couch mode is the current one; a new tree is being chosen. SteamDrop's tile in Steam gets the new art the next time SteamDrop starts while Steam is closed. The installer shows the forest on its first and last page and in the page header. New title cards (games without art) use the same colors and pixel font.
 
-If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
+48. **Round 6:**
+    - The desktop window has no dark/light button any more; themes are only in Settings → Appearance (see test 40).
+    - **Settings** in both views is a list of sections: Adding games, Watched folders, Steam, Big Picture & Couch setup, Artwork, Appearance, Sound, Start and close, Updates, Help & About (Couch mode shows the ones that work from the couch). Each closed section shows a one-line summary (for example "Automatic mode: Off"). Click, Enter, Space or A opens and closes a section. Close SteamDrop and open it again: the same sections are open. With a controller you can reach every section and every setting inside it, and B always leaves.
+    - **The new logo** ("SD" with a vine and a flower on a strip of grass) is everywhere and always sharp, never blurry: the taskbar, tray, Start menu and .exe icon (also at the smallest size), the window and Couch mode header, About, the installer's first, last and header pictures, and SteamDrop's own tile in Steam (cover, banner, logo and icon say "SteamDrop", nothing about Couch mode; it gets the new art the next time SteamDrop starts while Steam is closed). Try Windows scaling at 100%, 125% and 150%.
+
+If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help & About → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 
 ## How to publish a new version
 

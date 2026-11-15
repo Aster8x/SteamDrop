@@ -25,7 +25,8 @@ p { margin: .3rem 0 .8rem; }
 
 .top { display: flex; align-items: center; gap: 2rem; padding: 1.2rem 2.5rem; }
 .brand { display: flex; align-items: center; gap: .7rem; font-size: 1.5rem; }
-.brand canvas { width: 2.4rem; height: 2.4rem; image-rendering: pixelated; }
+.brand canvas { width: 3rem; height: 3rem; image-rendering: pixelated; }
+canvas.logo { image-rendering: pixelated; flex: none; }
 .tabs { display: flex; align-items: center; gap: .6rem; margin-left: auto; }
 .tab { padding: .45rem 1.3rem; border-radius: 6px; color: var(--muted); background: var(--panel); font-size: 1.15rem; }
 .tab.active { background: var(--accent); color: var(--accent-ink); }
@@ -137,4 +138,9 @@ body.lib #screen { padding-left: calc(170 * var(--px) + 2rem); }
   body.lib #screen { padding-left: 2.5rem; }
 }
 /* Windows "reduce motion": nothing slides or fades. */
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+@media (prefers-reduced-motion: reduce) { *, ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+.btn.in-use { outline: .25rem solid var(--accent); outline-offset: -.25rem; }
+/* Settings sections: A opens and closes one; its settings are indented under it. */
+.btn.section-head { background: var(--panel-2); }
+.btn.section-head .value { font-size: 1.4rem; }
+.section-items { display: grid; gap: .7rem; padding-left: 1.6rem; }

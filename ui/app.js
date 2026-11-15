@@ -320,8 +320,6 @@ function render() {
     else t.removeAttribute("aria-current");
   }
   for (const v of ["games", "settings", "about"]) $(`#view-${v}`).hidden = v !== view;
-  const light = S.settings.theme === "light";
-  $("#theme").textContent = light ? "☾" : "☀";
   const target = $(`#view-${view}`);
   // Re-rendering replaces the elements; focus the same control again for keyboard and controller users.
   // Matched by what it is, not where it was: a list that grew must not move focus onto, say, a Remove button.
@@ -566,16 +564,15 @@ function setting(title, text, control) {
   return h("div", { class: "setting" }, h("div", { class: "text" }, h("strong", {}, title), h("span", {}, text)), control);
 }
 
-/** Theme cards, each drawn in its own colors. Pointing at or focusing one previews it; clicking keeps it. */
+/** Theme cards, each drawn in its own colors. Only a click (or A) changes the theme. */
 function themePicker(st) {
   const saved = SD.themeId(st.theme);
-  const restore = () => SD.applyTheme(S.settings.theme);
-  return h("div", { class: "themes", role: "radiogroup", "aria-label": "Theme", onmouseleave: restore,
-    onfocusout: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) restore(); } },
+  return h("div", { class: "themes", role: "radiogroup", "aria-label": "Theme" },
     SD.THEMES.map(([id, name]) => h("button", {
       class: "theme", role: "radio", "aria-checked": String(id === saved), "data-theme": id,
-      onmouseenter: () => SD.applyTheme(id), onfocus: () => SD.applyTheme(id), onclick: () => saveSettings({ theme: id }),
-    }, h("span", { class: "swatches", "aria-hidden": "true" }, h("i"), h("i"), h("i"), h("i")), h("span", {}, name))));
+      onclick: () => { SD.fadeToTheme(id); saveSettings({ theme: id }); },
+    }, h("span", { class: "swatches", "aria-hidden": "true" }, h("i"), h("i"), h("i"), h("i")), h("span", {}, name),
+      id === saved ? h("span", { class: "in-use" }, "✓ In use") : null)));
 }
 
 /** SteamGridDB key box: dots by default, the eye button shows it only while held down. */
@@ -644,15 +641,16 @@ function helpPanel() {
         h("textarea", { class: "report", readonly: true, rows: 12 }, report)], [{ label: "Close", value: null, kind: "primary" }]);
     }
   };
-  return h("div", { class: "panel" },
-    h("h2", {}, "Help"),
-    h("p", { class: "muted" }, "Something not working? Press \"Copy bug report\" and paste it into a new report on GitHub. It contains SteamDrop's recent activity and settings, with your Windows user name and SteamGridDB key left out."),
+  return [
+    h("p", { class: "muted" }, `You have SteamDrop ${S.version}. Something not working? Press "Copy bug report" and paste it into a new report on GitHub. Your Windows user name and SteamGridDB key are left out.`),
     h("div", { class: "row" },
       btn("Copy bug report", copyReport, "primary", { always: true }),
       btn("Report a problem", () => invoke("open", { target: `${REPO}/issues/new?template=bug_report.yml` }), "", { always: true }),
-      btn("Open log folder", () => invoke("open_logs").catch((e) => showStatus(String(e), true)), "", { always: true })),
+      btn("Open log folder", () => invoke("open_logs").catch((e) => showStatus(String(e), true)), "", { always: true }),
+      btn("About SteamDrop", () => { view = "about"; render(); }, "", { always: true })),
     h("h3", { class: "activity-title" }, "Activity"),
-    list);
+    list,
+  ];
 }
 
 const inside = (path, folder) => path.toLowerCase().startsWith(folder.toLowerCase().replace(/[\\/]+$/, "") + "\\");
@@ -740,6 +738,22 @@ function accountsPicker(st) {
     h("p", { class: "muted small" }, "Removing a game always removes it from every account it was added to."));
 }
 
+/* Settings sections open and close; which ones are open is remembered on this PC. */
+const OPEN_KEY = "steamdrop-open-sections";
+const openSections = (() => { try { return new Set(JSON.parse(localStorage.getItem(OPEN_KEY)) || []); } catch { return new Set(); } })();
+function section(id, title, summary, ...kids) {
+  return h("details", {
+    class: "panel section", open: openSections.has(id),
+    ontoggle: (e) => {
+      if (e.target.open) openSections.add(id); else openSections.delete(id);
+      try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openSections])); } catch { /* private window: just not remembered */ }
+    },
+  }, h("summary", {}, h("h2", {}, title), h("span", { class: "summary-line" }, summary)), h("div", { class: "section-body" }, ...kids));
+}
+const onOff = (v) => v ? "On" : "Off";
+const choice = (label, value, options, save) => h("div", { class: "seg", role: "group", "aria-label": label },
+  options.map(([v, text]) => h("button", { "aria-pressed": String(value === v), onclick: () => save(v) }, text)));
+
 function settingsView() {
   const st = S.settings;
   const subs = [st.auto_add, st.auto_restart, st.notify];
@@ -750,56 +764,64 @@ function settingsView() {
       onchange: () => { const on = mode !== "On"; saveSettings({ auto_add: on, auto_restart: on, notify: on }); },
     }),
     h("span", { class: "track" }));
-
-  const steamNote = !S.steam.path ? "Not found. Choose Steam's folder."
-    : st.steam_path ? "Chosen by you." : "Found automatically.";
   if (sgdbKey === null) {
     sgdbKey = "";
     invoke("get_sgdb_key").then((k) => { sgdbKey = k; render(); });
   }
+  const accounts = S.steam.accounts || [];
+  const sound = st.chime ? SOUNDS.find(([v]) => v === (st.chime_sound || "soft"))?.[1] : null;
 
   return [
     h("h1", {}, "Settings"),
-    h("div", { class: "panel" },
-      h("div", { class: "spread" },
-        h("div", { class: "text" }, h("h2", {}, "Automatic mode"),
-          h("p", { class: "muted" }, "On: SteamDrop adds new games by itself, restarts Steam and lets you know. Off: it asks you first.")),
+    section("auto", "Adding games", `Automatic mode: ${mode}`,
+      setting("Automatic mode", "On: new games are added, Steam restarts and you're told, all by itself. Off: SteamDrop asks first.",
         h("div", { class: "main-switch" }, h("span", { class: `mode-label ${mode.toLowerCase()}` }, mode), mainSwitch)),
       h("div", { class: "sub" },
         setting("Add games without asking", "New game folders go straight into Steam.",
           toggle(st.auto_add, (v) => saveSettings({ auto_add: v }), "Add games without asking")),
-        setting("Restart Steam automatically", "Steam only shows new games after a restart. When this is off, SteamDrop asks first.",
-          toggle(st.auto_restart, (v) => saveSettings({ auto_restart: v }), "Restart Steam automatically")),
-        setting("Show notifications", "A small message in the corner of the screen when a game is found or added.",
+        setting("Restart Steam by itself", "Steam only shows new games after a restart.",
+          toggle(st.auto_restart, (v) => saveSettings({ auto_restart: v }), "Restart Steam by itself")),
+        setting("Show notifications", "A small message when a game is found or added.",
           toggle(st.notify, (v) => saveSettings({ notify: v }), "Show notifications")))),
 
-    h("div", { class: "panel" },
-      h("h2", {}, "Watched folders"),
-      h("p", { class: "muted" }, "SteamDrop keeps an eye on these folders. Pick the folder that holds your game folders, not a single game's folder."),
+    section("folders", "Watched folders",
+      st.watched.length === 0 ? "None yet" : st.watched.length === 1 ? st.watched[0] : `${st.watched.length} folders`,
+      h("p", { class: "muted" }, "Pick the folder that holds your game folders (for example D:\\Games). Each folder inside it is one game."),
       st.watched.length
         ? h("ul", { class: "folder-list" }, st.watched.map((w) => watchedFolder(st, w)))
         : h("p", {}, "No folders yet."),
-      h("p", { class: "muted small" }, "Each folder directly inside a watched folder is one game. A watched folder inside another one is skipped by the outer one, and excluded folders are ignored with everything in them."),
       btn("Add a folder to watch", addWatchFolder, "primary")),
 
-    h("div", { class: "panel" },
-      h("h2", {}, "Steam"),
-      h("p", {}, h("strong", {}, "Steam folder: "), h("span", { class: "path" }, S.steam.path || "not found"), " ", h("span", { class: "muted" }, steamNote)),
-      S.steam.path ? accountsPicker(st) : null,
-      setting("When SteamDrop restarts Steam", "Keep current mode: Steam comes back in Big Picture only if Big Picture was open just before, otherwise in the normal desktop window.",
-        h("div", { class: "seg", role: "group", "aria-label": "When SteamDrop restarts Steam" },
-          [["keep", "Keep current mode"], ["bigpicture", "Always Big Picture"], ["desktop", "Always desktop mode"]].map(([v, label]) =>
-            h("button", { "aria-pressed": String((st.steam_restart_mode || "keep") === v), onclick: () => saveSettings({ steam_restart_mode: v }) }, label)))),
+    section("steam", "Steam",
+      !S.steam.path ? "Steam wasn't found" : st.all_accounts || accounts.length < 2 ? "Found · all accounts" : `Found · ${st.accounts.length} of ${accounts.length} accounts`,
+      h("p", {}, h("strong", {}, "Steam folder: "), h("span", { class: "path" }, S.steam.path || "not found"), " ",
+        h("span", { class: "muted" }, !S.steam.path ? "Choose Steam's folder." : st.steam_path ? "Chosen by you." : "Found automatically.")),
       h("div", { class: "row" },
-        btn("Choose Steam folder...", async () => {
-          const p = await invoke("pick_folder");
-          if (p) saveSettings({ steam_path: p });
-        }),
-        st.steam_path ? btn("Find automatically", () => saveSettings({ steam_path: "" })) : null)),
+        btn("Choose Steam folder...", async () => { const p = await invoke("pick_folder"); if (p) saveSettings({ steam_path: p }); }),
+        st.steam_path ? btn("Find automatically", () => saveSettings({ steam_path: "" })) : null),
+      S.steam.path ? accountsPicker(st) : null,
+      setting("When SteamDrop restarts Steam", "Keep current mode: Big Picture only if it was open just before.",
+        choice("When SteamDrop restarts Steam", st.steam_restart_mode || "keep",
+          [["keep", "Keep current mode"], ["bigpicture", "Always Big Picture"], ["desktop", "Always desktop mode"]], (v) => saveSettings({ steam_restart_mode: v })))),
 
-    h("div", { class: "panel" },
-      h("h2", {}, "Artwork"),
-      h("p", { class: "muted" }, "SteamDrop fills in all of Steam's pictures for each game: cover, wide banner, background, logo and icon. It uses official Steam art when the game is on Steam, then SteamGridDB, and otherwise makes a clean title card."),
+    section("couch", "Big Picture & Couch setup",
+      `Couch setup: ${st.couch_setup_undo ? "on" : "off"} · Keep Big Picture in front: ${onOff(st.keep_big_picture).toLowerCase()}`,
+      setting("Couch setup", "Turns on everything for playing with only a controller. You see the list first, and you can undo it.",
+        h("div", { class: "row" }, btn("Couch setup...", () => couchSetup(), "primary", { always: true }),
+          st.couch_setup_undo ? btn("Undo Couch setup", async () => { await saveSettings(SD.couchSetupUndo(st)); showStatus("Couch setup was undone: those settings are back to how they were."); }, "", { always: true }) : null)),
+      setting("Keep Big Picture in front", "Brings Big Picture back when another app covers it, and gives it the controller back after a game. Never pushes away games, SteamDrop or Windows prompts. Windows may sometimes say no.",
+        toggle(st.keep_big_picture, (v) => saveSettings({ keep_big_picture: v }), "Keep Big Picture in front")),
+      st.keep_big_picture ? exceptionsList(st) : null,
+      setting("Open Steam in Big Picture when Windows starts", "For a gaming PC on the TV.",
+        toggle(st.big_picture_at_sign_in, (v) => saveSettings({ big_picture_at_sign_in: v }), "Open Steam in Big Picture when Windows starts")),
+      setting("Show SteamDrop in my Steam library", "A SteamDrop tile in Steam, so you can open it from the couch. Turning it off removes only that tile.",
+        toggle(st.steam_shortcut, (v) => run(() => invoke("set_steam_shortcut", { on: v })), "Show SteamDrop in my Steam library")),
+      setting("When opened from Steam", "Auto: Couch mode in Big Picture, this window otherwise. F11 switches anytime.",
+        choice("When opened from Steam", st.steam_view || "auto", [["auto", "Auto"], ["couch", "Always Couch mode"], ["window", "Always window"]], (v) => saveSettings({ steam_view: v }))),
+      h("div", { class: "row" }, btn("Open Couch mode", () => invoke("open_couch"), "", { always: true }))),
+
+    section("artwork", "Artwork", `SteamGridDB key: ${sgdbKey ? "saved" : "not set"}`,
+      h("p", { class: "muted" }, "Pictures come from Steam when the game is on Steam, then from SteamGridDB, otherwise a clean title card."),
       keyField(),
       h("details", { class: "guide" },
         h("summary", {}, "How to get a free SteamGridDB key"),
@@ -809,26 +831,23 @@ function settingsView() {
           h("li", {}, "Press \"Generate API Key\" and copy the key."),
           h("li", {}, "Paste it above and press \"Save key\".")),
         h("p", { class: "muted small" }, "The key is kept in Windows Credential Manager on this PC and is only ever sent to SteamGridDB.")),
-      setting("Also save art in the game folder", "Keeps a copy in a \"SteamDrop art\" folder inside each game, so it comes back if you move the game.",
+      setting("Also save art in the game folder", "A \"SteamDrop art\" folder in each game, so the art comes back if you move it.",
         toggle(st.art_in_game_folder, (v) => saveSettings({ art_in_game_folder: v }), "Also save art in the game folder"))),
 
-    h("div", { class: "panel" },
-      h("h2", {}, "App"),
-      setting("Run when Windows starts", "SteamDrop starts quietly in the tray, next to the clock.",
-        toggle(st.run_on_startup, (v) => saveSettings({ run_on_startup: v }), "Run when Windows starts")),
-      setting("Open Steam in Big Picture when Windows starts", "For a gaming PC on the TV: when you sign in to Windows, Steam opens in Big Picture, its full-screen mode for controllers. If Steam is already in Big Picture, nothing changes. This works even if SteamDrop itself doesn't start with Windows.",
-        toggle(st.big_picture_at_sign_in, (v) => saveSettings({ big_picture_at_sign_in: v }), "Open Steam in Big Picture when Windows starts")),
-      setting("Keep Big Picture in front", "While Big Picture is open and no game is running, SteamDrop brings it back a moment after another app takes over the screen (an update window, a chat app). It never pushes away games started from Steam, SteamDrop itself, Windows' permission prompts or the lock screen. Windows sometimes doesn't allow an app to change what's in front, so it may not catch everything.",
-        toggle(st.keep_big_picture, (v) => saveSettings({ keep_big_picture: v }), "Keep Big Picture in front")),
-      st.keep_big_picture ? exceptionsList(st) : null,
-      setting("Keep running in the tray when closed", "Closing the window keeps SteamDrop watching your folders. Quit it from the tray icon.",
-        toggle(st.close_to_tray, (v) => saveSettings({ close_to_tray: v }), "Keep running in the tray when closed")),
-      setting("Sound when a game is added", "A short sound, so you hear it even while Steam's Big Picture is on screen.",
-        h("div", { class: "seg", role: "group", "aria-label": "Sound when a game is added" },
-          [...SOUNDS, ["off", "Off"]].map(([v, label]) => h("button", {
-            "aria-pressed": String(v === "off" ? !st.chime : st.chime && (st.chime_sound || "soft") === v),
-            onclick: () => saveSettings(v === "off" ? { chime: false } : { chime: true, chime_sound: v }),
-          }, label)))),
+    section("appearance", "Appearance", `${SD.themeName(st.theme)} · ${st.zoom_window}% size`,
+      h("p", { class: "muted" }, "Choose a theme. Couch mode uses the same one."),
+      themePicker(st),
+      setting("Interface size", "Bigger or smaller. Also Ctrl and plus, Ctrl and minus, Ctrl and 0.",
+        h("div", { class: "row nowrap zoom", role: "group", "aria-label": "Interface size" },
+          btn("−", () => Z.step(-1), "small", { always: true, "aria-label": "Smaller", disabled: st.zoom_window <= 50 }),
+          h("span", { class: "zoom-level", "aria-live": "polite" }, `${st.zoom_window}%`),
+          btn("+", () => Z.step(1), "small", { always: true, "aria-label": "Bigger", disabled: st.zoom_window >= 200 }),
+          btn("Reset", Z.reset, "small", { always: true, disabled: st.zoom_window === 100 })))),
+
+    section("sound", "Sound", sound ? `${sound} · ${st.chime_volume}%` : "Off",
+      setting("Sound when a game is added", "Loud enough to hear over Big Picture.",
+        choice("Sound when a game is added", st.chime ? st.chime_sound || "soft" : "off", [...SOUNDS, ["off", "Off"]],
+          (v) => saveSettings(v === "off" ? { chime: false } : { chime: true, chime_sound: v }))),
       h("div", { class: "row sounds" }, h("span", { class: "muted" }, "Preview:"),
         SOUNDS.map(([v, label]) => btn(`▶ ${label}`, () => invoke("test_chime", { volume: Number($("#chime-volume")?.value ?? st.chime_volume), sound: v }),
           "small", { always: true, "aria-label": `Preview ${label}` }))),
@@ -837,47 +856,27 @@ function settingsView() {
         h("input", { id: "chime-volume", type: "range", min: "0", max: "100", step: "5", value: String(st.chime_volume),
           oninput: (e) => { e.target.nextSibling.textContent = `${e.target.value}%`; },
           onchange: (e) => saveSettings({ chime_volume: Number(e.target.value) }) }),
-        h("span", { class: "muted" }, `${st.chime_volume}%`)) : null,
-      h("div", { class: "row" }, btn("Quit SteamDrop", () => invoke("quit"), "", { always: true }))),
+        h("span", { class: "muted" }, `${st.chime_volume}%`)) : null),
 
-    h("div", { class: "panel" },
-      h("h2", {}, "Appearance"),
-      h("p", { class: "muted" }, "Point at a theme (or move to it with the keyboard or a controller) to try it; click it to keep it. Couch mode uses the same theme."),
-      themePicker(st),
-      setting("Interface size", "Makes everything in this window bigger or smaller. Shortcuts: Ctrl and plus, Ctrl and minus, Ctrl and 0 to reset, or Ctrl and the mouse wheel.",
-        h("div", { class: "row nowrap zoom", role: "group", "aria-label": "Interface size" },
-          btn("−", () => Z.step(-1), "small", { always: true, "aria-label": "Smaller", disabled: st.zoom_window <= 50 }),
-          h("span", { class: "zoom-level", "aria-live": "polite" }, `${st.zoom_window}%`),
-          btn("+", () => Z.step(1), "small", { always: true, "aria-label": "Bigger", disabled: st.zoom_window >= 200 }),
-          btn("Reset", Z.reset, "small", { always: true, disabled: st.zoom_window === 100 })))),
+    section("startup", "Start and close",
+      `${st.run_on_startup ? "Starts with Windows" : "Doesn't start with Windows"} · ${st.close_to_tray ? "stays in the tray" : "quits when closed"}`,
+      setting("Start with Windows", "SteamDrop starts quietly in the tray, next to the clock.",
+        toggle(st.run_on_startup, (v) => saveSettings({ run_on_startup: v }), "Start with Windows")),
+      setting("Keep running in the tray when closed", "Closing the window keeps SteamDrop watching your folders.",
+        toggle(st.close_to_tray, (v) => saveSettings({ close_to_tray: v }), "Keep running in the tray when closed")),
+      h("div", { class: "row" }, btn("Quit SteamDrop", quitSteamDrop, "", { always: true }))),
 
-    h("div", { class: "panel" },
-      h("h2", {}, "Couch mode"),
-      h("p", { class: "muted" }, "A full-screen view for the TV that you control with a gamepad. It opens when you start SteamDrop from your Steam library (for example in Big Picture)."),
-      setting("Show SteamDrop in my Steam library", "A SteamDrop tile with its own artwork in your Steam library, so you can open it from the couch. Turning it off removes only that tile; your games stay.",
-        toggle(st.steam_shortcut, (v) => run(() => invoke("set_steam_shortcut", { on: v })), "Show SteamDrop in my Steam library")),
-      setting("When opened from Steam", "Auto: Couch mode in Big Picture (and on a Steam Deck), this window in normal Steam. You can switch anytime with F11.",
-        h("div", { class: "seg", role: "group", "aria-label": "When opened from Steam" },
-          [["auto", "Auto"], ["couch", "Always Couch mode"], ["window", "Always window"]].map(([v, label]) =>
-            h("button", { "aria-pressed": String((st.steam_view || "auto") === v), onclick: () => saveSettings({ steam_view: v }) }, label)))),
-      setting("Couch setup", "One button for playing with only a controller: Automatic mode, Keep Big Picture in front, Steam in Big Picture after restarts and when Windows starts, and SteamDrop starting with Windows. You see the list before anything changes.",
-        h("div", { class: "row" }, btn("Couch setup...", () => couchSetup(), "primary", { always: true }),
-          st.couch_setup_undo ? btn("Undo Couch setup", async () => { await saveSettings(SD.couchSetupUndo(st)); showStatus("Couch setup was undone: those settings are back to how they were."); }, "", { always: true }) : null)),
-      h("div", { class: "row" }, btn("Open Couch mode", () => invoke("open_couch"), "", { always: true }))),
-
-    h("div", { class: "panel" },
-      h("h2", {}, "Updates"),
-      h("p", { class: "muted" }, `You have SteamDrop ${S.version}. Updates come from SteamDrop's GitHub page.`),
-      setting("Check for updates on startup", "Looks for a new version each time SteamDrop starts.",
+    section("updates", "Updates", `Version ${S.version} · ${st.update_auto_install ? "installs updates by itself" : "asks before updating"}`,
+      setting("Check for updates on startup", "Each time SteamDrop starts.",
         toggle(st.update_on_startup, (v) => saveSettings({ update_on_startup: v }), "Check for updates on startup")),
-      setting("Also check once a day while running", "Looks again every 24 hours while SteamDrop sits in the tray.",
-        toggle(st.update_daily, (v) => saveSettings({ update_daily: v }), "Also check once a day while running")),
-      setting("Install updates automatically", "Downloads and installs new versions by itself, never while you're playing a game. You'll get a notification afterward.",
+      setting("Also check once a day", "While SteamDrop sits in the tray.",
+        toggle(st.update_daily, (v) => saveSettings({ update_daily: v }), "Also check once a day")),
+      setting("Install updates automatically", "Never while you're playing. You get a notification afterward.",
         toggle(st.update_auto_install, (v) => saveSettings({ update_auto_install: v }), "Install updates automatically")),
       h("div", { class: "row" }, btn("Check now", checkNow, "primary", { always: true })),
       checkLine()),
 
-    helpPanel(),
+    section("help", "Help & About", "Bug report, activity, version", ...helpPanel()),
   ];
 }
 
@@ -885,7 +884,7 @@ function aboutView() {
   const link = (label, url) => btn(label, () => invoke("open", { target: url }), "", { always: true });
   return [
     h("div", { class: "panel" },
-      h("div", { class: "about-head" }, logo(),
+      h("div", { class: "about-head" }, logo(96),
         h("div", {}, h("h1", {}, "SteamDrop"), h("p", { class: "muted" }, `Version ${S.version} · Free and open source (MIT)`))),
       h("p", {}, "Drop a game folder in, play it from Steam. SteamDrop adds games stored on your PC to your Steam library, with artwork."),
       h("div", { class: "row" },
@@ -970,7 +969,6 @@ document.addEventListener("mousedown", () => document.body.classList.remove("pad
 for (const t of document.querySelectorAll(".tab")) {
   t.addEventListener("click", () => { view = t.dataset.view; render(); window.scrollTo(0, 0); });
 }
-$("#theme").addEventListener("click", () => saveSettings({ theme: S.settings.theme === "light" ? "dark" : "light" }));
 listen("changed", refresh);
 // Games added while this window was hidden or closed show up as soon as it's back.
 window.addEventListener("focus", refresh);

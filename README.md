@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="src-tauri/icons/128x128@2x.png" width="112" alt="SteamDrop icon">
+<img src="src-tauri/icons/128x128@2x.png" width="128" alt="SteamDrop logo">
 
 # SteamDrop
 
@@ -46,9 +46,10 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 - **Game details** (description, developer, genres) from the Steam store, with a link to the store page.
 - **Safe.** SteamDrop backs up Steam's shortcuts file before every change. "Remove from Steam" removes only the shortcut, never your game files.
 - **Light on your PC.** The window is fully closed while SteamDrop sits in the tray. The installer is only a few megabytes.
-- **A sound** when a game has been added, loud enough to hear over Big Picture: **Soft chime** (the default), **Retro coin** or **Pop**, each with a Preview button, or Off, plus a volume slider (Settings → App). The sounds are made by SteamDrop itself.
+- **A sound** when a game has been added, loud enough to hear over Big Picture: **Soft chime** (the default), **Retro coin** or **Pop**, each with a Preview button, or Off, plus a volume slider (Settings → Sound). The sounds are made by SteamDrop itself.
 - **A calm pixel-art forest.** SteamDrop looks like a small grove at night, and a tree grows with your library: every game SteamDrop adds is a fruit on it. A new game opens as a blossom and ripens with a few fireflies; moving over a game nudges its fruit. Nothing moves when nothing happens (and nothing animates at all if Windows' "reduce motion" is on).
-- **Themes** (Settings → Appearance): Night Grove (the default), Day Grove, Dracula, Nord, Catppuccin Mocha, Gruvbox Dark, Tokyo Night and Terminal (green on black). Point at one to try it, click to keep it; Couch mode uses the same theme. Large readable text (Atkinson Hyperlegible) in every theme.
+- **Tidy settings:** Settings are grouped in sections you open and close, each with a one-line summary, in both views.
+- **Themes** (Settings → Appearance): Night Grove (the default), Day Grove, Dracula, Nord, Catppuccin Mocha, Gruvbox Dark, Tokyo Night and Terminal (green on black). Click one to use it; Couch mode uses the same theme. Large readable text (Atkinson Hyperlegible) in every theme.
 - **Interface size:** Ctrl and plus, Ctrl and minus, Ctrl and 0, or Ctrl and the mouse wheel make everything bigger or smaller (50% to 200%), with LT and RT on a controller. The desktop window and Couch mode each remember their own size (Settings → Appearance → "Interface size", with Reset).
 - **Stays up to date:** checks for new versions on startup and once a day, shows what changed, and can install updates by itself (never while you're playing).
 
@@ -91,13 +92,13 @@ When you go **Back to Steam**, quit, or hide the desktop window, Steam shows Ste
 
 **Deleting a game** needs you to hold A for 2 seconds. The game folder goes to the **Recycle Bin**, never deleted for good (on drives without a Recycle Bin, SteamDrop refuses).
 
-For a gaming PC on the TV, turn on **Settings → App → "Open Steam in Big Picture when Windows starts"**: after you sign in, Steam opens straight into Big Picture (unless it's already there).
+For a gaming PC on the TV, turn on **Settings → Big Picture & Couch setup → "Open Steam in Big Picture when Windows starts"**: after you sign in, Steam opens straight into Big Picture (unless it's already there).
 
-**Couch setup** (Settings → Couch mode, and offered once the first time SteamDrop opens): one button that turns on everything for playing with only a controller. It shows the list first (Automatic mode, Keep Big Picture in front, Steam in Big Picture after restarts and when Windows starts, SteamDrop starting with Windows, updates installing by themselves), and **Undo Couch setup** puts those settings back.
+**Couch setup** (Settings → Big Picture & Couch setup, and offered once the first time SteamDrop opens): one button that turns on everything for playing with only a controller. It shows the list first (Automatic mode, Keep Big Picture in front, Steam in Big Picture after restarts and when Windows starts, SteamDrop starting with Windows, updates installing by themselves), and **Undo Couch setup** puts those settings back.
 
-**Keep Big Picture in front** (Settings → App, off by default): while Big Picture is open and no game is running, SteamDrop brings Big Picture back a moment after another app takes over the screen, like an update window or a chat app popping up. A window that sits on top of Big Picture without taking over (a progress popup, for example) is sent behind it; other apps' windows are never closed or minimized. And whenever a game you started from Steam closes, Big Picture gets the controller back, with or without this setting. It never pushes away games started from Steam, SteamDrop itself, Windows' permission prompts or the lock screen, and you can list apps it should leave alone under **Except these apps**. Windows sometimes doesn't allow an app to change what's in front, so it may not catch everything. Each time it acts, it says so in the Activity list.
+**Keep Big Picture in front** (Settings → Big Picture & Couch setup, off by default): while Big Picture is open and no game is running, SteamDrop brings Big Picture back a moment after another app takes over the screen, like an update window or a chat app popping up. A window that sits on top of Big Picture without taking over (a progress popup, for example) is sent behind it; other apps' windows are never closed or minimized. And whenever a game you started from Steam closes, Big Picture gets the controller back, with or without this setting. It never pushes away games started from Steam, SteamDrop itself, Windows' permission prompts or the lock screen, and you can list apps it should leave alone under **Except these apps**. Windows sometimes doesn't allow an app to change what's in front, so it may not catch everything. Each time it acts, it says so in the Activity list.
 
-The installer has a **Show SteamDrop in my Steam library** box (on by default). You can change it later in Settings → Couch mode, where there's also an **Open Couch mode** button. Changes made in Couch mode show in Steam's library after Steam restarts. When you leave Couch mode, SteamDrop offers to restart Steam for you and brings you back to Big Picture.
+The installer has a **Show SteamDrop in my Steam library** box (on by default). You can change it later in Settings → Big Picture & Couch setup, where there's also an **Open Couch mode** button. Changes made in Couch mode show in Steam's library after Steam restarts. When you leave Couch mode, SteamDrop offers to restart Steam for you and brings you back to Big Picture.
 
 ## Screenshots
 
@@ -141,7 +142,7 @@ With Automatic mode off, you confirm the pick before anything is added. Otherwis
 By default SteamDrop adds games to every account that has signed in on this PC. In Settings → Steam → "Add games to" you can pick "Only these accounts" and select the ones you want; each account is shown with its Steam name. Removing a game always removes it from every account it was added to.
 
 **Something went wrong. How do I report it?**
-Go to **Settings → Help** and press **Copy bug report**. Then press **Report a problem** (or open a [new issue](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml)), describe what happened, and paste the report into the last box. The report holds SteamDrop's version, your Windows version, whether Steam was found, your settings, and the last 200 lines of SteamDrop's activity. Your Windows user name is replaced with `<user>`, and your SteamGridDB key is never included. The **Activity** list on the same page shows what SteamDrop did recently, in plain words.
+Go to **Settings → Help & About** and press **Copy bug report**. Then press **Report a problem** (or open a [new issue](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml)), describe what happened, and paste the report into the last box. The report holds SteamDrop's version, your Windows version, whether Steam was found, your settings, and the last 200 lines of SteamDrop's activity. Your Windows user name is replaced with `<user>`, and your SteamGridDB key is never included. The **Activity** list on the same page shows what SteamDrop did recently, in plain words.
 
 **Where does SteamDrop keep its files?**
 In `%APPDATA%\SteamDrop`: settings, the artwork cache (`art`), store details (`info`), a backup of its settings (`data.json.bak`), backups of Steam's shortcuts file (`backups`), and the activity log (`logs`, one file per day such as `steamdrop-2026-11-06.log`, kept for 14 days and never more than 20 MB together). The SteamGridDB key is kept in Windows Credential Manager.

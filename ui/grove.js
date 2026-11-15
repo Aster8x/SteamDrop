@@ -180,34 +180,101 @@ window.Grove = (() => {
     canvas.getContext("2d").drawImage(g.c, 0, 0);
   }
 
-  /* ---------- the icon and the pictures made from the same drawing ---------- */
-  // 16 px by hand: at this size every pixel is chosen. L leaf, l light, D dark, F fruit, B bark, . sky, space clear.
-  const ICON16 = [
-    " .............. ", "......lll.......", "....llllLLL.....", "...lllLLLLLD....", "..LllLLLLLLDD...", "..LLLLLLLFFDD...", "..LLLLLLLFFDD...", "..DLLLLLLLLDD...",
-    "...DDLLLLDDD....", ".....DBBDD......", "......BB........", "......BB........", "...BBBBBBBB.....", "....BBBBBB......", ".....BBBB.......", " .....BB....... ",
+  /* ---------- the logo, and the pictures made from the same drawing ---------- */
+  // The "SD" logo with a vine and a flower on a strip of grass, hand-drawn pixel by pixel at 32, 24
+  // and 16 px (the small ones are simplified so they stay readable). It keeps its own colors in
+  // every theme. a outline, g/h cream light/dark, c/b green light/dark, d dark green, e/f flower, i soil.
+  const LOGO_COLORS = { a: "#0e161e", b: "#4a9c54", c: "#96d26e", d: "#266842", e: "#f08caa", f: "#f2c14e", g: "#f0e4c4", h: "#d2c4a0", i: "#684228" };
+  const LOGO32 = [
+    "                                ",
+    "                                ",
+    "                                ",
+    "                      a         ",
+    "                  aa aba        ",
+    "                 acbabca   aa   ",
+    "                  aadaaba aefa  ",
+    "                  ada  adaaeea  ",
+    "   aaaaaaaaaa   aadaaaaaabcaa   ",
+    "  agggggggggga acccccccccca     ",
+    " aaggggggggggaaaccccccccccaa    ",
+    "aggggaaaaaaggggaccccaaaacccca   ",
+    "agggga    aggggacccca  accccaa  ",
+    "agggga     aaaaacccca   aacccca ",
+    "aggggaaaaaa    acccca    acccca ",
+    " aahhhhhhhha   abbbba    abbbba ",
+    "  ahhhhhhhhaaaaabbbba    abbbba ",
+    "   aaaaaaaahhhhabbbba    abbbba ",
+    " aaaa     ahhhhabbbba   aabbbba ",
+    "ahhhha    ahhhhabbbba  abbbbaa  ",
+    "ahhhhaaaaaahhhhabbbbaaaabbbba   ",
+    " aahhhhhhhhhhaaabbbbbbbbbbaa    ",
+    "  ahhhhhhhhhha abbbbbbbbbba     ",
+    "   aaaaaaaaaa   aaaaaaaaaa      ",
+    " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+    "adddddddddddddddddddddddddddddda",
+    "aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia",
+    " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+    "                                ",
+    "                                ",
+    "                                ",
+    "                                ",
   ];
-  /** The app icon on an n x n grid (16, 24 or 32): a round tree with one fruit; trunk and roots point down ("drop it in"). */
-  function icon(n, P) {
+  const LOGO24 = [
+    "                        ",
+    "             a   a      ",
+    "            aca aca  aa ",
+    "            ada ada aefa",
+    "            ada  adaaeea",
+    "  aaaaaaaa  adaaaadaaaa ",
+    " aggggggggaaccccccca    ",
+    "agggaaaagggacccccccaa   ",
+    "aggga  agggacccaaaccca  ",
+    "aggga   aaaaccca  accca ",
+    "agggaaaa   accca  accca ",
+    " aahhhhhha abbba  abbba ",
+    "  ahhhhhhaaabbba  abbba ",
+    "   aaaaahhhabbba  abbba ",
+    " aaa   ahhhabbba  abbba ",
+    "ahhha  ahhhabbba abbba  ",
+    "ahhhaaaahhhabbbaaabbba  ",
+    " aahhhhhhhaabbbbbbbbaa  ",
+    "  ahhhhhhhaabbbbbbbba   ",
+    "   aaaaaaa  aaaaaaaa    ",
+    " aaaaaaaaaaaaaaaaaaaaaa ",
+    "adddddddddddddddddddddda",
+    "aiiiiiiiiiiiiiiiiiiiiiia",
+    " aaaaaaaaaaaaaaaaaaaaaa ",
+  ];
+  const LOGO16 = [
+    "         a   aa ",
+    "        aca aefa",
+    "         adaaeea",
+    "          d  aa ",
+    " aaaaaaaaaaaaa  ",
+    "aggggggacccccca ",
+    "aggaaaaaccaaacca",
+    "aggaaaaaccaaacca",
+    "ahhhhhhabbaaabba",
+    " aaaahhabbaaabba",
+    "aaaaahhabbaaabba",
+    "ahhhhhhabbbbbba ",
+    " aaaaaaaaaaaaaa ",
+    "adddddddddddddda",
+    "aiiiiiiiiiiiiiia",
+    " aaaaaaaaaaaaaa ",
+  ];
+  const LOGOS = { 16: LOGO16, 24: LOGO24, 32: LOGO32 };
+  /** The logo on its own n x n grid (16, 24 or 32 pixels); enlarge it only by whole numbers. */
+  function icon(n) {
     const g = cv(n, n);
-    if (n === 16) {
-      const col = { ".": P["sky-2"], L: P.leaf, l: P["leaf-l"], D: P["leaf-d"], F: P.fruit, B: P.bark };
-      ICON16.forEach((row, y) => [...row].forEach((ch, x) => { if (col[ch]) g.px(x, y, col[ch]); }));
-      return g.c;
-    }
-    const u = n / 16, R = (x, y, w, h, c) => g.rect(Math.round(x * u), Math.round(y * u), Math.max(1, Math.round(w * u)), Math.max(1, Math.round(h * u)), c);
-    R(0, 0, 16, 16, P["sky-2"]);
-    for (const [x, y] of [[0, 0], [n - 1, 0], [0, n - 1], [n - 1, n - 1]]) g.x.clearRect(x, y, 1, 1);
-    g.disc(Math.round(8 * u), Math.round(6.2 * u), Math.round(4.6 * u), P["leaf-d"]);
-    g.disc(Math.round(7.6 * u), Math.round(5.8 * u), Math.round(4.1 * u), P.leaf);
-    g.disc(Math.round(6.6 * u), Math.round(4.6 * u), Math.round(2 * u), P["leaf-l"]);
-    R(7, 9.5, 2, 3, P.bark); R(4.5, 12, 7, 1, P.bark); R(5.5, 13, 5, 1, P.bark); R(6.5, 14, 3, 1, P.bark); R(7.25, 15, 1.5, 1, P.bark);
-    g.disc(Math.round(10 * u), Math.round(7 * u), Math.max(1, Math.round(1.1 * u)), P.fruit); g.px(Math.round(10 * u) - 1, Math.round(7 * u) - 1, P["fruit-hi"]);
+    LOGOS[n].forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== " ") g.px(x, y, LOGO_COLORS[ch]); }));
     return g.c;
   }
-  /** A whole scene (sky, woods, ground and a tree with fruit) for the Steam art and installer pictures. */
+  /** A whole scene (sky, woods, ground, and a tree with fruit unless `size` is 0) for SteamDrop's own pictures. */
   function picture(w, h, P, { cx = w / 2, size = h * 0.56, ground = Math.round(h * 0.16), fruits = 6 } = {}) {
     const g = cv(w, h);
     land(g, P, ground);
+    if (!size) return g.c;
     const s = shape(Math.round(cx), h - ground + 1, size);
     drawTree(g, s, P);
     spots(s, fruits).forEach(([x, y]) => fruit(g, x, y, Math.max(1, Math.round(size / 40)), 1, P));
