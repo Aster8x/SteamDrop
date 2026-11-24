@@ -31,7 +31,7 @@ const $ = (sel) => document.querySelector(sel);
 const btn = (label, onclick, kind = "", extra = {}) =>
   h("button", { class: `btn ${kind}`, onclick, disabled: busy && !extra.always, ...extra }, label);
 const logo = SD.logo;
-// The tree in the sidebar: one fruit per game.
+// The tree in the sidebar: one apple per game.
 const tree = Grove.tree($("#tree"), { w: 90, h: 150, scale: 0.5 });
 const growTree = () => { if (S) tree.motion(S.settings.tree_breeze, S.settings.tree_front_only); tree.set(S ? S.games.map((g) => g.id) : []); };
 document.addEventListener("theme", growTree);
@@ -510,7 +510,7 @@ function gamesView() {
   } else {
     out.push(h("div", { class: "panel empty" }, Grove.young(),
       h("h2", {}, "Nothing planted yet"),
-      h("p", { class: "muted" }, "Copy a game folder into a watched folder and SteamDrop adds it by itself, or add one yourself. Your tree grows a fruit for every game."),
+      h("p", { class: "muted" }, "Copy a game folder into a watched folder and SteamDrop adds it by itself, or add one yourself. Your tree grows an apple for every game."),
       h("div", { class: "row" }, btn("+ Add a game", addGameFolder, "primary"))));
   }
   return out;
@@ -988,5 +988,5 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) refr
 listen("status", (e) => showStatus(e.payload));
 refresh().then(() => { if (S.status) showStatus(S.status); });
 
-// Pointing at a game (or moving onto it) nudges its fruit on the tree.
+// Pointing at a game (or moving onto it) makes its apple on the tree bob.
 for (const type of ["mouseover", "focusin"]) $("#view-games").addEventListener(type, (e) => { const id = Number(e.target.closest?.(".card")?.dataset.id); if (id) tree.bob(id); });

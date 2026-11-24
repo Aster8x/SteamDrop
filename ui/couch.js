@@ -68,9 +68,9 @@ function libraryScreen() {
   if (!S.games.length) {
     return [h("div", { class: "empty" }, h("h1", {}, "Nothing planted yet"),
       h("p", {}, "Copy a game folder into your games folder and SteamDrop plants it here by itself."),
-      h("p", { class: "muted" }, "Each game grows a fruit on your tree. You choose the games folder in SteamDrop on your desktop."))];
+      h("p", { class: "muted" }, "Each game grows an apple on your tree. You choose the games folder in SteamDrop on your desktop."))];
   }
-  return [h("div", { class: "note" }, h("h1", {}, nGames(S.games.length)), h("p", {}, "Your tree has a fruit for every game.")),
+  return [h("div", { class: "note" }, h("h1", {}, nGames(S.games.length)), h("p", {}, "Your tree has an apple for every game.")),
     selected.size ? selectionBar() : null, h("div", { class: "grid" }, S.games.map((g) =>
     h("button", { class: `tile f ${selected.has(g.id) ? "selected" : ""}`, "data-key": `game-${g.id}`, "aria-label": g.name, "aria-pressed": String(selected.has(g.id)), onclick: () => push({ name: "detail", id: g.id }) },
       SD.art(g, "portrait"),
@@ -311,7 +311,7 @@ function grove() {
 document.addEventListener("theme", grove);
 let resized = 0;
 window.addEventListener("resize", () => { cancelAnimationFrame(resized); resized = requestAnimationFrame(grove); });
-// Moving onto a game nudges its fruit.
+// Moving onto a game makes its apple bob.
 $("#screen").addEventListener("focusin", (e) => { const key = e.target.dataset?.key || ""; if (key.startsWith("game-")) tree.bob(Number(key.slice(5))); });
 // Scrolling makes the tree lean and drop a few leaves.
 const scrolls = new WeakMap();
