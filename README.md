@@ -1,16 +1,14 @@
 <div align="center">
 
-<img src="src-tauri/icons/128x128@2x.png" width="128" alt="SteamDrop logo">
+<img src="docs/banner.png" width="100%" alt="SteamDrop: Drop a game folder in. Play it from Steam.">
 
-# SteamDrop
+<a href="https://github.com/Aster8x/SteamDrop/releases/latest/download/SteamDrop-Setup.exe"><img src="https://img.shields.io/badge/Download%20for%20Windows-8FD06A?style=for-the-badge&logo=windows&logoColor=0C1418&labelColor=8FD06A&color=8FD06A" height="56" alt="Download for Windows"></a>
 
-**Drop a game folder in, play it from Steam.**
+<sub>Free and open source · Windows 10 and 11 (64-bit) · <a href="https://github.com/Aster8x/SteamDrop/releases">All releases</a></sub>
 
 SteamDrop adds the games on your PC to your Steam library automatically, with proper artwork.
 
-<a href="https://github.com/Aster8x/SteamDrop/releases/latest/download/SteamDrop-Setup.exe"><img src="https://img.shields.io/badge/Download%20for%20Windows-5CC8FF?style=for-the-badge&logo=windows&logoColor=052131&labelColor=5CC8FF&color=5CC8FF" height="56" alt="Download for Windows"></a>
-
-<sub>Free and open source · Windows 10 and 11 (64-bit) · <a href="https://github.com/Aster8x/SteamDrop/releases">All releases</a></sub>
+<img src="docs/tree.gif" width="100%" alt="SteamDrop's apple tree swaying in the breeze, a new game blossoming into an apple, and the tree leaning as the library scrolls">
 
 </div>
 
@@ -39,19 +37,16 @@ It works with any game folder on your own PC, including DRM-free games (for exam
 
 ## Features
 
-- **Automatic mode** (off by default). Turn it on and SteamDrop adds games, restarts Steam and tells you, all by itself. Or keep it off and confirm each game with one click.
-- **Complete folders only.** If a folder contains only an installer, SteamDrop skips it and tells you to install the game first.
-- **Full artwork** in every slot Steam uses: portrait cover, wide banner, hero background, logo and icon. Only real artwork from Steam or SteamGridDB, or a clean text title card.
-- **Several games at once:** select games on the Games page with their checkboxes (or Ctrl+click and Shift+click their covers, or press X on a controller; hold X to select all), then **Re-fetch art**, **Re-check game file**, **Remove from Steam** or **Delete games** for all of them together, with one Steam restart. Deleting lists the games first and needs DELETE typed (in Couch mode: hold A for 2 seconds).
-- **Game details** (description, developer, genres) from the Steam store, with a link to the store page.
-- **Safe.** SteamDrop backs up Steam's shortcuts file before every change. "Remove from Steam" removes only the shortcut, never your game files.
-- **Light on your PC.** The window is fully closed while SteamDrop sits in the tray. The installer is only a few megabytes.
-- **A sound** when a game has been added, loud enough to hear over Big Picture: **Soft chime** (the default), **Retro coin** or **Pop**, each with a Preview button, or Off, plus a volume slider (Settings → Sound). The sounds are made by SteamDrop itself.
-- **A calm pixel-art forest.** SteamDrop looks like a small grove at night, and an apple tree grows with your library: every game SteamDrop adds is a red apple on it. A new game opens as a blossom and ripens with a few fireflies; moving over a game makes its apple bob. A gentle breeze sways it, and it reacts when you scroll, switch tabs or click it. It only moves while SteamDrop is the window in front (you can turn the animation off, and Windows' "reduce motion" always keeps it still).
-- **Tidy settings:** Settings are grouped in sections you open and close, each with a one-line summary, in both views.
-- **Themes** (Settings → Appearance): Night Grove (the default), Day Grove, Dracula, Nord, Catppuccin Mocha, Gruvbox Dark, Tokyo Night and Terminal (green on black). Click one to use it; Couch mode uses the same theme. Large readable text (Atkinson Hyperlegible) in every theme.
-- **Interface size:** Ctrl and plus, Ctrl and minus, Ctrl and 0, or Ctrl and the mouse wheel make everything bigger or smaller (50% to 200%), with LT and RT on a controller. The desktop window and Couch mode each remember their own size (Settings → Appearance → "Interface size", with Reset).
-- **Stays up to date:** checks for new versions on startup and once a day, shows what changed, and can install updates by itself (never while you're playing).
+| | |
+|:-:|---|
+| <img src="docs/icons/folder.png" width="32" alt=""> | **Automatic mode** (off by default). Turn it on and SteamDrop adds games, restarts Steam and tells you, all by itself. Or keep it off and confirm each game with one click. **Complete folders only:** if a folder contains only an installer, SteamDrop skips it and tells you to install the game first. |
+| <img src="docs/icons/art.png" width="32" alt=""> | **Full artwork** in every slot Steam uses: portrait cover, wide banner, hero background, logo and icon. Only real artwork from Steam or SteamGridDB, or a clean text title card. **Game details** (description, developer, genres) from the Steam store, with a link to the store page. |
+| <img src="docs/icons/pad.png" width="32" alt=""> | **Couch mode:** a full-screen view for the sofa, made for an Xbox or PlayStation controller. See [Couch mode](#couch-mode) below. |
+| <img src="docs/icons/select.png" width="32" alt=""> | **Several games at once:** select games on the Games page with their checkboxes (or Ctrl+click and Shift+click their covers, or press X on a controller; hold X to select all), then **Re-fetch art**, **Re-check game file**, **Remove from Steam** or **Delete games** for all of them together, with one Steam restart. Deleting lists the games first and needs DELETE typed (in Couch mode: hold A for 2 seconds). |
+| <img src="docs/icons/safe.png" width="32" alt=""> | **Safe.** SteamDrop backs up Steam's shortcuts file before every change. "Remove from Steam" removes only the shortcut, never your game files. **Light on your PC:** the window is fully closed while SteamDrop sits in the tray, and the installer is only a few megabytes. **Stays up to date:** checks for new versions on startup and once a day, shows what changed, and can install updates by itself (never while you're playing). |
+| <img src="docs/icons/apple.png" width="32" alt=""> | **A calm pixel-art forest.** SteamDrop looks like a small grove at night, and an apple tree grows with your library: every game SteamDrop adds is a red apple on it. A new game opens as a blossom and ripens with a few fireflies; moving over a game makes its apple bob. A gentle breeze sways it, and it reacts when you scroll, switch tabs or click it. It only moves while SteamDrop is the window in front (you can turn the animation off, and Windows' "reduce motion" always keeps it still). |
+| <img src="docs/icons/themes.png" width="32" alt=""> | **Themes** (Settings → Appearance): Night Grove (the default), Day Grove, Dracula, Nord, Catppuccin Mocha, Gruvbox Dark, Tokyo Night and Terminal (green on black). Click one to use it; Couch mode uses the same theme. Large readable text (Atkinson Hyperlegible) in every theme. **Interface size:** Ctrl and plus, Ctrl and minus, Ctrl and 0, or Ctrl and the mouse wheel make everything bigger or smaller (50% to 200%), with LT and RT on a controller; the desktop window and Couch mode each remember their own size. **Tidy settings:** grouped in sections you open and close, each with a one-line summary, in both views. |
+| <img src="docs/icons/sound.png" width="32" alt=""> | **A sound** when a game has been added, loud enough to hear over Big Picture: **Soft chime** (the default), **Retro coin** or **Pop**, each with a Preview button, or Off, plus a volume slider (Settings → Sound). The sounds are made by SteamDrop itself. |
 
 ## Folder rules
 
@@ -102,7 +97,13 @@ The installer has a **Show SteamDrop in my Steam library** box (on by default). 
 
 ## Screenshots
 
-> _Screenshots coming soon._
+<sub>Shown with made-up games and placeholder covers.</sub>
+
+| Couch mode | An empty library |
+|---|---|
+| <img src="docs/screenshot-couch.png" alt="Couch mode's Library with game covers and the apple tree"> | <img src="docs/screenshot-empty.png" alt="Couch mode with no games yet: a young apple tree and Nothing planted yet"> |
+| **Games** (desktop window) | **Settings** (desktop window) |
+| <img src="docs/screenshot-games.png" alt="The desktop window's Games page with covers and the tree in the sidebar"> | <img src="docs/screenshot-settings.png" alt="Settings, Appearance: themes, interface size and the tree animation settings"> |
 
 ## Install
 

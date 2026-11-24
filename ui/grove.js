@@ -496,5 +496,5 @@ window.Grove = (() => {
     return g.c;
   }
 
-  return { palette, tree, backdrop, icon, picture, young, crisp, get drawn() { return drawn; } };
+  return { cv, palette, tree, backdrop, icon, picture, young, crisp, get drawn() { return drawn; } };
 })();
