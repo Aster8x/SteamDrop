@@ -215,7 +215,9 @@ function settingsScreen() {
         { value: onoff(st.steam_shortcut), on: st.steam_shortcut })]),
     group("appearance", "Appearance", `${SD.themeName(st.theme)} · ${st.zoom_couch}% size`, [
       button("theme", "Theme", () => { push({ name: "themes" }); document.querySelector(`[data-key="theme-${SD.themeId(st.theme)}"]`)?.focus(); }, { value: SD.themeName(st.theme), on: true }),
-      button("zoom", "Interface size", () => Z.reset(), { value: `${st.zoom_couch}%`, on: st.zoom_couch !== 100, note: "(LT smaller, RT bigger, A resets)" })]),
+      button("zoom", "Interface size", () => Z.reset(), { value: `${st.zoom_couch}%`, on: st.zoom_couch !== 100, note: "(LT smaller, RT bigger, A resets)" }),
+      button("tree_breeze", "Tree animation", () => save({ tree_breeze: !st.tree_breeze }), { value: st.tree_breeze ? "Gentle breeze" : "Off", on: st.tree_breeze }),
+      toggle("tree_front", "Only animate when SteamDrop is in front", "tree_front_only")]),
     group("sound", "Sound", SOUNDS.find(([v]) => v === sound)[1], [
       button("sound", "Sound when a game is added", nextSound, { value: SOUNDS.find(([v]) => v === sound)[1], on: st.chime, note: "(A plays the next one)" })]),
     group("artwork", "Artwork", `Copy in game folder: ${onoff(st.art_in_game_folder).toLowerCase()}`, [
@@ -297,10 +299,11 @@ function controlBar() {
 
 /* ---------- navigation ---------- */
 /* ---------- the grove: forest backdrop, and the tree beside the Library ---------- */
-const tree = Grove.tree($("#tree"), { w: 170, h: 190, cx: 84, size: 104 });
+const tree = Grove.tree($("#tree"), { w: 170, h: 190 });
+tree.button.classList.add("f"); tree.button.dataset.key = "tree";
 function grove() {
-  // One forest pixel is a whole number of screen pixels, so the art stays crisp at any size.
-  const px = Math.max(2, Math.round(innerHeight / 270));
+  // One forest pixel is a whole number of screen pixels (at any Windows scaling or interface size), so the art stays crisp.
+  const px = Math.max(2, Math.round(innerHeight * devicePixelRatio / 270)) / devicePixelRatio;
   document.documentElement.style.setProperty("--px", `${px}px`);
   Grove.backdrop($("#backdrop"), px);
   tree.set(S ? S.games.map((g) => g.id) : []);
@@ -310,10 +313,18 @@ let resized = 0;
 window.addEventListener("resize", () => { cancelAnimationFrame(resized); resized = requestAnimationFrame(grove); });
 // Moving onto a game nudges its fruit.
 $("#screen").addEventListener("focusin", (e) => { const key = e.target.dataset?.key || ""; if (key.startsWith("game-")) tree.bob(Number(key.slice(5))); });
+// Scrolling makes the tree lean and drop a few leaves.
+const scrolls = new WeakMap();
+document.addEventListener("scroll", (e) => { const el = e.target.scrollingElement || e.target, y = el.scrollTop; tree.scroll(y - (scrolls.get(el) ?? y)); scrolls.set(el, y); }, true);
 
+let shown = "";
 function render() {
   const keep = document.activeElement?.dataset?.key;
   document.body.classList.toggle("lib", tab === "library" && !stack.length);
+  // A new tab or settings section sends a small gust through the tree.
+  const where = `${tab} ${[...openSections]}`;
+  if (shown && where !== shown) tree.gust();
+  shown = where;
   SD.applyTheme(S.settings.theme);
   for (const t of document.querySelectorAll(".tab")) t.classList.toggle("active", t.dataset.tab === tab);
   SD.fill($("#screen"), current());
@@ -413,7 +424,7 @@ function press(action) {
 // Switching away while holding A must not finish a delete.
 window.addEventListener("blur", holdEnd);
 function release(action) { if (action === "a") holdEnd(); else if (action === "x") xUp(); }
-const move = (dx, dy) => SD.move(dx, dy, [...document.querySelectorAll("#screen .f, #controls .f")]);
+const move = (dx, dy) => SD.move(dx, dy, [...document.querySelectorAll("#screen .f, #controls .f, #tree .f")].filter((el) => el.getClientRects().length));
 
 /* Keyboard */
 const KEYS = { x: "x", X: "x", F11: "view", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "a", " ": "a", Escape: "b", Backspace: "b", q: "lb", Q: "lb", PageUp: "lb", e: "rb", E: "rb", PageDown: "rb" };
@@ -433,6 +444,7 @@ async function refresh() {
   S = await invoke("get_state");
   Z.sync(S.settings.zoom_couch);
   SD.applyTheme(S.settings.theme);
+  tree.motion(S.settings.tree_breeze, S.settings.tree_front_only);
   tree.set(S.games.map((g) => g.id));
   render();
 }

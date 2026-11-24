@@ -23,6 +23,7 @@ Version 0.1.0, first complete build. Everything in the spec is implemented. It h
 - **`SteamDrop.exe --uninstall-cleanup`** was run as a Windows binary under Wine against a fake Steam folder. It removed SteamDrop's shortcut and its grid art, kept another tool's shortcut, made a backup, and cleared the art cache and the game list.
 - **The UI** was rendered in Chromium against a mocked backend (games list, new-game card, installer card, details window, settings, about, dark and light). The layout looks right.
 - **Title cards** (portrait, wide, hero, logo) were rendered and checked by eye.
+- **The tree's frames** were counted in Chromium against the real UI (both views, 6 games, 3-second windows): about 35 frames (under 12 a second) in front with the breeze on; 0 behind another window, 0 hidden or minimized, 0 with "reduce motion", 0 with "Tree animation" off; with "Only animate when SteamDrop is in front" turned off, 35 behind another window and still 0 when hidden. At every interface size and at 100%, 125%, 150% and 200% Windows scaling, each art pixel was a whole number of screen pixels.
 
 ## Not tested yet (couldn't be, from the build machine)
 
@@ -184,17 +185,21 @@ Before you start, back up `C:\Program Files (x86)\Steam\userdata\<your number>\c
 
 47. **Night Grove:**
     - Both views show the forest look: solid cards and panels (no thin outlines), pixel headings, readable body text. Check every screen and dialog you can reach: Games, Settings, About, a game's details, Remove and Delete dialogs, the update window, What's new, Couch mode's Library, details, Settings, Activity and questions.
-    - **The tree** (sidebar in the window, left of the Library in Couch mode) has one fruit per game. Add a game: a blossom opens where the new fruit will be, a few fireflies rise, and it ripens in about two seconds. Move over games (mouse, Tab or D-pad): that game's fruit bobs once. Remove a game: its fruit is gone.
-    - With no games, a young tree shows with "Nothing planted yet" and a short hint.
-    - Leave SteamDrop open and idle and look at Task Manager: its CPU stays at 0%.
-    - Windows Settings → Accessibility → Visual effects → turn Animation effects off, restart SteamDrop, add a game: the fruit simply appears, nothing animates.
+    - The tree is now the Orchard Apple; see test 49.
     - Try each theme: the forest and tree change colors with it. Change the interface size: the art stays sharp.
-    - The tree in the sidebar and in Couch mode is the current one; a new tree is being chosen. SteamDrop's tile in Steam gets the new art the next time SteamDrop starts while Steam is closed. The installer shows the forest on its first and last page and in the page header. New title cards (games without art) use the same colors and pixel font.
+    - SteamDrop's tile in Steam gets the new art the next time SteamDrop starts while Steam is closed. The installer shows the forest on its first and last page and in the page header. New title cards (games without art) use the same colors and pixel font.
 
 48. **Round 6:**
     - The desktop window has no dark/light button any more; themes are only in Settings → Appearance (see test 40).
     - **Settings** in both views is a list of sections: Adding games, Watched folders, Steam, Big Picture & Couch setup, Artwork, Appearance, Sound, Start and close, Updates, Help & About (Couch mode shows the ones that work from the couch). Each closed section shows a one-line summary (for example "Automatic mode: Off"). Click, Enter, Space or A opens and closes a section. Close SteamDrop and open it again: the same sections are open. With a controller you can reach every section and every setting inside it, and B always leaves.
     - **The new logo** ("SD" with a vine and a flower on a strip of grass) is everywhere and always sharp, never blurry: the taskbar, tray, Start menu and .exe icon (also at the smallest size), the window and Couch mode header, About, the installer's first, last and header pictures, and SteamDrop's own tile in Steam (cover, banner, logo and icon say "SteamDrop", nothing about Couch mode; it gets the new art the next time SteamDrop starts while Steam is closed). Try Windows scaling at 100%, 125% and 150%.
+
+49. **The Orchard Apple tree** (sidebar in the window, left of the Library in Couch mode):
+    - One red apple per game. Add a game: a blossom opens where its apple will be, fireflies rise, and it ripens in about two seconds. Move over games (mouse, Tab or D-pad): that game's apple bobs once. Remove a game: only its apple is gone. With no games, a young apple tree shows (also next to "Nothing planted yet").
+    - The crown sways gently (the top most) and now and then a leaf drifts down and fades. Scroll a list: the crown leans and rustles that way and 3 to 5 leaves fall. Switch tabs or open a settings section: a small gust. Click the tree (or move left onto it in Couch mode and press A): it shakes and drops a leaf or two. Tab and the D-pad move on and off the tree like any other button.
+    - Settings → Appearance: "Tree animation" Gentle breeze / Off (Off: a still tree that still gets its apples), and "Only animate when SteamDrop is in front" (on). With it on, click another app, minimize SteamDrop, close it to the tray, or start a game: Task Manager shows SteamDrop at 0% CPU. Come back: the tree moves again (a game added meanwhile blossoms then).
+    - Windows Settings → Accessibility → Visual effects → Animation effects off: the tree is still and new apples simply appear.
+    - Try every theme and interface sizes from 50% to 200% with Windows scaling at 100%, 125% and 150%: the tree changes colors with the theme and stays sharp.
 
 If something goes wrong, the backups are in `%APPDATA%\SteamDrop\backups`. To report a problem, use **Settings → Help & About → Copy bug report** and paste it into a [bug report on GitHub](https://github.com/Aster8x/SteamDrop/issues/new?template=bug_report.yml).
 

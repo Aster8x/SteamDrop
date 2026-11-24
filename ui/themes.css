@@ -78,20 +78,27 @@
   --ground: color-mix(in srgb, var(--ok) 22%, var(--panel));
   --soil: color-mix(in srgb, var(--ok) 8%, var(--bg));
   --moss: color-mix(in srgb, var(--ok) 45%, var(--panel));
-  --bark: #6b4a33; --bark-d: #3f2c22;
+  /* The apple tree's ramps, darkest first: bark, leaves, apples. */
+  --bark-0: #1e140f; --bark-d: #3a271c; --bark-m: #5a3a26; --bark: #7a5034; --bark-l: #a2714a;
   --leaf-d: color-mix(in srgb, var(--ok) 40%, var(--bg));
   --leaf: color-mix(in srgb, var(--ok) 70%, var(--bg));
   --leaf-l: var(--ok);
   --leaf-hi: color-mix(in srgb, var(--ok) 55%, #fff);
-  --fruit: var(--danger); --fruit-hi: color-mix(in srgb, var(--danger) 35%, #fff);
-  --blossom: #f4e9c9; --glow: var(--warn);
+  --leaf-0: color-mix(in srgb, var(--leaf-d) 60%, #000);
+  --leaf-m: color-mix(in srgb, var(--leaf-d) 50%, var(--leaf));
+  --outline: color-mix(in srgb, var(--leaf-0) 45%, #000);
+  --fruit-d: color-mix(in srgb, var(--danger) 55%, #000); --fruit-m: var(--danger);
+  --fruit: color-mix(in srgb, var(--danger) 70%, #fff); --fruit-hi: color-mix(in srgb, var(--danger) 30%, #fff);
+  --blossom: #f4e9c9; --blossom-c: #f08caa; --glow: var(--warn);
+  --fly: var(--glow); --fly-hi: color-mix(in srgb, var(--glow) 35%, #fff);
   --star: color-mix(in srgb, var(--muted) 45%, var(--bg));
 }
 /* Night Grove's own forest colors (the page always names its theme, so other themes don't get these). */
 [data-theme="dark"] {
   --sky-0: #0c1418; --sky-1: #101d22; --sky-2: #14272b; --sky-3: #1a3334;
   --far: #14282a; --mid: #183230; --ground: #1d3a2c; --soil: #16261f; --moss: #2f5d44;
-  --leaf-d: #234a38; --leaf: #3f7d4b; --leaf-l: #6fb05a; --leaf-hi: #b9dc7c;
-  --fruit: #e8623c; --fruit-hi: #ffd9a0; --star: #4d6b63;
+  --leaf-0: #14301f; --leaf-d: #21543a; --leaf-m: #2f7446; --leaf: #4a9c54; --leaf-l: #7cc463; --leaf-hi: #c3eb8f;
+  --outline: #0e161e; --fruit-d: #7a1f20; --fruit-m: #c0392b; --fruit: #e8623c; --fruit-hi: #ffd0a0;
+  --blossom: #fbe3ea; --fly: #ffd96a; --fly-hi: #fff3c0; --star: #4d6b63;
 }
-[data-theme="light"] { --leaf-d: #2f6b3a; --leaf: #4f9a4a; --leaf-l: #86c46a; --leaf-hi: #d7f0a8; --fruit: #d2452b; --glow: #f2c14e; --star: #f8faf0; }
+[data-theme="light"] { --leaf-d: #2f6b3a; --leaf: #4f9a4a; --leaf-l: #86c46a; --leaf-hi: #d7f0a8; --fruit-m: #d2452b; --glow: #f2c14e; --star: #f8faf0; }

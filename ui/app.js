@@ -32,9 +32,12 @@ const btn = (label, onclick, kind = "", extra = {}) =>
   h("button", { class: `btn ${kind}`, onclick, disabled: busy && !extra.always, ...extra }, label);
 const logo = SD.logo;
 // The tree in the sidebar: one fruit per game.
-const tree = Grove.tree($("#tree"), { w: 90, h: 150, cx: 45, size: 62, ground: 18 });
-const growTree = () => tree.set(S ? S.games.map((g) => g.id) : []);
+const tree = Grove.tree($("#tree"), { w: 90, h: 150, scale: 0.5 });
+const growTree = () => { if (S) tree.motion(S.settings.tree_breeze, S.settings.tree_front_only); tree.set(S ? S.games.map((g) => g.id) : []); };
 document.addEventListener("theme", growTree);
+// Scrolling makes the tree lean and drop a few leaves.
+const scrolls = new WeakMap();
+document.addEventListener("scroll", (e) => { const el = e.target.scrollingElement || e.target, y = el.scrollTop; tree.scroll(y - (scrolls.get(el) ?? y)); scrolls.set(el, y); }, true);
 
 /* ---------- state and status ---------- */
 async function refresh() {
@@ -313,8 +316,12 @@ async function addWatchFolder() {
 }
 
 /* ---------- views ---------- */
+let shownView = "";
 function render() {
   if (!S) return;
+  // A new tab sends a small gust through the tree (so does opening or closing a settings section).
+  if (shownView && view !== shownView) tree.gust();
+  shownView = view;
   for (const t of document.querySelectorAll(".tab")) {
     if (t.dataset.view === view) t.setAttribute("aria-current", "page");
     else t.removeAttribute("aria-current");
@@ -745,6 +752,7 @@ function section(id, title, summary, ...kids) {
   return h("details", {
     class: "panel section", open: openSections.has(id),
     ontoggle: (e) => {
+      if (e.target.open !== openSections.has(id)) tree.gust();
       if (e.target.open) openSections.add(id); else openSections.delete(id);
       try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openSections])); } catch { /* private window: just not remembered */ }
     },
@@ -842,7 +850,11 @@ function settingsView() {
           btn("−", () => Z.step(-1), "small", { always: true, "aria-label": "Smaller", disabled: st.zoom_window <= 50 }),
           h("span", { class: "zoom-level", "aria-live": "polite" }, `${st.zoom_window}%`),
           btn("+", () => Z.step(1), "small", { always: true, "aria-label": "Bigger", disabled: st.zoom_window >= 200 }),
-          btn("Reset", Z.reset, "small", { always: true, disabled: st.zoom_window === 100 })))),
+          btn("Reset", Z.reset, "small", { always: true, disabled: st.zoom_window === 100 }))),
+      setting("Tree animation", "The apple tree sways in a gentle breeze and reacts when you scroll, switch tabs or click it. Always still when Windows' \"Animation effects\" is off.",
+        choice("Tree animation", st.tree_breeze ? "breeze" : "off", [["breeze", "Gentle breeze"], ["off", "Off"]], (v) => saveSettings({ tree_breeze: v === "breeze" }))),
+      setting("Only animate when SteamDrop is in front", "No animation behind other apps, minimized, in the tray or while you play.",
+        toggle(st.tree_front_only, (v) => saveSettings({ tree_front_only: v }), "Only animate when SteamDrop is in front"))),
 
     section("sound", "Sound", sound ? `${sound} · ${st.chime_volume}%` : "Off",
       setting("Sound when a game is added", "Loud enough to hear over Big Picture.",

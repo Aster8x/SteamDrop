@@ -13,7 +13,6 @@ window.Grove = (() => {
       px(px, py, col) { x.fillStyle = col; x.fillRect(Math.round(px), Math.round(py), 1, 1); },
       rect(rx, ry, rw, rh, col) { x.fillStyle = col; x.fillRect(Math.round(rx), Math.round(ry), Math.round(rw), Math.round(rh)); },
       disc(cx, cy, r, col) { for (let dy = -r; dy <= r; dy++) { const s = Math.floor(Math.sqrt(r * r - dy * dy + r * 0.8)); g.rect(cx - s, cy + dy, 2 * s + 1, 1, col); } },
-      line(x0, y0, x1, y1, col) { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1; for (let i = 0; i <= n; i++) g.px(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, col); },
       // Horizontal color bands with a dithered edge between them.
       bands(y0, y1, cols) {
         const n = cols.length, hgt = (y1 - y0) / n;
@@ -30,7 +29,8 @@ window.Grove = (() => {
   function rnd(seed) { let s = seed; return () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff; }
 
   /* ---------- colors: the theme's CSS variables, as canvas colors ---------- */
-  const NAMES = ["sky-0", "sky-1", "sky-2", "sky-3", "far", "mid", "ground", "soil", "moss", "bark", "bark-d", "leaf-d", "leaf", "leaf-l", "leaf-hi", "fruit", "fruit-hi", "blossom", "glow", "star"];
+  const NAMES = ["sky-0", "sky-1", "sky-2", "sky-3", "far", "mid", "ground", "soil", "moss", "bark-0", "bark-d", "bark-m", "bark", "bark-l",
+    "leaf-0", "leaf-d", "leaf-m", "leaf", "leaf-l", "leaf-hi", "fruit-d", "fruit-m", "fruit", "fruit-hi", "blossom", "blossom-c", "outline", "fly", "fly-hi", "glow", "star"];
   function palette(el = document.documentElement) {
     const probe = document.createElement("i");
     el.append(probe);
@@ -67,109 +67,327 @@ window.Grove = (() => {
   }
   function moon(g, x, y, r, P) { g.disc(x, y, r, P.glow); g.disc(x + Math.round(r * 0.45), y - Math.round(r * 0.3), Math.round(r * 0.82), P["sky-0"]); }
 
-  // Where the tree's trunk and leaves go, for a tree `size` pixels tall standing on `base`.
-  const BLOBS = [[0, 0, 1.25], [-1.25, 0.35, 0.95], [1.3, 0.3, 1.0], [-0.65, -0.85, 0.95], [0.75, -0.9, 0.9], [0, 0.75, 1.0], [-1.8, 1.0, 0.6], [1.9, 0.95, 0.62]];
-  function shape(cx, base, size) { const th = Math.round(size * 0.55); return { cx, base, size, th, top: base - th - size * 0.28, R: size * 0.2 }; }
-  function drawTree(g, s, P) {
-    const { cx, base, size, th, top, R } = s;
-    for (let y = 0; y < th; y++) {
-      const wdt = Math.round(2 + (y / th) * (size * 0.09) + (y > th - 4 ? (y - th + 4) : 0));
-      g.rect(cx - wdt, base - th + y, wdt * 2, 1, P.bark); g.rect(cx + wdt - 2, base - th + y, 2, 1, P["bark-d"]);
+  /* ---------- the Orchard Apple: one apple per game ---------- */
+  // Its own random and smooth noise, so the tree is the same every time.
+  function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+  function noise(seed) {
+    const r = rng(seed), T = new Float32Array(256 * 256);
+    for (let i = 0; i < T.length; i++) T[i] = r();
+    const at = (x, y) => T[((y & 255) << 8) | (x & 255)];
+    const sm = (t) => t * t * (3 - 2 * t);
+    return (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = sm(x - xi), yf = sm(y - yi);
+      const a = at(xi, yi), b = at(xi + 1, yi), c = at(xi, yi + 1), d = at(xi + 1, yi + 1);
+      return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
+    };
+  }
+  // The tree's color ramps, darkest first, from the theme.
+  function colors() {
+    const P = palette();
+    return {
+      L: [P["leaf-0"], P["leaf-d"], P["leaf-m"], P.leaf, P["leaf-l"], P["leaf-hi"]],
+      B: [P["bark-0"], P["bark-d"], P["bark-m"], P.bark, P["bark-l"]],
+      F: [P["fruit-d"], P["fruit-m"], P.fruit, P["fruit-hi"]],
+      petal: P.blossom, heart: P["blossom-c"], O: P.outline, fly: [P.fly, P["fly-hi"]],
+    };
+  }
+
+  // Built once per theme and size; a frame only moves the cached leaf clusters.
+  function build(C, w, h, scale) {
+    const r = rng(492), N = noise(20), S = (v) => v * scale;
+    const base = { x: Math.round(w / 2), y: h - 4 };
+    const T = { C, w, h, base, clusters: [], branches: [], spots: [] };
+    const trunkH = Math.round(S(62)), w0 = S(6.5);
+    const bend = (t) => Math.round(S(-2) * Math.sin(t * Math.PI * 0.7));
+    const halfW = (t) => w0 * (1 - 0.45 * t) + S(7) * Math.exp(-t * trunkH / S(4.5));
+    T.trunk = { trunkH, bend, halfW };
+    const top = { x: base.x + bend(1), y: base.y - trunkH };
+    // Limbs from the trunk up into the crown.
+    for (const [side, at, dx, dy, th] of [[-0.3, 0.7, -22, -26, 3.4], [0.3, 0.7, 20, -28, 3.4], [0, 0.96, 2, -30, 2.6]]) {
+      const sx = base.x + bend(at) + Math.round(side * halfW(at)), sy = base.y - Math.round(trunkH * at);
+      T.branches.push({ x0: sx, y0: sy, x1: sx + S(dx), y1: sy + S(dy), th: S(th), mx: sx + S(dx) * 0.45 + S(dx > 0 ? 6 : -6), my: sy + S(dy) * 0.6 });
     }
-    g.line(cx - 1, base - th + 6, cx - size * 0.22, base - th - size * 0.1, P.bark);
-    g.line(cx + 1, base - th + 4, cx + size * 0.25, base - th - size * 0.12, P["bark-d"]);
-    for (const [dx, dy, k] of BLOBS) g.disc(Math.round(cx + dx * R), Math.round(top + dy * R + 1), Math.round(k * R), P["leaf-d"]);
-    for (const [dx, dy, k] of BLOBS) g.disc(Math.round(cx + dx * R - 1), Math.round(top + dy * R - 1), Math.round(k * R - 1), P.leaf);
-    for (const [dx, dy, k] of BLOBS) g.disc(Math.round(cx + dx * R - 2), Math.round(top + dy * R - k * R * 0.45), Math.round(k * R * 0.5), P["leaf-l"]);
-    const r = rnd(7);
-    for (let i = 0; i < size * 1.2; i++) { const a = r() * 6.28, d = r() * R * 1.9; g.px(cx + Math.cos(a) * d, top + Math.sin(a) * d * 0.8 - 2, r() > 0.5 ? P["leaf-hi"] : P["leaf-d"]); }
-  }
-  /** Places for `n` fruits in the crown: a few chosen by hand, then more scattered, never too close. */
-  function spots(s, n) {
-    const out = [[-1.3, 0.5], [0.9, -0.6], [0.1, 0.9], [-0.5, -0.9], [1.6, 0.7], [-1.9, 1.1], [0.5, 0.1], [-0.9, 0.0]].map(([x, y]) => [Math.round(s.cx + x * s.R), Math.round(s.top + y * s.R)]);
-    const r = rnd(99), gap = Math.max(5, s.size / 16);
-    for (let tries = 0; out.length < n && tries < 4000; tries++) {
-      const [dx, dy, k] = BLOBS[Math.floor(r() * BLOBS.length)], a = r() * 6.28, d = r() * k * s.R * 0.8;
-      const p = [Math.round(s.cx + dx * s.R + Math.cos(a) * d), Math.round(s.top + dy * s.R + Math.sin(a) * d)];
-      if (out.every((o) => Math.hypot(o[0] - p[0], o[1] - p[1]) >= gap)) out.push(p);
+    // Leaf clusters: lumps along the crown's edge make a scalloped outline; big darker ones fill the inside.
+    const crown = { cx: top.x, cy: top.y - S(30), rx: S(46), ry: S(40) }, EDGE = 9, LUMP = 0.42, INNER = 4;
+    const placed = [];
+    for (let i = 0; i < EDGE; i++) {
+      const a = Math.PI * 0.8 + Math.PI * 1.4 * (i + 0.5) / EDGE + (r() - 0.5) * 0.18;
+      const x = crown.cx + Math.cos(a) * crown.rx * 0.78, y = crown.cy + Math.sin(a) * crown.ry * 0.78;
+      const rad = Math.min(crown.rx, crown.ry) * LUMP * (0.85 + r() * 0.35) * (Math.sin(a) > 0.3 ? 0.85 : 1.15);
+      placed.push({ x, y, rad, layer: Math.sin(a) > 0.2 ? 2 : 1, seed: Math.floor(r() * 1e6) });
     }
-    return out.slice(0, n);
+    placed.push({ x: crown.cx, y: crown.cy, rad: crown.ry * 0.7, layer: 0, seed: Math.floor(r() * 1e6) });
+    for (let i = 0; i < INNER; i++) {
+      const a = (i / INNER) * Math.PI * 2 + r() * 0.4;
+      placed.push({ x: crown.cx + Math.cos(a) * crown.rx * 0.42, y: crown.cy + Math.sin(a) * crown.ry * 0.35, rad: crown.ry * 0.58, layer: 0, seed: Math.floor(r() * 1e6) });
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = Math.PI * (1.25 + i * 0.25) + (r() - 0.5) * 0.2;
+      placed.push({ x: crown.cx + Math.cos(a) * crown.rx * 0.55, y: crown.cy + Math.sin(a) * crown.ry * 0.95, rad: Math.min(crown.rx, crown.ry) * LUMP, layer: 0, seed: Math.floor(r() * 1e6) });
+    }
+    placed.sort((a, b) => a.layer - b.layer || a.y - b.y);
+    for (const p of placed) T.clusters.push(cluster(p, C));
+    T.top = Math.min(...T.clusters.map((c) => c.y));
+    // Places for apples on the front clusters, ordered so each new one lands far from the others.
+    const fr = rng(12);
+    for (let tries = 0; tries < 4000 && T.spots.length < MAX; tries++) {
+      const c = T.clusters[Math.floor(fr() * T.clusters.length)];
+      if (c.layer === 0) continue;
+      const a = fr() * Math.PI * 2, d = c.rad * (0.15 + fr() * 0.5);
+      const x = Math.round(c.x + Math.cos(a) * d), y = Math.round(c.y + Math.sin(a) * d * 0.8 + c.rad * 0.15);
+      if (T.spots.every((s) => Math.hypot(s.x - x, s.y - y) > S(9))) T.spots.push({ cluster: c, x, y });
+    }
+    const pool = T.spots.splice(0), cx0 = crown.cx, cy0 = crown.cy + crown.ry * 0.3;
+    pool.sort((a, b) => Math.hypot(a.x - cx0, a.y - cy0) - Math.hypot(b.x - cx0, b.y - cy0));
+    if (pool.length) T.spots.push(pool.shift());
+    while (pool.length) {
+      let best = 0, bd = -1;
+      pool.forEach((p, i) => { const d = Math.min(...T.spots.map((q) => Math.hypot(p.x - q.x, p.y - q.y))); if (d > bd) { bd = d; best = i; } });
+      T.spots.push(pool.splice(best, 1)[0]);
+    }
+    T.static = trunk(T, N);
+    return T;
   }
-  // One fruit. `grown` runs from 0 (a bud) through 0.5 (an open blossom) to 1 (a ripe fruit).
-  function fruit(g, x, y, r, grown, P) {
-    if (grown < 0.5) { const k = grown * 2; g.px(x, y, P.blossom); if (k > 0.3) { g.rect(x - 1, y, 3, 1, P.blossom); g.rect(x, y - 1, 1, 3, P.blossom); } if (k > 0.7) { g.px(x - 1, y - 1, P.blossom); g.px(x + 1, y + 1, P.blossom); g.px(x, y, P.glow); } return; }
-    g.disc(x, y, grown < 0.75 ? Math.max(1, r - 1) : r, P.fruit); g.px(x - 1, y - 1, P["fruit-hi"]); g.px(x, y - r - 1, P.bark);
+
+  // One cluster as a sprite: lumps lit from the upper left, small leaf shapes, a light rim and a dark outline.
+  function cluster(p, C) {
+    const L = C.L, r = rng(p.seed), R = Math.ceil(p.rad * 1.3) + 3;
+    const g = cv(R * 2, R * 2), cx = R, cy = R;
+    const blobs = [{ x: 0, y: p.rad * 0.08, r: p.rad * 0.7 }];
+    const k = 6 + Math.floor(r() * 3);
+    for (let i = 0; i < k; i++) { const a = (i / k) * Math.PI * 2 + r() * 0.5; blobs.push({ x: Math.cos(a) * p.rad * 0.5, y: Math.sin(a) * p.rad * 0.42 - p.rad * 0.06, r: p.rad * (0.42 + r() * 0.14) }); }
+    blobs.sort((a, b) => a.y - b.y);
+    const tone = new Int8Array(g.w * g.h).fill(-1), owner = new Int8Array(g.w * g.h).fill(-1);
+    blobs.forEach((b, bi) => {
+      for (let y = Math.floor(cy + b.y - b.r); y <= cy + b.y + b.r; y++) for (let x = Math.floor(cx + b.x - b.r); x <= cx + b.x + b.r; x++) {
+        if (x < 0 || y < 0 || x >= g.w || y >= g.h) continue;
+        const dx = (x - cx - b.x) / b.r, dy = (y - cy - b.y) / b.r, d = Math.hypot(dx, dy);
+        const wob = 1 + 0.1 * Math.sin(Math.atan2(dy, dx) * 7 + bi * 1.7);
+        if (d > wob) continue;
+        const lit = -(dx * -0.6 + dy * -0.8) + (1 - d) * 0.35;
+        let t = lit > 0.62 ? 4 : lit > 0.22 ? 3 : lit > -0.25 ? 2 : 1;
+        if (d > wob - 0.16 && lit < -0.1) t = 1;
+        tone[y * g.w + x] = t; owner[y * g.w + x] = bi;
+      }
+    });
+    for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
+      const i = y * g.w + x, t = tone[i];
+      if (t < 2) continue;
+      const row = Math.floor(y / 3), col = Math.floor((x + (row % 2) * 2) / 4), lx = (x + (row % 2) * 2) % 4, ly = y % 3;
+      const hh = Math.sin(row * 12.9898 + col * 78.233 + p.seed) * 43758.5453 % 1;
+      if (Math.abs(hh) < 0.45) continue;
+      if (ly === 0 && (lx === 1 || lx === 2)) tone[i] = Math.min(5, t + (t >= 3 && Math.abs(hh) > 0.8 ? 2 : 1));
+      else if (ly === 1 && lx === 2) tone[i] = Math.max(1, t - 1);
+    }
+    const out = (xx, yy) => xx < 0 || yy < 0 || xx >= g.w || yy >= g.h || tone[yy * g.w + xx] < 0;
+    for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
+      const i = y * g.w + x, t = tone[i];
+      if (t < 0) continue;
+      if (out(x, y + 1) || out(x + 1, y) || out(x - 1, y) || out(x, y - 1)) { g.px(x, y, C.O); continue; }
+      if ((out(x, y - 2) || out(x - 2, y)) && t >= 2) { g.px(x, y, L[Math.min(5, t + 1)]); continue; }
+      const below = owner[(y + 1) * g.w + x];
+      if (below >= 0 && below < owner[i] && tone[(y + 1) * g.w + x] >= 0 && owner[(y + 2) * g.w + x] !== owner[i]) { g.px(x, y, L[0]); continue; }
+      g.px(x, y, L[t]);
+    }
+    return { ...p, sprite: g.c, ox: cx, oy: cy, phase: r() * 6.28 };
   }
-  /** A young tree for an empty library: big enough to notice, with two buds waiting. */
-  function sapling(g, cx, base, P, k = 1) {
-    const q = (v) => Math.round(v * k);
-    for (let y = 0; y < q(34); y++) g.rect(cx + Math.round(Math.sin(y / (9 * k)) * 1.5 * k) - q(1), base - y, y < q(12) ? q(3) : q(2), 1, y % 5 ? P.bark : P["bark-d"]);
-    for (const [dx, dy, r] of [[-9, -22, 5], [8, -27, 6], [-2, -36, 7], [-10, -33, 4], [9, -37, 4]]) { g.disc(cx + q(dx), base + q(dy) + 1, q(r), P["leaf-d"]); g.disc(cx + q(dx) - 1, base + q(dy), q(r) - 1, P.leaf); g.disc(cx + q(dx) - 2, base + q(dy) - 2, Math.max(1, q(r) - 3), P["leaf-l"]); }
-    fruit(g, cx + q(-4), base + q(-38), 2, 0.4, P); fruit(g, cx + q(9), base + q(-29), 2, 0.2, P);
-    for (const [x, y] of [[-20, -30], [19, -44], [24, -16], [-16, -8]]) { g.px(cx + q(x), base + q(y), P.glow); g.px(cx + q(x) + 1, base + q(y), P["leaf-hi"]); }
+
+  // Roots and the trunk with its grain and a knot, lit from the left: drawn once.
+  function trunk(T, N) {
+    const g = cv(T.w, T.h), B = T.C.B, { base } = T, { trunkH, bend, halfW } = T.trunk, rr = rng(31);
+    for (const side of [-1, 1, -0.5, 0.6]) {
+      const len = 10 + rr() * 10;
+      for (let i = 0; i < len; i++) {
+        const x = base.x + side * (halfW(0) * 0.6 + i * 1.1), y = base.y - 2 + Math.round(i * 0.18), th = Math.max(1, 3 - i / 5);
+        for (let k = 0; k < th; k++) g.px(x, y - k, k === 0 ? B[1] : B[2 + (side < 0 ? 1 : 0)]);
+      }
+    }
+    for (let y = 0; y < trunkH + 2; y++) {
+      const t = y / trunkH, hw = halfW(Math.min(1, t)), cxl = base.x + bend(Math.min(1, t));
+      for (let x = Math.floor(cxl - hw); x <= cxl + hw; x++) {
+        const u = (x - cxl) / hw, gr = N(x * 0.9, (base.y - y) * 0.13);
+        let k = u < -0.55 ? 4 : u < -0.05 ? 3 : u < 0.5 ? 2 : 1;
+        if (gr > 0.72) k = Math.max(0, k - 2); else if (gr < 0.18 && k < 4) k += 1;
+        if (Math.abs(u) > 0.92) k = 0;
+        g.px(x, base.y - y, B[k]);
+      }
+    }
+    const kx = base.x + bend(0.42) + 1, ky = base.y - Math.round(trunkH * 0.42);
+    g.rect(kx - 1, ky - 2, 3, 1, B[0]); g.rect(kx - 2, ky - 1, 1, 2, B[0]); g.rect(kx + 2, ky - 1, 1, 2, B[1]); g.rect(kx - 1, ky + 1, 3, 1, B[1]); g.px(kx, ky - 1, B[4]);
+    return g.c;
+  }
+  // A limb from trunk to crown, its tip following the crown as it sways.
+  function limb(g, b, tipDx, B) {
+    const n = Math.ceil(Math.hypot(b.x1 - b.x0, b.y1 - b.y0));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, u = 1 - t;
+      const x = u * u * b.x0 + 2 * u * t * b.mx + t * t * (b.x1 + tipDx), y = u * u * b.y0 + 2 * u * t * b.my + t * t * b.y1;
+      const th = Math.max(1, Math.round(b.th * (1 - t * 0.7)));
+      for (let k = 0; k < th; k++) g.px(x, y - k, k === 0 ? B[1] : k === th - 1 ? B[4] : B[3]);
+    }
+  }
+  // An apple; `grown` below 1 is a small green-to-red bud.
+  function apple(g, C, x, y, grown) {
+    const F = C.F;
+    if (grown < 1) { const k = grown < 0.5 ? 1 : 2; g.rect(x - k + 1, y - k + 1, k, k, F[1]); return; }
+    g.rect(x - 2, y - 1, 5, 3, F[1]); g.rect(x - 1, y - 2, 3, 1, F[1]); g.rect(x - 1, y + 2, 3, 1, F[0]);
+    g.px(x - 2, y + 1, F[0]); g.px(x + 2, y + 1, F[0]); g.px(x + 2, y, F[0]);
+    g.px(x - 1, y - 1, F[2]); g.px(x - 1, y - 2, F[3]); g.px(x, y - 1, F[2]);
+    g.px(x, y - 3, C.B[1]); g.px(x + 1, y - 4, C.L[4]); g.px(x + 2, y - 4, C.L[3]);
+  }
+  function blossom(g, C, x, y, k) {
+    g.px(x, y, C.petal);
+    if (k > 0.3) { g.px(x - 1, y, C.petal); g.px(x + 1, y, C.petal); g.px(x, y - 1, C.petal); g.px(x, y + 1, C.petal); }
+    if (k > 0.6) { g.px(x - 1, y - 1, C.petal); g.px(x + 1, y + 1, C.petal); g.px(x + 1, y - 1, C.petal); g.px(x - 1, y + 1, C.petal); g.px(x, y, C.heart); }
   }
 
   /* ---------- the living tree ---------- */
-  const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches || document.hidden;
-  const GROW = 1700, BOB = 420, FLY = 1900, FRAME = 80, MAX = 60;
+  // At most 12 frames a second, and only while it may move (see live()).
+  const FRAME = 84, MAX = 40, GROW = 1700, BOB = 400, FLY = 1900;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  let drawn = 0;
 
   /**
-   * A tree on its own canvas with one fruit per game id. `set(ids)` shows them (ids that are new
-   * since the last call open as a blossom and ripen, with a few fireflies); `bob(id)` nudges that
-   * game's fruit once. It only redraws while something is moving; at rest it uses no CPU.
+   * The Orchard Apple in `host`, one apple per game id (a young tree with no games). `set(ids)`: new
+   * ids blossom into apples, removed ids lose theirs. `bob(id)`, `scroll(dy)`, `gust()` react;
+   * clicking it shakes it. `motion(breeze, front)` applies the settings.
    */
-  function tree(host, { w, h, cx, size, ground = 0 }) {
-    const g = cv(w, h);
-    g.c.className = "grove-tree";
-    host.replaceChildren(g.c);
-    let P = null, base = null, s = null, ids = [], known = null, places = [];
-    const moving = new Map();   // id -> { grow: start time } or { bob: start time }
-    let flies = [], timer = 0;
-    function paint(now) {
+  function tree(host, { w, h, scale = 1 }) {
+    const g = cv(w, h), button = document.createElement("button");
+    g.c.className = "grove-tree"; g.c.setAttribute("aria-hidden", "true");
+    button.type = "button"; button.className = "grove-shake"; button.setAttribute("aria-label", "Shake the tree");
+    button.append(g.c); host.replaceChildren(button);
+    let T = null, look = "", slots = new Map(), known = null, breeze = true, front = true, timer = 0, last = 0, dropped = 0;
+    const st = { t: 0, lean: 0, leanV: 0, rustle: 0, gust: 0, shake: 0, leaves: [], flies: [], grow: new Map(), bob: new Map() };
+    const r = rng(99);
+    // Drawing only while it shows, is in front (unless that setting is off) and may move at all.
+    const calm = () => !breeze || reduced.matches;
+    const live = () => !calm() && !document.hidden && (!front || document.hasFocus()) && host.getClientRects().length > 0;
+    function drop(count) {
+      for (let i = 0; i < count; i++) {
+        const c = T.clusters[Math.floor(r() * T.clusters.length)];
+        st.leaves.push({ x: c.x + (r() - 0.5) * c.rad, y: c.y + c.rad * (0.1 + r() * 0.5), vx: (r() - 0.5) * 0.2, ph: r() * 6, age: 0, life: 70 + r() * 50, col: 2 + Math.floor(r() * 3) });
+      }
+    }
+    function sway(c) {
+      if (calm()) return 0;
+      const hf = Math.max(0.2, (T.base.y - c.y) / (T.base.y - T.top));
+      const breath = Math.sin(st.t * 0.0016 + c.phase) * 0.9 + Math.sin(st.t * 0.0041 + c.phase * 2) * 0.35;
+      const rust = st.rustle * Math.sin(st.t * 0.03 + c.phase * 3), shake = st.shake * Math.sin(st.t * 0.045 + c.phase);
+      return Math.round((breath * (1 + st.gust * 2.2) + st.lean * 3 + rust * 1.4 + shake * 2.2) * hf);
+    }
+    // Moves everything on by `dt` ms and draws.
+    function frame(dt) {
+      drawn++;
+      const C = T.C, f = dt / 83;
+      st.t += dt;
+      st.leanV += (-st.lean * 0.08 - st.leanV * 0.25) * f; st.lean += st.leanV * f;
+      st.rustle *= Math.pow(0.9, f); st.gust *= Math.pow(0.93, f); st.shake *= Math.pow(0.86, f);
+      if (dt && r() < 0.012 * f * (1 + st.gust * 6)) drop(1);
       g.x.clearRect(0, 0, w, h);
-      g.x.drawImage(base.c, 0, 0);
-      const r = Math.max(1, Math.round(s.size / 40));
-      ids.slice(0, MAX).forEach((id, i) => {
-        const m = moving.get(id), [x, y] = places[i];
-        const grown = m?.grow != null ? Math.min(1, (now - m.grow) / GROW) : 1;
-        const lift = m?.bob != null ? Math.round(Math.sin(Math.min(1, (now - m.bob) / BOB) * Math.PI) * 3) : 0;
-        fruit(g, x, y - lift, r, grown, P);
-      });
-      for (const f of flies) { const t = (now - f.t) / FLY; g.px(f.x + Math.sin(t * 6 + f.p) * 5, f.y - t * 14, t < 0.8 ? P.glow : P["leaf-hi"]); }
+      const offs = T.clusters.map(sway);
+      g.x.drawImage(T.static, 0, 0);
+      const crownDx = Math.round(offs.reduce((a, b) => a + b, 0) / offs.length);
+      T.branches.forEach((b) => limb(g, b, crownDx, C.B));
+      T.clusters.forEach((c, i) => g.x.drawImage(c.sprite, Math.round(c.x - c.ox) + offs[i], Math.round(c.y - c.oy)));
+      for (const [id, i] of slots) {
+        const s = T.spots[i], dx = offs[T.clusters.indexOf(s.cluster)], b = st.bob.get(id), gr = st.grow.get(id);
+        if (gr != null) {
+          const k = (st.t - gr) / GROW;
+          if (k < 0.45) blossom(g, C, s.x + dx, s.y, k / 0.45); else apple(g, C, s.x + dx, s.y, k < 0.7 ? 0.5 : k < 1 ? 0.9 : 1);
+          if (k >= 1) st.grow.delete(id);
+        } else apple(g, C, s.x + dx, s.y - (b != null ? Math.round(Math.sin(Math.min(1, (st.t - b) / BOB) * Math.PI) * 2) : 0), 1);
+        if (b != null && st.t - b > BOB) st.bob.delete(id);
+      }
+      // Falling leaves drift and turn, then fade out with a dither.
+      st.leaves = st.leaves.filter((l) => (l.age += f) < l.life);
+      for (const l of st.leaves) {
+        l.y += 0.32 * f; l.x += (Math.sin(l.age * 0.12 + l.ph) * 0.35 + st.lean * 0.4 + st.gust * 0.5 + l.vx) * f;
+        if (l.age / l.life > 0.75 && (Math.round(l.age) + Math.round(l.x)) % 2) continue;
+        g.px(l.x, l.y, C.L[l.col]); if (Math.sin(l.age * 0.25 + l.ph) > 0) g.px(l.x + 1, l.y, C.L[l.col]); else g.px(l.x, l.y + 1, C.L[1]);
+      }
+      st.flies = st.flies.filter((q) => st.t - q.t < FLY);
+      for (const q of st.flies) {
+        const k = (st.t - q.t) / FLY; if (k < 0) continue;
+        const x = q.x + Math.sin(k * 7 + q.p) * 4, y = q.y - k * 16;
+        if ((Math.round(st.t / 120) + q.p) % 3) { g.px(x, y, C.fly[0]); g.px(x + 1, y, C.fly[1]); }
+      }
     }
     function step() {
+      timer = 0;
+      if (!T || !live()) return;
       const now = performance.now();
-      for (const [id, m] of moving) if (now - (m.grow ?? m.bob) > (m.grow != null ? GROW : BOB)) moving.delete(id);
-      flies = flies.filter((f) => now - f.t < FLY);
-      paint(now);
-      timer = moving.size || flies.length ? setTimeout(step, FRAME) : 0;
+      frame(Math.min(FRAME * 2, now - last)); last = now;
+      timer = setTimeout(step, FRAME);
     }
-    const run = () => { if (still()) { moving.clear(); flies = []; paint(performance.now()); } else if (!timer) step(); };
-    // Nothing keeps moving behind another window or with "reduce motion" on: jump to the end.
-    document.addEventListener("visibilitychange", () => { if (document.hidden && timer) { clearTimeout(timer); timer = 0; moving.clear(); flies = []; } else if (!document.hidden && base) paint(performance.now()); });
+    const wake = () => { if (!timer && T && live()) { last = performance.now() - FRAME; step(); } };
+    // After any change: animate if it may move; with the animation off show the end state; behind
+    // other windows draw nothing (it catches up when SteamDrop comes back in front).
+    function changed() {
+      if (!T) return;
+      if (live()) return wake();
+      if (!calm()) return;
+      st.lean = st.leanV = st.rustle = st.gust = st.shake = 0; st.leaves = []; st.flies = []; st.grow.clear(); st.bob.clear();
+      frame(0);
+    }
+    const react = (fn) => { if (T && live()) { fn(); wake(); } };
+    button.addEventListener("click", () => react(() => { st.shake = 1; drop(1 + Math.floor(r() * 2)); }));
+    addEventListener("focus", wake);
+    document.addEventListener("visibilitychange", wake);
+    reduced.addEventListener("change", changed);
+    // Whole screen pixels at any size; showing the tree again (Couch mode's Library) wakes it.
+    new ResizeObserver(() => { if (host.clientWidth) { crisp(g.c, host.clientWidth); wake(); } }).observe(host);
     return {
-      /** Redraw for the current theme and games. */
       set(list) {
-        P = palette();
-        const n = Math.min(list.length, MAX);
-        s = shape(cx, h - ground - (ground ? 1 : 0), size + Math.min(n, 12) * 2);
-        base = cv(w, h);
-        if (ground) { base.rect(0, h - ground, w, ground, P.ground); base.rect(0, h - ground + 8, w, ground, P.soil); grass(base, h - ground + 1, P.moss, P.leaf, 2); }
-        if (n) drawTree(base, s, P); else sapling(base, cx, h - ground - 1, P, size / 52);
-        places = spots(s, n);
-        const now = performance.now();
-        if (known) for (const id of list) if (!known.has(id)) {
-          moving.set(id, { grow: now });
-          const i = list.indexOf(id);
-          if (places[i]) for (let k = 0; k < 6; k++) flies.push({ x: places[i][0] + (k - 3) * 3, y: places[i][1] + 4, t: now + k * 90, p: k });
+        const C = colors(), young = !list.length, key = JSON.stringify(C) + young;
+        if (key !== look) { look = key; T = build(C, w, h, young ? scale * 0.55 : scale); }
+        for (const id of slots.keys()) if (!list.includes(id)) { slots.delete(id); st.grow.delete(id); st.bob.delete(id); }
+        const free = T.spots.map((_, i) => i).filter((i) => ![...slots.values()].includes(i));
+        for (const id of list) {
+          if (slots.has(id) || !free.length) continue;
+          const i = free.shift(), s = T.spots[i];
+          slots.set(id, i);
+          if (known && !known.has(id)) {
+            st.grow.set(id, st.t);
+            for (let k = 0; k < 6; k++) st.flies.push({ x: s.x + (k - 3) * 3, y: s.y + 3, t: st.t + k * 90, p: k });
+          }
         }
         known = new Set(list);
-        ids = list;
-        run();
+        changed();
       },
-      bob(id) { if (!base || !ids.includes(id) || moving.has(id)) return; moving.set(id, { bob: performance.now() }); run(); },
+      bob(id) { if (slots.has(id) && !st.grow.has(id)) react(() => st.bob.set(id, st.t)); },
+      scroll(dy) {
+        react(() => {
+          st.leanV = Math.max(-0.5, Math.min(0.5, st.leanV + Math.sign(dy) * 0.25)); st.rustle = 1;
+          // One handful of leaves per scroll, not one per scroll event.
+          if (performance.now() - dropped > 700) { dropped = performance.now(); drop(3 + Math.floor(r() * 3)); }
+        });
+      },
+      gust() { react(() => { st.gust = 1; drop(2); }); },
+      motion(b, f) { if (b === breeze && f === front) return; breeze = b; front = f; changed(); },
+      button,
     };
   }
+
+  /** The young tree as a still picture, for "nothing planted yet". */
+  function young() {
+    const C = colors(), T = build(C, 90, 96, 0.55), g = cv(90, 96);
+    g.x.drawImage(T.static, 0, 0);
+    T.branches.forEach((b) => limb(g, b, 0, C.B));
+    T.clusters.forEach((c) => g.x.drawImage(c.sprite, Math.round(c.x - c.ox), Math.round(c.y - c.oy)));
+    g.c.className = "grove-tree"; g.c.setAttribute("aria-hidden", "true");
+    return crisp(g.c, 180);
+  }
+
+  /** Shows canvas `c` about `size` CSS pixels wide, enlarged by a whole number of screen pixels so it stays sharp. */
+  function crisp(c, size) {
+    if (size) c.dataset.size = size;
+    const k = Math.max(1, Math.round(c.dataset.size * devicePixelRatio / c.width));
+    c.style.width = `${k * c.width / devicePixelRatio}px`; c.style.height = `${k * c.height / devicePixelRatio}px`;
+    return c;
+  }
+  // Windows scaling and the interface size change the screen pixel size.
+  addEventListener("resize", () => document.querySelectorAll("canvas[data-size]").forEach((c) => crisp(c)));
 
   /** The backdrop of Couch mode: sky, woods and ground filling `canvas` at whole-pixel `scale`. */
   function backdrop(canvas, scale) {
@@ -177,6 +395,7 @@ window.Grove = (() => {
     land(g, P);
     moon(g, Math.round(g.w * 0.34), 30, 11, P);
     canvas.width = g.w; canvas.height = g.h;
+    canvas.style.width = `${g.w * scale}px`; canvas.style.height = `${g.h * scale}px`;
     canvas.getContext("2d").drawImage(g.c, 0, 0);
   }
 
@@ -270,25 +489,12 @@ window.Grove = (() => {
     LOGOS[n].forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== " ") g.px(x, y, LOGO_COLORS[ch]); }));
     return g.c;
   }
-  /** A whole scene (sky, woods, ground, and a tree with fruit unless `size` is 0) for SteamDrop's own pictures. */
-  function picture(w, h, P, { cx = w / 2, size = h * 0.56, ground = Math.round(h * 0.16), fruits = 6 } = {}) {
+  /** A whole scene (sky, woods and ground) for SteamDrop's own pictures. */
+  function picture(w, h, P, { ground = Math.round(h * 0.16) } = {}) {
     const g = cv(w, h);
     land(g, P, ground);
-    if (!size) return g.c;
-    const s = shape(Math.round(cx), h - ground + 1, size);
-    drawTree(g, s, P);
-    spots(s, fruits).forEach(([x, y]) => fruit(g, x, y, Math.max(1, Math.round(size / 40)), 1, P));
     return g.c;
   }
 
-  /** The young tree as a picture, for "nothing planted yet". */
-  function young() {
-    const g = cv(66, 58), P = palette();
-    g.rect(0, 50, 66, 8, P.ground); g.rect(0, 55, 66, 3, P.soil); grass(g, 51, P.moss, P.leaf, 2);
-    sapling(g, 33, 50, P);
-    g.c.className = "grove-tree";
-    return g.c;
-  }
-
-  return { palette, tree, backdrop, icon, picture, young };
+  return { palette, tree, backdrop, icon, picture, young, crisp, get drawn() { return drawn; } };
 })();

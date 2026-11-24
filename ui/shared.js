@@ -121,18 +121,11 @@ window.SD = (() => {
     document.startViewTransition(() => applyTheme(id));
   };
   /** The logo about `size` CSS pixels wide, enlarged by a whole number of screen pixels so it stays sharp. */
-  const fit = (c) => {
-    const k = Math.max(1, Math.round(c.dataset.size * devicePixelRatio / 32));
-    c.style.width = c.style.height = `${k * 32 / devicePixelRatio}px`;
-  };
   const logo = (size) => {
     const c = Grove.icon(32);
-    c.className = "logo"; c.setAttribute("aria-hidden", "true"); c.dataset.size = size;
-    fit(c);
-    return c;
+    c.className = "logo"; c.setAttribute("aria-hidden", "true");
+    return Grove.crisp(c, size);
   };
-  // Windows scaling and the interface size change the screen pixel size.
-  addEventListener("resize", () => document.querySelectorAll("canvas.logo").forEach(fit));
   const header = document.querySelector(".brand .logo");
   header?.replaceWith(logo(header.offsetWidth || 40));
 

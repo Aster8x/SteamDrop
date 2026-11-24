@@ -295,12 +295,13 @@ body { padding-left: 15rem; }
 .topbar nav { flex: none; flex-direction: column; margin-top: 1.2rem; }
 .tab { text-align: left; font-family: "Pixelify Sans", sans-serif; font-size: 1.25rem; border-radius: 6px; }
 .brand canvas { width: 64px; height: 64px; image-rendering: pixelated; }
-/* The tree stands at the bottom of the sidebar; it never takes clicks. */
-#tree { margin: auto -1.2rem 0; pointer-events: none; }
-.grove-tree { display: block; width: 100%; image-rendering: pixelated; }
+/* The tree stands at the bottom of the sidebar. It is a button: clicking it shakes it. Its size is set
+   in whole screen pixels by grove.js. */
+#tree { margin: auto -1.2rem 0; }
+.grove-shake { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.grove-tree { display: block; margin: 0 auto; image-rendering: pixelated; }
 .card .name, .selbar .count, .mode-label { font-family: "Pixelify Sans", sans-serif; }
 .card .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.empty .grove-tree { width: 264px; margin: 0 auto; }
 .status { border-radius: 0; }
 @media (max-width: 700px), (max-height: 520px) {
   body { padding-left: 0; }

@@ -53,6 +53,10 @@ pub struct Settings {
     /// "Couch setup" was offered once, and the settings it changed as they were before (for Undo).
     pub couch_setup_offered: bool,
     pub couch_setup_undo: Option<serde_json::Map<String, serde_json::Value>>,
+    /// "Tree animation": the gentle breeze (on) or a still tree (off).
+    pub tree_breeze: bool,
+    /// "Only animate when SteamDrop is in front".
+    pub tree_front_only: bool,
 }
 
 impl Default for Settings {
@@ -88,6 +92,8 @@ impl Default for Settings {
             keep_big_picture_except: vec![],
             couch_setup_offered: false,
             couch_setup_undo: None,
+            tree_breeze: true,
+            tree_front_only: true,
         }
     }
 }
@@ -369,6 +375,7 @@ mod tests {
         let d: Data = serde_json::from_str(r#"{"settings":{"auto_add":true}}"#).unwrap();
         assert!(d.settings.auto_add && d.settings.close_to_tray);
         assert_eq!(d.settings.theme, "dark");
+        assert!(d.settings.tree_breeze && d.settings.tree_front_only, "the tree's breeze is on, only in front");
     }
 
     /// Settings, watched folders, exclusions, baselines and games survive every way SteamDrop restarts.

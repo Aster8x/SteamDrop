@@ -121,11 +121,14 @@ canvas.logo { image-rendering: pixelated; flex: none; }
 .hints b.x { background: #3a7bd5; color: #fff; }
 
 /* ---------- Night Grove: the forest behind everything, the tree beside the Library ---------- */
-#backdrop { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; image-rendering: pixelated; }
+#backdrop { position: fixed; left: 0; top: 0; z-index: -1; image-rendering: pixelated; }
 /* --px is one forest pixel on screen (set from the window size, always a whole number). */
-#tree { position: fixed; left: 0; bottom: calc(46 * var(--px)); width: calc(170 * var(--px)); pointer-events: none; display: none; }
-.grove-tree { display: block; width: 100%; image-rendering: pixelated; }
+#tree { position: fixed; left: 0; bottom: calc(46 * var(--px)); width: calc(170 * var(--px)); display: none; }
+/* The tree is a button: clicking it (or A on it) shakes it. Its size is set in whole screen pixels by grove.js. */
+.grove-shake { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.grove-tree { display: block; margin: 0 auto; image-rendering: pixelated; }
 body.lib #tree { display: block; }
+#tree .f:focus { transform: none; }
 body.lib #screen { padding-left: calc(170 * var(--px) + 2rem); }
 .note { position: fixed; left: 2.5rem; top: 6.2rem; width: calc(170 * var(--px) - 2rem); }
 .note h1 { margin: 0; }
